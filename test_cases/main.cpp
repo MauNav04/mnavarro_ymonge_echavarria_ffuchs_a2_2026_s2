@@ -112,6 +112,7 @@ void trabajoThread(
     const std::vector<Numero>& primosConocidos,
     std::vector<Numero>& resultado)
 {
+    //Igualmente acá se busca optimizar ignorando pares.
     if (inicio % 2 == 0)
         ++inicio;
 
@@ -132,22 +133,30 @@ std::vector<Numero> procesarTandaParalela(
     const std::vector<Numero>& primosConocidos,
     unsigned int cantidadThreads)
 {
+    // Cantidad es igual a la tanda
     Numero cantidad = fin - inicio + 1;
 
+    // Se optimiza para que no haya más threads que números a procesar.
     if (cantidadThreads > cantidad)
         cantidadThreads = static_cast<unsigned int>(cantidad);
 
     if (cantidadThreads == 0)
         cantidadThreads = 1;
 
+    //creamos un vector de threads para almacenar los hilos que se van a crear.
     std::vector<std::thread> threads;
 
-    // Cada thread tiene SU PROPIO vector.
+    // Cada thread tiene SU PROPIO vector. Aquí se usa la técnica de "thread-local storage" para evitar conflictos de escritura.
     std::vector<std::vector<Numero>> resultados(cantidadThreads);
 
+    // Este cálculo es muy importante:
+    // Divide la tanda en bloques pero lo hace de manera en que la división entera no afecte a la distribución de números entre threads.
+    // Al sumar la cantidad de threads menos 1 antes de dividir, nos aseguramos de que cualquier residuo se distribuya entre los primeros threads.
+    // Esto evita que no se puedan cubrir todos los números de la tanda.
     Numero tamanoBloque =
         (cantidad + cantidadThreads - 1) / cantidadThreads;
 
+    // Crear threads y asignarles su bloque de trabajo.
     for (unsigned int t = 0; t < cantidadThreads; ++t)
     {
         Numero desde = inicio + t * tamanoBloque;
@@ -160,6 +169,9 @@ std::vector<Numero> procesarTandaParalela(
             desde + tamanoBloque - 1
         );
 
+        // Esta función crea el hilo, emplace_back construye el objeto thread, no hay que inicializarlo.
+        // std::cref() se usa para pasar la referencia constante de primosConocidos, evitando copias innecesarias.
+        // std::ref() se usa para pasar la referencia de resultados[t], permitiendo que el hilo escriba directamente en el vector correspondiente.
         threads.emplace_back(
             trabajoThread,
             desde,
@@ -169,7 +181,7 @@ std::vector<Numero> procesarTandaParalela(
         );
     }
 
-    // Esperar a todos.
+    // Esperar a todos. El hilo principal no continúna su trabajo hasta que todos los threads hayan terminado.
     for (std::thread& hilo : threads)
         hilo.join();
 
