@@ -454,6 +454,38 @@ int main(int argc, char* argv[])
     std::cout << "Tiempo paralelo:     "
               << paralelo.segundos
               << " segundos\n\n";
+    
+    // ----------------------------------
+    // Comprobar resultados
+    // ----------------------------------
 
+    if (secuencial.cantidadPrimos ==
+        paralelo.cantidadPrimos)
+    {
+        std::cout
+            << "OK: ambos algoritmos dieron "
+            << "el mismo resultado.\n";
+    }
+    else
+    {
+        std::cout
+            << "ERROR: los resultados no coinciden.\n";
+    }
+
+    // ----------------------------------
+    // Speedup
+    // ----------------------------------
+
+    if (paralelo.segundos > 0)
+    {
+        double speedup =
+            secuencial.segundos /
+            paralelo.segundos;
+
+        std::cout << "\nSpeedup: "
+                  << speedup
+                  << "x\n";
+    }
+    
     return 0;
 }
