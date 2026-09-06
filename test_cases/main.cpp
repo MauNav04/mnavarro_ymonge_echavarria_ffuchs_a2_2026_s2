@@ -3,6 +3,7 @@
 #include <vector>
 #include <chrono> // Necesario para medir tiempos
 #include <cmath>
+#include <thread>
 
 
 using Numero = uint64_t; //tipo de dato entero sin signo ocupa 8 bytes de memoria.
@@ -96,6 +97,92 @@ std::vector<Numero> procesarTandaSecuencial(
     {
         if (esPrimo(n, primosConocidos))
             encontrados.push_back(n);
+    }
+
+    return encontrados;
+}
+
+// ============================================================
+// Trabajo que realizará cada thread
+// ============================================================
+
+void trabajoThread(
+    Numero inicio,
+    Numero fin,
+    const std::vector<Numero>& primosConocidos,
+    std::vector<Numero>& resultado)
+{
+    if (inicio % 2 == 0)
+        ++inicio;
+
+    for (Numero n = inicio; n <= fin; n += 2)
+    {
+        if (esPrimo(n, primosConocidos))
+            resultado.push_back(n);
+    }
+}
+
+// ============================================================
+// Procesamiento PARALELO de una tanda
+// ============================================================
+
+std::vector<Numero> procesarTandaParalela(
+    Numero inicio,
+    Numero fin,
+    const std::vector<Numero>& primosConocidos,
+    unsigned int cantidadThreads)
+{
+    Numero cantidad = fin - inicio + 1;
+
+    if (cantidadThreads > cantidad)
+        cantidadThreads = static_cast<unsigned int>(cantidad);
+
+    if (cantidadThreads == 0)
+        cantidadThreads = 1;
+
+    std::vector<std::thread> threads;
+
+    // Cada thread tiene SU PROPIO vector.
+    std::vector<std::vector<Numero>> resultados(cantidadThreads);
+
+    Numero tamanoBloque =
+        (cantidad + cantidadThreads - 1) / cantidadThreads;
+
+    for (unsigned int t = 0; t < cantidadThreads; ++t)
+    {
+        Numero desde = inicio + t * tamanoBloque;
+
+        if (desde > fin)
+            break;
+
+        Numero hasta = std::min(
+            fin,
+            desde + tamanoBloque - 1
+        );
+
+        threads.emplace_back(
+            trabajoThread,
+            desde,
+            hasta,
+            std::cref(primosConocidos),
+            std::ref(resultados[t])
+        );
+    }
+
+    // Esperar a todos.
+    for (std::thread& hilo : threads)
+        hilo.join();
+
+    // Juntar resultados.
+    std::vector<Numero> encontrados;
+
+    for (const auto& lista : resultados)
+    {
+        encontrados.insert(
+            encontrados.end(),
+            lista.begin(),
+            lista.end()
+        );
     }
 
     return encontrados;
@@ -196,6 +283,85 @@ Resultado ejecutarSecuencial(
     };
 }
 
+// ============================================================
+// Ejecución PARALELA completa
+// ============================================================
+
+Resultado ejecutarParalelo(
+    Numero N,
+    Numero tamanoTanda,
+    unsigned int cantidadThreads)
+{
+    std::vector<Numero> primos = primosIniciales();
+
+    if (N <= 100)
+    {
+        uint64_t contador = 0;
+
+        for (Numero p : primos)
+        {
+            if (p <= N)
+                ++contador;
+        }
+
+        return {contador, 0.0};
+    }
+
+    auto inicioTiempo =
+        std::chrono::high_resolution_clock::now();
+
+    Numero inicio = 101;
+
+    while (inicio <= N)
+    {
+        Numero fin = std::min(
+            N,
+            inicio + tamanoTanda - 1
+        );
+
+        if (!tandaEsSegura(inicio, fin))
+        {
+            std::cerr
+                << "ERROR: la tanda "
+                << inicio << "-" << fin
+                << " es demasiado grande para "
+                << "los primos conocidos.\n";
+
+            exit(1);
+        }
+
+        std::vector<Numero> encontrados =
+            procesarTandaParalela(
+                inicio,
+                fin,
+                primos,
+                cantidadThreads
+            );
+
+        // Ningún thread modifica "primos".
+        // Solo el hilo principal lo modifica aquí.
+        primos.insert(
+            primos.end(),
+            encontrados.begin(),
+            encontrados.end()
+        );
+
+        inicio = fin + 1;
+    }
+
+    auto finTiempo =
+        std::chrono::high_resolution_clock::now();
+
+    double segundos =
+        std::chrono::duration<double>(
+            finTiempo - inicioTiempo
+        ).count();
+
+    return {
+        static_cast<uint64_t>(primos.size()),
+        segundos
+    };
+}
 
 // ============================================================
 // MAIN
@@ -212,11 +378,11 @@ int main(int argc, char* argv[])
     Numero N = 500;
     Numero tamanoTanda = 100;
 
-    // unsigned int threads =
-    //     std::thread::hardware_concurrency();
+    unsigned int threads =
+        std::thread::hardware_concurrency(); // Detecta la cantidad de threads lógicos disponibles en el hardware.
 
-    // if (threads == 0)
-    //     threads = 1;
+    if (threads == 0)
+        threads = 1;
 
     if (argc >= 2)
         N = std::stoull(argv[1]);
@@ -224,8 +390,8 @@ int main(int argc, char* argv[])
     if (argc >= 3)
         tamanoTanda = std::stoull(argv[2]);
 
-    // if (argc >= 4)
-    //     threads = std::stoul(argv[3]);
+    if (argc >= 4)
+        threads = std::stoul(argv[3]);
 
     std::cout << "====================================\n";
     std::cout << " Calculo de numeros primos\n";
@@ -237,12 +403,12 @@ int main(int argc, char* argv[])
     std::cout << "Tamano de tanda:    "
               << tamanoTanda << "\n";
 
-    // std::cout << "Threads utilizados: "
-    //           << threads << "\n";
+    std::cout << "Threads utilizados: "
+              << threads << "\n";
 
-    // std::cout << "Threads HW detectados: "
-    //           << std::thread::hardware_concurrency()
-    //           << "\n";
+    std::cout << "Threads HW detectados: "
+              << std::thread::hardware_concurrency()
+              << "\n";
 
     std::cout << "sqrt(N):            "
               << std::sqrt(static_cast<long double>(N))
@@ -266,6 +432,27 @@ int main(int argc, char* argv[])
 
     std::cout << "Tiempo secuencial:   "
               << secuencial.segundos
+              << " segundos\n\n";
+    
+    // ----------------------------------
+    // PARALELO
+    // ----------------------------------
+
+    std::cout << "Ejecutando paralelo...\n";
+
+    Resultado paralelo =
+        ejecutarParalelo(
+            N,
+            tamanoTanda,
+            threads
+        );
+
+    std::cout << "Primos encontrados: "
+              << paralelo.cantidadPrimos
+              << "\n";
+
+    std::cout << "Tiempo paralelo:     "
+              << paralelo.segundos
               << " segundos\n\n";
 
     return 0;
