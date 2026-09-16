@@ -1,0 +1,20 @@
+# macOS
+.DS_Store
+
+# C / C++
+*.o
+*.out
+*.exe
+
+# Compilation
+build/
+bin/
+
+# Benchmark output
+results/
+*.csv
+*.log
+
+# Generated graphs
+*.png
+*.pdf
