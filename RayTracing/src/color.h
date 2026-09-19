@@ -7,6 +7,7 @@
 
 using color = vec3;
 
+// Escribe el color de un pixel en la salida estándar, escalando los valores de [0,1] a [0,255].
 void write_color(std::ostream& out, const color& pixel_color) {
     auto r = pixel_color.x();
     auto g = pixel_color.y();

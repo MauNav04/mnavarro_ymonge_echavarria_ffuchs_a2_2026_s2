@@ -4,3 +4,4 @@ project(RayTracing)
 set(CMAKE_CXX_STANDARD 17)
 
 add_executable(inOneWeekend main.cpp)
+target_include_directories(inOneWeekend PRIVATE src)
