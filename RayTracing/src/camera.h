@@ -1,3 +1,12 @@
+/**
+ * ============================================================================
+ * Referencia: Ray Tracing in One Weekend (v4.0)
+ * Autores: Peter Shirley, Trevor David Black, Steve Hollasch
+ * Enlace: https://raytracing.github.io/books/RayTracingInOneWeekend.html
+ * Licencia original: CC0 1.0 Universal (Dominio Público)
+ * ============================================================================
+ */
+
 #ifndef CAMERA_H
 #define CAMERA_H
 

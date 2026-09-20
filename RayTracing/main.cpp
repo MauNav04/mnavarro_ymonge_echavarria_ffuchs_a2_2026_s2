@@ -1,3 +1,12 @@
+/**
+ * ============================================================================
+ * Referencia: Ray Tracing in One Weekend (v4.0)
+ * Autores: Peter Shirley, Trevor David Black, Steve Hollasch
+ * Enlace: https://raytracing.github.io/books/RayTracingInOneWeekend.html
+ * Licencia original: CC0 1.0 Universal (Dominio Público)
+ * ============================================================================
+ */
+
 #include "src/rtweekend.h"
 #include "src/hittable.h"
 #include "src/hittable_list.h"
