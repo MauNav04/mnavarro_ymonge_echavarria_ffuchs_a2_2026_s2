@@ -3,11 +3,15 @@
 
 #include "rtweekend.h"
 
+class material;
+
+
 // Clase que representa el registro de un impacto de un rayo con un objeto.
 class hit_record {
     public:
     point3 p;
     vec3 normal;
+    shared_ptr<material> mat;
     double t;
     bool front_face;
 
