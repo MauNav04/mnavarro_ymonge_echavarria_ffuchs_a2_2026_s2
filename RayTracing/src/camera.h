@@ -12,6 +12,7 @@
 
 #include "hittable.h"
 #include "material.h"
+#include <chrono>
 
 // Clase que representa una cámara en un espacio 3D.
 class camera {
@@ -34,14 +35,24 @@ class camera {
     void render(const hittable& world) {
         initialize();
 
+        std::clog << "\n======================================================\n";
+        std::clog << "  EJECUCIÓN SISTEMA BASE (SECUENCIAL - SIN HILOS)    \n";
+        std::clog << "======================================================\n";
+        std::clog << "Resolución:        " << image_width << " x " << image_height << " píxeles\n";
+        std::clog << "Muestras / píxel:  " << samples_per_pixel << "\n";
+        std::clog << "Máx. profundidad:  " << max_depth << "\n";
+        std::clog << "------------------------------------------------------\n";
+
+        auto start_time = std::chrono::high_resolution_clock::now();
+
         std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
 
         // =====================================================================
-        // [PUNTO 1 DE PARALELIZACIÓN - Descomposición  / CMP / Coarse-Grained]
+        // [PUNTO 1 DE PARALELIZACIÓN - Descomposición 1D / CMP / Coarse-Grained]
         // Bucle exterior por filas (scanlines): Cada hilo procesa un bloque de filas
         // =====================================================================
         for (int j = 0; j < image_height; j++) {
-            std::clog << "\rScanlines remaining: " << (image_height - j) << ' ' << std::flush;
+            std::clog << "\rProgreso: " << (100 * j / image_height) << "% (Filas restantes: " << (image_height - j) << ")   " << std::flush;
 
             // =================================================================
             // [PUNTO 2 DE PARALELIZACIÓN - Descomposición 2D por Mosaicos / Tiles]
@@ -70,7 +81,13 @@ class camera {
             }
         }
 
-        std::clog << "\rDone.                 \n";
+        auto end_time = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed = end_time - start_time;
+
+        std::clog << "\rProgreso: 100% completado.                                  \n";
+        std::clog << "------------------------------------------------------\n";
+        std::clog << "Tiempo total de ejecución (secuencial): " << elapsed.count() << " segundos.\n";
+        std::clog << "======================================================\n\n";
     }
 
   private:

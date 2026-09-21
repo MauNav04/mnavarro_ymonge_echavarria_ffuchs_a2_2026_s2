@@ -16,7 +16,7 @@
 
 
 
-int main() {
+int main(int argc, char* argv[]) {
     hittable_list world;
 
     auto ground_material = make_shared<lambertian>(color(0.5, 0.5, 0.5));
@@ -63,9 +63,9 @@ int main() {
 
     cam.aspect_ratio      = 16.0 / 9.0;
     // [Variables clave del problema que escalan el cómputo e influyen en el speedup]:
-    cam.image_width       = 1200; // Resolución total W x H (cantidad de tareas independientes)
-    cam.samples_per_pixel = 10;   // Granularidad de cómputo por píxel
-    cam.max_depth         = 50;   // Cadena de rebotes (variabilidad de carga entre hilos)
+    cam.image_width       = (argc > 1) ? std::atoi(argv[1]) : 1200; // Resolución total W x H (default: 1200 px)
+    cam.samples_per_pixel = (argc > 2) ? std::atoi(argv[2]) : 10;   // Granularidad de cómputo por píxel (default: 10)
+    cam.max_depth         = (argc > 3) ? std::atoi(argv[3]) : 50;   // Cadena de rebotes (default: 50)
 
     cam.vfov     = 20;
     cam.lookfrom = point3(13,2,3);
