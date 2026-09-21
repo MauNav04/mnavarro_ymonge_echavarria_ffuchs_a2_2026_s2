@@ -17,9 +17,10 @@
 class camera {
   public:
     double aspect_ratio = 1.0;  // Ratio of image width over height
-    int    image_width  = 100;  // Rendered image width in pixel count
-    int    samples_per_pixel = 10;  // Number of samples per pixel for anti-aliasing
-    int    max_depth         = 10;  // Maximum number of ray bounces into scene
+    // --- VARIABLES CLAVE PARA PARALELIZACIÓN (Avance 2) ---
+    int    image_width  = 100;  // [Variable 1]: Espacio total de tareas independientes (Resolución W x H)
+    int    samples_per_pixel = 10;  // [Variable 2]: Granularidad de cómputo por píxel (Rayos/Anti-aliasing)
+    int    max_depth         = 10;  // [Variable 3]: Desbalance de carga estocástico (Límite de rebotes)
 
     double vfov = 90.0; // Field of view in degrees
     point3 lookfrom = point3(0,0,0);   // Point camera is looking from
@@ -35,14 +36,36 @@ class camera {
 
         std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
 
+        // =====================================================================
+        // [PUNTO 1 DE PARALELIZACIÓN - Descomposición  / CMP / Coarse-Grained]
+        // Bucle exterior por filas (scanlines): Cada hilo procesa un bloque de filas
+        // =====================================================================
         for (int j = 0; j < image_height; j++) {
             std::clog << "\rScanlines remaining: " << (image_height - j) << ' ' << std::flush;
+
+            // =================================================================
+            // [PUNTO 2 DE PARALELIZACIÓN - Descomposición 2D por Mosaicos / Tiles]
+            // Combinación de j e i para dividir la imagen en bloques 2D (ej. 16x16)
+            // distribuidos dinámicamente con una cola de tareas (Work Queue).
+            // =================================================================
             for (int i = 0; i < image_width; i++) {
                 color pixel_color(0,0,0);
+
+                // =============================================================
+                // [PUNTO 3 DE PARALELIZACIÓN - Fine-Grained Multithreading]
+                // Bucle de muestras por píxel: Cada rayo es independiente.
+                // Permite simulación de quantums.
+                // =============================================================
                 for (int sample = 0; sample < samples_per_pixel; sample++) {
                     ray r = get_ray(i, j);
                     pixel_color += ray_color(r, max_depth, world);
                 }
+
+                // =============================================================
+                // [CUELLO DE BOTELLA SECUENCIAL A RESOLVER]
+                // Escritura directa a std::cout (condición de carrera en I/O con hilos).
+                // En multihilo se reemplaza por un Framebuffer en RAM:
+                // =============================================================
                 write_color(std::cout, pixel_samples_scale * pixel_color);
             }
         }
