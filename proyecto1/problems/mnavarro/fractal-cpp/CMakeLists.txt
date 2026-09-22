@@ -1,0 +1,22 @@
+cmake_minimum_required(VERSION 3.16)
+project(FractalCodec LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+# Se agrega una librearía estática (.a) que contiene la implementación del codec
+# Aquí es una biblioteca por que la idea es que toda la codificacio de la compresión de imagenes con fractales se obtenga de acá.
+# Definirlo como una librería genera al final el archivo libfractal_codec.a que se puede linkear con cualquier proyecto que lo necesite.
+add_library(fractal_codec STATIC src/codec.cpp)
+target_include_directories(fractal_codec PUBLIC include)
+option(BUILD_APP "Compilar el controlador con OpenCV" ON)
+if(BUILD_APP)
+    find_package(OpenCV 4 REQUIRED COMPONENTS core imgcodecs)
+    add_executable(fractal app/main.cpp app/file_io.cpp)
+    target_include_directories(fractal PRIVATE ${OpenCV_INCLUDE_DIRS})
+    target_link_libraries(fractal PRIVATE fractal_codec ${OpenCV_LIBS})
+endif()
+enable_testing()
+add_executable(codec_tests tests/test_codec.cpp app/file_io.cpp)
+target_include_directories(codec_tests PRIVATE app)
+target_link_libraries(codec_tests PRIVATE fractal_codec)
+add_test(NAME codec_tests COMMAND codec_tests)
