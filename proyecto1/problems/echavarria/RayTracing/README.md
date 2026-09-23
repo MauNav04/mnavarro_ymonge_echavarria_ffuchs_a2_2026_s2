@@ -5,15 +5,15 @@
 
 ---
 
-## esumen de Navegación Rpara Demostración 2.Esta guía orienta al profesor y evaluadores para localizar de forma inmediata cada uno de los requerimientos solicitados para la **Demostración 2 (Semana 8)**:
+## Resumen de Navegación para la Demostración 2.
+
+ Esta guía busca orientar al profesor para localizar de forma inmediata cada uno de los requerimientos solicitados para la **Demostración 2 (Semana 8)**:
 
 | # | Requerimiento de la Evaluación | Ubicación en el Repositorio | Descripción Breve |
 |---|---|---|---|
 | **1** | **Identificación en código** de variables y puntos de paralelización | [`src/camera.h`](src/camera.h) y [`main.cpp`](main.cpp) | Comentarios inline marcando variables críticas, bucles paralelizables y cuello de botella. |
 | **2** | **Diagrama Arquitectónico Preliminar** (Secuencial vs. Paralelo) | [`docs/Secuencial_vs_paralelo.png`](docs/Secuencial_vs_paralelo.png) | Esquema visual del cambio más significativo: desacoplamiento de `std::cout` y uso de `Framebuffer` en RAM. |
 | **3** | **2 Propuestas de Diseño comparadas por criterios** | [`docs/Propuestas.md`](docs/Propuestas.md) | Descomposición 1D (Filas) vs. 2D (Mosaicos / Tiles) evaluadas bajo Balance de Carga, Caché L1/L2 y Sincronización.  |
-|
-
 ---
 
 ## 1. Identificación de Variables y Puntos de Paralelización en Código
@@ -72,20 +72,13 @@ O para una ejecución de prueba rápida (ej. 200 × 112 píxeles, 5 muestras, 20
 ./build/inOneWeekend 200 5 20 > imagen_base.ppm
 ```
 
-### Salida esperada en Terminal (para captura de métricas):
-```text
-======================================================
-  EJECUCIÓN SISTEMA BASE (SECUENCIAL - SIN HILOS)    
-======================================================
-Resolución:        200 x 112 píxeles
-Muestras / píxel:  5
-Máx. profundidad:  20
-------------------------------------------------------
-Progreso: 100% completado.                                  
-------------------------------------------------------
-Tiempo total de ejecución (secuencial): 4.68618 segundos.
-======================================================
-```
+### Ejecución y Output
+Al ejecutar la versión actual del problema, se obtiene la siguiente salida en terminal
+![alt text](images/image.png)
+
+Esta ejecución nos da como resultado el siguiente render:
+![alt text](images/Output.png)
+
 *La imagen generada se almacena en formato estándar `imagen_base.ppm`.*
 
 ---
