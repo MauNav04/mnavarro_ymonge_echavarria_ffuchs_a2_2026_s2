@@ -21,7 +21,6 @@ inOneWeekend
 *.app
 
 # Archivos de salida de render (imágenes generadas)
-*.ppm
 
 # Archivos del sistema y editor
 .vscode/
