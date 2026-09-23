@@ -27,3 +27,7 @@ inOneWeekend
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Permitir imágenes de documentación y diagramas
+!images/*.png
+!docs/*.png
