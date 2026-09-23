@@ -72,20 +72,13 @@ O para una ejecución de prueba rápida (ej. 200 × 112 píxeles, 5 muestras, 20
 ./build/inOneWeekend 200 5 20 > imagen_base.ppm
 ```
 
-### Salida esperada en Terminal (para captura de métricas):
-```text
-======================================================
-  EJECUCIÓN SISTEMA BASE (SECUENCIAL - SIN HILOS)    
-======================================================
-Resolución:        200 x 112 píxeles
-Muestras / píxel:  5
-Máx. profundidad:  20
-------------------------------------------------------
-Progreso: 100% completado.                                  
-------------------------------------------------------
-Tiempo total de ejecución (secuencial): 4.68618 segundos.
-======================================================
-```
+### Ejecución y Output:
+Al ejecutar la versión actual del problema, se obtiene la siguiente salida en terminal
+![alt text](images/image.png)
+
+Esta ejecución nos da como resultado el siguiente render:
+![alt text](images/Output.png)
+
 *La imagen generada se almacena en formato estándar `imagen_base.ppm`.*
 
 ---
