@@ -1,10 +1,10 @@
-#include "grid.hpp"  // Incluye la declaración de la clase Grid que vamos a implementar.
+#include "grid.hpp"
 
-#include <algorithm>  // Proporciona std::fill para asignar un valor a todas las celdas.
-#include <cassert>    // Proporciona assert para verificar índices durante desarrollo.
-#include <stdexcept>  // Proporciona std::invalid_argument para reportar dimensiones inválidas.
+#include <algorithm>
+#include <cassert>
+#include <stdexcept>
 
-namespace heat2d {  // Todas las implementaciones pertenecen al namespace del proyecto Heat2D.
+namespace heat2d {
 
 /**
  * @brief Construye una malla rectangular y asigna una temperatura inicial.
@@ -18,16 +18,14 @@ Grid::Grid(
     std::size_t cols,
     double initialTemperature
 )
-    : rows_(rows),                                  // Guarda la cantidad de filas recibida.
-      cols_(cols),                                  // Guarda la cantidad de columnas recibida.
-      data_(rows * cols, initialTemperature) {      // Crea todas las celdas con la temperatura inicial.
+    : rows_(rows),
+      cols_(cols),
+      data_(rows * cols, initialTemperature) {
 
-    if (rows == 0 || cols == 0) {                   // Comprueba que ninguna dimensión sea cero.
-
-        throw std::invalid_argument(                // Lanza una excepción indicando el error.
+    if (rows == 0 || cols == 0) {
+        throw std::invalid_argument(
             "Grid dimensions must be greater than zero."
         );
-
     }
 }
 
@@ -41,8 +39,7 @@ double& Grid::operator()(
     std::size_t row,
     std::size_t col
 ) {
-
-    return data_[index(row, col)];  // Devuelve la celda correspondiente permitiendo modificarla.
+    return data_[index(row, col)];
 }
 
 /**
@@ -54,44 +51,35 @@ const double& Grid::operator()(
     std::size_t row,
     std::size_t col
 ) const {
-
-    return data_[index(row, col)];  // Devuelve la celda sin permitir modificar su valor.
+    return data_[index(row, col)];
 }
 
 /**
  * @brief Obtiene la cantidad de filas almacenadas.
  */
 std::size_t Grid::rows() const {
-
-    return rows_;  // Retorna el número de filas de la malla.
+    return rows_;
 }
 
 /**
  * @brief Obtiene la cantidad de columnas almacenadas.
  */
 std::size_t Grid::cols() const {
-
-    return cols_;  // Retorna el número de columnas de la malla.
+    return cols_;
 }
 
 /**
  * @brief Calcula la cantidad total de celdas de la superficie.
  */
 std::size_t Grid::size() const {
-
-    return data_.size();  // Retorna la cantidad de elementos almacenados en el vector.
+    return data_.size();
 }
 
 /**
  * @brief Asigna una misma temperatura a todas las celdas de la malla.
  */
 void Grid::fill(double temperature) {
-
-    std::fill(                   // Utiliza el algoritmo estándar para recorrer todo el vector.
-        data_.begin(),           // Indica el inicio del rango que debe modificarse.
-        data_.end(),             // Indica el final del rango que debe modificarse.
-        temperature              // Especifica el nuevo valor que recibirá cada celda.
-    );
+    std::fill(data_.begin(), data_.end(), temperature);
 }
 
 /**
@@ -104,12 +92,10 @@ std::size_t Grid::index(
     std::size_t row,
     std::size_t col
 ) const {
+    assert(row < rows_);
+    assert(col < cols_);
 
-    assert(row < rows_);          // Verifica durante desarrollo que la fila exista.
-
-    assert(col < cols_);          // Verifica durante desarrollo que la columna exista.
-
-    return row * cols_ + col;     // Convierte (fila, columna) en un índice lineal.
+    return row * cols_ + col;
 }
 
 }  // namespace heat2d
