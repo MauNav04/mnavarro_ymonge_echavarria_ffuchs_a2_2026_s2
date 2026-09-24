@@ -14,8 +14,8 @@
 
 ---
 
-> **Aviso de Congelamiento de Código (Code Freeze / Entrega):**  
-> Esta rama (`demostracion2/avance2`) dejará de ser editada antes de la **1:00 p.m. del jueves 24 de septiembre de 2026** para garantizar la integridad y estabilidad de los entregables a evaluar en la Demostración 2.
+> **Aviso de Congelamiento de Código (Entrega):**  
+> Esta rama (`demostracion2/avance2`) dejará de ser editada antes de la **1:00 p.m. del jueves 24 de septiembre de 2026** para garantizar la integridad de los entregables a evaluar en la Demostración 2.
 
 ---
 
