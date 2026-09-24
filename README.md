@@ -34,10 +34,10 @@ Cada problema seleccionado cuenta con su propio módulo independiente, código f
 
 | Problema | Responsable | Espacio / Documentación |
 | :--- | :--- | :--- |
-| **Ray Tracing** | Emanuel Chavarría Hernández | [`RayTracing/README.md`](proyecto1/problems/echavarria/RayTracing/README.md) |
-| **Fractales C++** | Mauricio Navarro Obando | [`fractal-cpp/README.md`](proyecto1/problems/mnavarro/fractal-cpp/README.md) |
-| **Heat 2D** | Yonathan Monge Sanabria | [`heat2d/README.md`](proyecto1/problems/heat2d/README.md) |
-| **Gray-Scott** | Fernando Fuchs Mora | [`gray-scott/README.md`](proyecto1/problems/gray-scott/README.md) |
+| **Ray Tracing** | Emanuel Chavarría Hernández | [`RayTracing/`](proyecto1/problems/echavarria/RayTracing/) |
+| **Fractales C++** | Mauricio Navarro Obando | [`fractal-cpp/`](proyecto1/problems/mnavarro/fractal-cpp/) |
+| **Heat 2D** | Yonathan Monge Sanabria | [`heat2d/`](proyecto1/problems/heat2d/) |
+| **Gray-Scott** | Fernando Fuchs Mora | [`gray-scott/`](proyecto1/problems/gray-scott/) |
 
 ---
 
