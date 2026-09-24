@@ -16,7 +16,6 @@ results/
 *.log
 
 # Generated graphs
-*.png
 *.pdf
 
 # Gray-Scott compilation output
