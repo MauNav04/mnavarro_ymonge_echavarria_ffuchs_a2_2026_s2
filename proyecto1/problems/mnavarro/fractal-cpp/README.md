@@ -13,13 +13,9 @@ Este proyecto implementa un compresor fractal de imágenes en C++17. La versión
 
 | # | Requerimiento de evaluación tomado de la referencia | Ubicación | Alcance de esta entrega |
 |---|---|---|---|
-| 1 | Identificación de variables y puntos de paralelización | Sección 1 de esta guía; `src/codec.cpp` y `src/color.cpp` | Se identifican funciones, bucles y datos. Se incluyen comentarios sugeridos para insertar en el código. |
-| 2 | Diagrama arquitectónico preliminar secuencial frente a paralelo | Sección 2 de esta guía | Diagramas Mermaid integrados, sin depender de imágenes externas. |
+| 1 | Identificación de variables y puntos de paralelización | Sección 1 de esta guía; [src/codec.cpp](src/codec.cpp) y [src/color.cpp](src/color.cpp) | Se identifican funciones, bucles y datos. Se incluyen comentarios sugeridos para insertar en el código. |
+| 2 | Diagrama arquitectónico preliminar secuencial frente a paralelo | [Sección 2](#2-diagrama-arquitectónico-preliminar) de esta guía | Diagramas Mermaid integrados, sin depender de imágenes externas. |
 | 3 | Dos propuestas comparadas por criterios | [docs/Propuestas.md](docs/Propuestas.md) | Asignación estática de ranges frente a asignación dinámica de grupos de ranges. |
-
-**Estado:** el sistema base es secuencial. La ejecución satisfactoria de la versión RGB fue reportada durante el desarrollo; todavía no se presentan mediciones de aceleración paralela. Las propuestas y los diagramas paralelos son diseños preliminares, no funcionalidades ya implementadas.
-
-**Alcance documental:** los requisitos anteriores se tomaron de los archivos de referencia. Esta entrega no modifica el código ni acredita que ya existan marcas de paralelización dentro de él. Para completar ese requisito, deben incorporarse los comentarios de la sección 1.C y comprobarse contra la versión del repositorio que se entregue.
 
 ---
 
@@ -52,11 +48,20 @@ Ejemplo de conteo, no de rendimiento medido: para 128×128, B=8 y S=8, existen 2
 ### B. Bucles paralelizables y cuello de botella esperado
 
 1. **Canales:** el recorrido de `planes` en `encode(const MultiImage&, Config)`, dentro de `src/color.cpp`, procesa R, G y B independientemente. Es un punto sencillo de paralelización, pero usar solo este nivel limita el número de tareas a tres.
-2. **Ranges:** los bucles `ry` y `rx` de `encode(const Image&, Config)`, dentro de `src/codec.cpp`, calculan reglas independientes. Este es el nivel principal propuesto: proporciona muchas tareas y evita reducir resultados parciales entre hilos.
-3. **Dominios y simetrías:** los bucles sobre `domains` y `sym` también admiten descomposición, pero exigen combinar mínimos locales para elegir una sola regla. Se pospone este nivel para reducir sincronización y evitar paralelismo anidado.
+2. **Rangos:** los bucles `ry` y `rx` de `encode(const Image&, Config)`, dentro de `src/codec.cpp`, calculan reglas independientes. Este es el nivel principal propuesto. Además, los ranges se distribuirán entre equipos de hilos, permitiendo procesar varios bloques simultáneamente. La cantidad de equipos será configurable para comparar distintas distribuciones del trabajo.
+3. **Dominios y simetrías:** los bucles sobre `domains` y `sym` también admiten descomposición. Dentro de cada equipo, los hilos se repartirán los dominios candidatos de un mismo range y evaluarán sus respectivas simetrías. Cada hilo conservará su mejor candidato y, al finalizar, se combinarán los mínimos locales para seleccionar una única regla. Así, cada range seguirá evaluándose contra todos los dominios, aunque la búsqueda esté distribuida.
 4. **Decodificación:** dentro de una iteración, los ranges pueden calcularse en paralelo leyendo `current` y escribiendo regiones disjuntas de `next`. Las iteraciones consecutivas dependen entre sí y requieren una barrera antes de intercambiar los buffers.
 
 El **cuello de botella esperado** es la búsqueda exhaustiva del codificador: reducción precalculada, transformación, ajuste y evaluación de candidatos. La transformación crea temporales repetidamente, lo que también puede afectar el rendimiento. Esta hipótesis debe verificarse con mediciones; no se atribuye el cuello de botella a la consola ni se reporta un perfil de ejecución inexistente.
+
+### Ejemplo de distribución rangos / dominios esperada
+| Equipo | Rangos asignados | Primer hilo | Segundo hilo |
+|---|---|---|---|
+| 0 | 0–19 | Dominios 0–99 | Dominios 100–199 |
+| 1 | 20–39 | Dominios 0–99 | Dominios 100–199 |
+| 2 | 40–59 | Dominios 0–99 | Dominios 100–199 |
+| 3 | 60–79 | Dominios 0–99 | Dominios 100–199 |
+| 4 | 80–99 | Dominios 0–99 | Dominios 100–199 |
 
 ---
 
@@ -84,22 +89,25 @@ flowchart TD
 ```mermaid
 flowchart TD
     A["Canal actual y dominios de solo lectura"] --> B["Dimensionar vector de reglas"]
-    B --> C["Repartir ranges entre trabajadores"]
-    C --> D["Trabajador 0: búsqueda y mínimo privados"]
-    C --> E["Trabajador 1: búsqueda y mínimo privados"]
-    C --> F["Trabajador restante: búsqueda y mínimo privados"]
-    D --> G["Escribir rules en índices exclusivos"]
-    E --> G
-    F --> G
-    G --> H["Barrera o join"]
-    H --> I{"¿Quedan canales?"}
-    I -->|Sí| A
-    I -->|No| J["Guardar FRC2 desde el controlador"]
+    B --> C["Repartir ranges entre equipos de hilos"]
+    C --> D["Equipo 0: Divide en dos dominios (Hilos). Y realiza búsqueda y mínimo privados"]
+    C --> E["Equipo 1: Divide en dos dominios (Hilos). Y realiza búsqueda y mínimo privados"]
+    C --> F["Equipo 2: Divide en dos dominios (Hilos). Y realiza búsqueda y mínimo privados"]
+    D --> G["Define mínimo global del equipo"]
+    E --> H["Define mínimo global del equipo"]
+    F --> I["Define mínimo global del equipo"]
+    G --> J["Escribir rules en índices exclusivos"]
+    H --> J
+    I --> J
+    J --> K["Barrera o join"]
+    K --> L{"¿Quedan canales?"}
+    L -->|Sí| A
+    L -->|No| M["Guardar FRC2 desde el controlador"]
 ```
 
 El cambio principal es reemplazar el crecimiento secuencial de `rules` por un vector dimensionado antes del trabajo paralelo. `reserve` por sí solo no basta para escribir por índice: debe establecerse el tamaño mediante `resize`.
 
-El formato y el orden de las reglas se conservan. La serialización ocurre después de reunir a los trabajadores. Los dos mecanismos de reparto se detallan en [Propuestas.md](docs/Propuestas.md).
+El formato y el orden de las reglas se conservan. La serialización ocurre después de reunir a los equipos. Los dos mecanismos de reparto se detallan en [Propuestas.md](docs/Propuestas.md).
 
 ---
 
@@ -146,7 +154,7 @@ RGB usa `FRC2`; gris conserva `FRC1`. El decodificador nuevo reconoce ambos form
 
 El programa informa canales, reglas por canal, bytes del archivo y relación contra píxeles sin comprimir. Mide codificación o decodificación sin E/S y tiempo total con E/S. La comparación contra píxeles no equivale a una comparación contra el tamaño del PNG/JPEG de entrada.
 
-No se adjuntan capturas ni tiempos inventados. Para la demostración deben conservarse la salida real de terminal, la imagen original, el archivo `.frc`, la reconstrucción y las métricas del comando `compare`.
+Se pueden ver benchmarks en [docs/images](docs/images) además de un ejemplo de la imagen original y la imagen descomprimida por el algoritmo.
 
 ### Restricciones actuales
 

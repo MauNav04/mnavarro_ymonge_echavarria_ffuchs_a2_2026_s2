@@ -12,7 +12,7 @@ La paralelización se concentrará en esta búsqueda. Se consideran dos formas d
 
 **Descripción:** los ranges se enumeran por filas y se reparten en grupos contiguos de tamaño similar. Cada hilo conoce desde el inicio los bloques que debe procesar y realiza la búsqueda completa para cada uno. Los canales se procesan en orden R, G y B, aplicando el reparto dentro de cada canal.
 
-**Sincronización:** no requiere bloqueos ni un contador compartido para repartir tareas durante la búsqueda. Al terminar cada canal, se espera a todos los hilos antes de continuar. La escritura del archivo se realiza después de completar la codificación.
+**Sincronización:** se quiere poder probar los casos en los que la paralelización no se dé solamente en los ranges sino también en los dominios. Por ejemplo si se dispone de 10 hilos se quiere hacer 5 ranges y el dominio se divide en 2 para usar los 10 hilos en un momento determinado y ver si eso mejora la eficiencia. Para este caso concreto si se necesita sincronización ya que considerando un "equipo" de 2 hilos para cada range, si uno de los hilos termina debe esperar al otro, para luego poder definir cual de los dos obtuvo el menor error y crear la regla respectiva.
 
 **Escritura en memoria:** el vector de reglas se dimensiona con `resize` antes de iniciar los hilos. Cada hilo escribe en los índices correspondientes a sus ranges. La imagen y los dominios se comparten para lectura; el mejor candidato y los cálculos temporales son privados de cada hilo.
 
@@ -82,7 +82,7 @@ En la asignación estática, el reparto queda definido antes de la búsqueda. En
 |---|---|---|
 | **Balance de carga** | Adecuado para el trabajo aproximadamente uniforme de la búsqueda actual. | Puede compensar diferencias de duración entre tareas. |
 | **Localidad de caché L1/L2** | Los ranges consecutivos favorecen accesos cercanos al leer sus píxeles y escribir reglas. | Conserva localidad dentro de cada grupo, pero puede cambiar de región al solicitar otro. |
-| **Sincronización** | Coordinación al inicio y al final del canal. | Añade una operación atómica por cada grupo asignado. |
+| **Sincronización** | Coordinación al inicio y al final del canal. También en medio durante la el cálculo de mínimos si el dominio se divide en grupos. | Añade una operación atómica por cada grupo asignado. |
 | **Memoria compartida** | Imagen y dominios de solo lectura; resultados en posiciones exclusivas. | Mismo esquema, más el contador de grupos. |
 | **Complejidad** | Reparto sencillo y fácil de seguir durante la depuración. | Requiere gestionar la asignación y elegir el tamaño de los grupos. |
 
