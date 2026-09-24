@@ -15,8 +15,8 @@ Esta guía permite localizar rápidamente los elementos solicitados para la **De
 | **1** | **Ejecución del sistema base sin hilos** | [`src/main.cpp`](src/main.cpp), [`src/models/sequential.cpp`](src/models/sequential.cpp) y [`src/core/heat2d.cpp`](src/core/heat2d.cpp) | Implementación secuencial completa del método explícito de diferencias finitas para difusión de calor 2D. |
 | **2** | **Identificación de variables importantes para aumentar la paralelización** | [`include/config.hpp`](include/config.hpp), [`src/core/heat2d.cpp`](src/core/heat2d.cpp) y [`src/models/sequential.cpp`](src/models/sequential.cpp) | Se identifican tamaño de malla, cantidad de pasos temporales, número de celdas interiores, granularidad del trabajo y número de hilos como variables críticas. |
 | **3** | **Identificación de los puntos de paralelización** | [`src/core/heat2d.cpp`](src/core/heat2d.cpp) | Los bucles sobre las filas y columnas interiores pueden distribuirse entre múltiples trabajadores porque cada celda lee de `current` y escribe en una posición independiente de `next`. |
-| **4** | **Diagramas preliminares de las soluciones** | Sección [4](#4-diagramas-preliminares-de-solución) | Se muestra la transición del sistema secuencial hacia una solución paralela mediante división por filas y mediante bloques 2D. |
-| **5** | **Dos propuestas de diseño comparadas** | Sección [5](#5-dos-propuestas-preliminares-de-diseño) | Se comparan descomposición estática por filas y descomposición 2D mediante tiles según balance, caché, sincronización, granularidad y complejidad. |
+| **4** | **Diagramas preliminares de las soluciones** | Sección 4 | Se muestra la transición del sistema secuencial hacia una solución paralela mediante división por filas y mediante bloques 2D. |
+| **5** | **Dos propuestas de diseño comparadas** | Sección 5 | Se comparan descomposición estática por filas y descomposición 2D mediante tiles según balance, caché, sincronización, granularidad y complejidad. |
 | **6** | **Validación del sistema secuencial** | [`tests/stress_sequential.cpp`](tests/stress_sequential.cpp) | Prueba de estrés que verifica estabilidad, fronteras, simetría, disipación térmica y error contra la solución analítica. |
 
 ---
@@ -25,15 +25,11 @@ Esta guía permite localizar rápidamente los elementos solicitados para la **De
 
 El problema seleccionado consiste en simular la **difusión de calor sobre una superficie bidimensional**.
 
-La superficie se representa mediante una malla rectangular donde cada posición almacena una temperatura:
-
-$$
-T[i][j]
-$$
+La superficie se representa mediante una malla rectangular donde cada posición almacena una temperatura $T[i][j]$.
 
 La evolución de la temperatura está descrita por la ecuación del calor bidimensional:
 
-$$
+```math
 \frac{\partial T}{\partial t}
 =
 \alpha
@@ -42,7 +38,7 @@ $$
 +
 \frac{\partial^2 T}{\partial y^2}
 \right)
-$$
+```
 
 donde:
 
@@ -55,7 +51,7 @@ Para resolver numéricamente la ecuación se utiliza un esquema explícito de **
 
 Para cada celda interior de la superficie:
 
-$$
+```math
 T_{i,j}^{n+1}
 =
 T_{i,j}^{n}
@@ -82,7 +78,7 @@ T_{i-1,j}^{n}
 \Delta y^2
 }
 \right]
-$$
+```
 
 Cada celda interior depende exclusivamente de su temperatura actual y de sus cuatro vecinos:
 
@@ -148,23 +144,17 @@ heat2d/
 
 Representan la superficie bidimensional.
 
-La matriz lógica:
-
-$$
-T[i][j]
-$$
-
-se almacena físicamente mediante un único `std::vector<double>` contiguo.
+La matriz lógica $T[i][j]$ se almacena físicamente mediante un único `std::vector<double>` contiguo.
 
 La transformación de una coordenada bidimensional hacia memoria lineal es:
 
-$$
+```math
 index(i,j)
 =
 i \cdot N_{columnas}
 +
 j
-$$
+```
 
 Esta representación favorece:
 
@@ -181,7 +171,7 @@ Inicializan la distribución térmica del sistema.
 
 La condición inicial utilizada es:
 
-$$
+```math
 T(x,y,0)
 =
 T_{\max}
@@ -193,23 +183,25 @@ T_{\max}
 \left(
 \frac{\pi y}{L_y}
 \right)
-$$
+```
 
 Para una superficie de $1\,m \times 1\,m$ y una temperatura máxima de $100^\circ C$:
 
-$$
+```math
 T(0.5,0.5,0)
 =
 100^\circ C
-$$
+```
 
 También se implementan condiciones de frontera de **Dirichlet**, manteniendo los cuatro bordes a una temperatura fija.
 
 Actualmente:
 
-$$
-T_{borde}=0^\circ C
-$$
+```math
+T_{borde}
+=
+0^\circ C
+```
 
 ---
 
@@ -235,11 +227,11 @@ next
 
 Es decir:
 
-$$
+```math
 T^n
 \longrightarrow
 T^{n+1}
-$$
+```
 
 También contiene la verificación de estabilidad numérica.
 
@@ -253,13 +245,9 @@ El flujo general es:
 
 ```text
 diffusionStep()
-
       ↓
-
 std::swap(current, next)
-
       ↓
-
 siguiente paso temporal
 ```
 
@@ -271,37 +259,37 @@ Este procedimiento se repite durante todos los pasos temporales solicitados.
 
 Contiene los principales parámetros físicos y numéricos:
 
-- `rows`;
-- `cols`;
-- `lengthX`;
-- `lengthY`;
-- `alpha`;
-- `dt`;
-- `totalTime`;
-- `maxTemperature`;
-- `boundaryTemperature`.
+- `rows`
+- `cols`
+- `lengthX`
+- `lengthY`
+- `alpha`
+- `dt`
+- `totalTime`
+- `maxTemperature`
+- `boundaryTemperature`
 
 También calcula:
 
-$$
+```math
 \Delta x
 =
 \frac{L_x}{N_x-1}
-$$
+```
 
-$$
+```math
 \Delta y
 =
 \frac{L_y}{N_y-1}
-$$
+```
 
 y la cantidad de pasos temporales:
 
-$$
+```math
 N_{steps}
 \approx
 \frac{t_{total}}{\Delta t}
-$$
+```
 
 ---
 
@@ -332,23 +320,16 @@ Contiene las pruebas robustas utilizadas para verificar que la implementación s
 flowchart TD
     A[SimulationConfig] --> B[Crear Grid current]
     A --> C[Crear Grid next]
-
     B --> D[Inicialización sinusoidal]
-
     D --> E[Aplicar fronteras de Dirichlet]
-
     E --> F{¿Quedan pasos temporales?}
-
-    F -->|Sí| G[diffusionStep current → next]
-
-    G --> H[std::swap current / next]
-
+    F -->|Sí| G[diffusionStep current a next]
+    G --> H[std::swap current y next]
     H --> F
-
     F -->|No| I[Resultado final]
 ```
 
-El sistema utiliza **double buffering**.
+El sistema utiliza **double buffering**:
 
 ```text
 Paso n:
@@ -357,7 +338,7 @@ current ── lectura ──► diffusionStep() ── escritura ──► next
 
                                                      │
                                                      ▼
-                                               std::swap()
+                                                std::swap()
 
 Paso n+1:
 
@@ -374,21 +355,17 @@ También evita realizar una copia completa de la matriz después de cada iteraci
 
 ## 3.1 Variables Críticas del Problema
 
-Las variables más importantes para determinar la cantidad de trabajo y el potencial de paralelización son las siguientes.
-
----
-
 ### `rows` y `cols`
 
 Determinan la resolución de la superficie.
 
 La cantidad de celdas interiores calculadas en cada paso temporal es:
 
-$$
+```math
 N_{interior}
 =
 (rows-2)(cols-2)
-$$
+```
 
 Por ejemplo:
 
@@ -415,27 +392,25 @@ Mientras mayor sea la malla, mayor será la cantidad de operaciones independient
 
 Representa la cantidad de iteraciones temporales de la simulación:
 
-$$
+```math
 steps
 \approx
 \frac{totalTime}{dt}
-$$
+```
 
 La cantidad total aproximada de actualizaciones de celda es:
 
-$$
+```math
 W
 =
-(rows-2)
-(cols-2)
-(steps)
-$$
+(rows-2)(cols-2)(steps)
+```
 
 donde $W$ representa aproximadamente el trabajo computacional total.
 
-Por ejemplo, para una malla de $801\times801$ y $1000$ pasos:
+Por ejemplo, para una malla de $801 \times 801$ y $1000$ pasos:
 
-$$
+```math
 W
 =
 799
@@ -443,27 +418,29 @@ W
 799
 \cdot
 1000
-$$
+```
 
-$$
+```math
 W
 =
 638\,401\,000
-$$
+```
 
-Por lo tanto se realizan aproximadamente:
+Por lo tanto, se realizan aproximadamente:
 
-$$
-\boxed{638.4\text{ millones de actualizaciones}}
-$$
+```math
+\boxed{
+638.4\text{ millones de actualizaciones}
+}
+```
 
 Los pasos temporales **no pueden paralelizarse directamente entre sí**, porque:
 
-$$
+```math
 T^{n+1}
 \text{ depende de }
 T^n
-$$
+```
 
 Sin embargo, las celdas pertenecientes al mismo paso temporal sí pueden calcularse de manera concurrente.
 
@@ -498,31 +475,17 @@ Esta variable permitirá estudiar:
 
 Determinará la cantidad de trabajo asignada a cada unidad de ejecución.
 
-Bloques grandes:
-
-```text
-████████████████████████
-```
-
-implican:
+Los bloques grandes implican:
 
 - menor overhead;
 - menos decisiones del scheduler;
 - granularidad gruesa.
 
-Bloques pequeños:
-
-```text
-██ ██ ██ ██ ██ ██ ██ ██
-```
-
-implican:
+Los bloques pequeños implican:
 
 - mayor cantidad de unidades de trabajo;
 - mayor frecuencia de planificación;
 - granularidad fina.
-
-Por lo tanto:
 
 > El tamaño del bloque permitirá controlar experimentalmente la granularidad de la ejecución.
 
@@ -534,7 +497,7 @@ Estas variables no aumentan directamente el paralelismo, pero modifican la canti
 
 La estabilidad numérica requiere:
 
-$$
+```math
 \alpha \Delta t
 \left(
 \frac{1}{\Delta x^2}
@@ -543,43 +506,43 @@ $$
 \right)
 \leq
 \frac{1}{2}
-$$
+```
 
 Si:
 
-$$
+```math
 \Delta x
 =
 \Delta y
 =
 h
-$$
+```
 
 entonces:
 
-$$
+```math
 \frac{\alpha\Delta t}{h^2}
 \leq
 \frac{1}{4}
-$$
+```
 
 Al aumentar la resolución espacial:
 
-$$
+```math
 \Delta x \downarrow
-$$
+```
 
 y:
 
-$$
+```math
 \Delta y \downarrow
-$$
+```
 
 por lo que normalmente debe disminuir también:
 
-$$
-\Delta t
-$$
+```math
+\Delta t \downarrow
+```
 
 Esto puede provocar un aumento en la cantidad de pasos temporales y, por consecuencia, aumentar considerablemente el trabajo computacional.
 
@@ -646,17 +609,7 @@ Thread 2 ──────────┼──► BARRIER ──► SWAP ─�
 Thread 3 ──────────┘
 ```
 
-Matemáticamente:
-
-$$
-T^{n+1}
-$$
-
-debe estar completamente calculado antes de utilizarlo para obtener:
-
-$$
-T^{n+2}
-$$
+Matemáticamente, $T^{n+1}$ debe estar completamente calculado antes de utilizarlo para obtener $T^{n+2}$.
 
 ---
 
@@ -666,23 +619,14 @@ $$
 
 ```mermaid
 flowchart LR
-
     A[current]
-
     A --> B[Procesar fila 1]
-
     B --> C[Procesar fila 2]
-
     C --> D[Procesar fila 3]
-
     D --> E[...]
-
     E --> F[Procesar última fila interior]
-
     F --> G[next]
-
     G --> H[swap]
-
     H --> A
 ```
 
@@ -694,27 +638,19 @@ Actualmente un único flujo de ejecución procesa secuencialmente todas las fila
 
 ```mermaid
 flowchart TD
-
     A[current]
 
-    A --> B1[Thread 0<br/>Filas 1..k]
-
-    A --> B2[Thread 1<br/>Filas k+1..2k]
-
-    A --> B3[Thread 2<br/>Filas 2k+1..3k]
-
-    A --> B4[Thread N<br/>Filas restantes]
+    A --> B1[Thread 0: filas 1 hasta k]
+    A --> B2[Thread 1: filas k+1 hasta 2k]
+    A --> B3[Thread 2: filas 2k+1 hasta 3k]
+    A --> B4[Thread N: filas restantes]
 
     B1 --> C[Barrier]
-
     B2 --> C
-
     B3 --> C
-
     B4 --> C
 
     C --> D[Swap current / next]
-
     D --> E[Siguiente timestep]
 ```
 
@@ -749,7 +685,7 @@ Esta estrategia aprovecha que las filas consecutivas también ocupan regiones co
 
 ## 4.3 Arquitectura Paralela Preliminar — División mediante Tiles
 
-La superficie también puede dividirse en pequeños bloques bidimensionales.
+La superficie también puede dividirse en pequeños bloques bidimensionales:
 
 ```text
 ┌────────────┬────────────┬────────────┐
@@ -765,12 +701,9 @@ Posteriormente:
 
 ```text
                  Tiles disponibles
-
                         │
                         ▼
-
                  Scheduler / Cola
-
                         │
           ┌─────────────┼─────────────┐
           ▼             ▼             ▼
@@ -812,11 +745,11 @@ Por ejemplo, utilizando cuatro hilos:
 
 Cada hilo recibe aproximadamente:
 
-$$
+```math
 N_{filas/thread}
 \approx
 \frac{rows-2}{threadCount}
-$$
+```
 
 filas interiores.
 
@@ -845,9 +778,9 @@ La superficie se divide en pequeños bloques bidimensionales.
 
 Por ejemplo:
 
-$$
-16\times16
-$$
+```math
+16 \times 16
+```
 
 celdas por bloque.
 
@@ -891,8 +824,6 @@ Cada bloque constituye una unidad independiente de trabajo.
 ---
 
 ## 5.4 Uso Preliminar de Cada Propuesta
-
-No se propone utilizar necesariamente una única estrategia para todos los modelos de ejecución.
 
 La distribución preliminar sería:
 
@@ -1011,9 +942,7 @@ Una decisión importante del diseño consiste en mantener separada la ecuación 
 
 La ecuación matemática debe permanecer idéntica.
 
-Lo único que cambia entre experimentos es:
-
-> **cómo se distribuye y ejecuta el trabajo computacional.**
+> **Lo único que cambia entre experimentos es cómo se distribuye y ejecuta el trabajo computacional.**
 
 Esto permitirá realizar comparaciones experimentales más justas.
 
@@ -1083,8 +1012,6 @@ Además del sistema base, se desarrolló:
 
 Esta prueba ejecuta una configuración considerablemente más pesada.
 
----
-
 ## 8.1 Configuración de Stress Test
 
 ```text
@@ -1099,43 +1026,43 @@ Pasos temporales:    1000
 
 La cantidad de celdas interiores es:
 
-$$
+```math
 N_{interior}
 =
 (801-2)^2
-$$
+```
 
-$$
+```math
 N_{interior}
 =
 799^2
-$$
+```
 
-$$
+```math
 \boxed{
 N_{interior}
 =
 638\,401
 }
-$$
+```
 
 Por lo tanto, la cantidad aproximada total de actualizaciones es:
 
-$$
+```math
 N_{updates}
 =
 638\,401
 \cdot
 1000
-$$
+```
 
-$$
+```math
 \boxed{
 N_{updates}
 =
 638\,401\,000
 }
-$$
+```
 
 ---
 
@@ -1163,7 +1090,7 @@ La condición inicial utilizada posee una solución analítica conocida.
 
 La solución exacta para una superficie rectangular es:
 
-$$
+```math
 T(x,y,t)
 =
 T_{\max}
@@ -1183,17 +1110,17 @@ e^{
 \frac{1}{L_y^2}
 \right)t
 }
-$$
+```
 
 Para:
 
-$$
+```math
 L_x=L_y=1
-$$
+```
 
 se reduce a:
 
-$$
+```math
 \boxed{
 T(x,y,t)
 =
@@ -1202,7 +1129,7 @@ T_{\max}
 \sin(\pi y)
 e^{-2\pi^2\alpha t}
 }
-$$
+```
 
 Esto permite comparar directamente la solución numérica con una solución matemática exacta.
 
@@ -1212,7 +1139,7 @@ Esto permite comparar directamente la solución numérica con una solución mate
 
 Se utiliza el error cuadrático medio:
 
-$$
+```math
 L_{2,RMS}
 =
 \sqrt{
@@ -1224,7 +1151,7 @@ T_k^{num}
 T_k^{exact}
 \right)^2
 }
-$$
+```
 
 Este valor permite estimar el error global de toda la superficie.
 
@@ -1234,7 +1161,7 @@ Este valor permite estimar el error global de toda la superficie.
 
 También se calcula:
 
-$$
+```math
 L_\infty
 =
 \max_k
@@ -1243,7 +1170,7 @@ T_k^{num}
 -
 T_k^{exact}
 \right|
-$$
+```
 
 Este valor indica el peor error encontrado entre todas las celdas.
 
@@ -1299,7 +1226,7 @@ La condición inicial es simétrica.
 
 Por lo tanto, debe mantenerse aproximadamente:
 
-$$
+```math
 T(i,j)
 =
 T
@@ -1307,7 +1234,7 @@ T
 N-1-i,
 M-1-j
 \right)
-$$
+```
 
 durante la simulación.
 
@@ -1325,34 +1252,34 @@ Esta comprobación ayuda a detectar:
 
 Se utiliza como indicador discreto la suma:
 
-$$
+```math
 E_n
 =
 \sum_{i,j}
 T_{i,j}^{n}
-$$
+```
 
 Como los bordes permanecen a:
 
-$$
+```math
 T=0
-$$
+```
 
 y existe temperatura positiva en el interior, el calor abandona gradualmente el dominio.
 
-Por lo tanto se espera:
+Por lo tanto, se espera:
 
-$$
+```math
 E_{n+1}
 <
 E_n
-$$
+```
 
 durante cada iteración.
 
 El stress test comprueba:
 
-$$
+```math
 E_0
 >
 E_1
@@ -1362,7 +1289,7 @@ E_2
 \cdots
 >
 E_N
-$$
+```
 
 Esto permite detectar generación artificial de temperatura dentro de la simulación.
 
@@ -1389,23 +1316,17 @@ Las principales variables experimentales previstas son:
 
 La versión secuencial servirá como referencia.
 
-Sea:
-
-$$
-T_1
-$$
-
-el tiempo de ejecución secuencial.
+Sea $T_1$ el tiempo de ejecución secuencial.
 
 Para $p$ trabajadores, el speedup será:
 
-$$
+```math
 \boxed{
 S(p)
 =
 \frac{T_1}{T_p}
 }
-$$
+```
 
 donde:
 
@@ -1414,13 +1335,13 @@ donde:
 
 La eficiencia paralela será:
 
-$$
+```math
 \boxed{
 E(p)
 =
 \frac{S(p)}{p}
 }
-$$
+```
 
 También se analizarán:
 
@@ -1502,25 +1423,25 @@ Para la **Demostración 2**, actualmente se cuenta con:
 
 El objetivo de las siguientes etapas será mantener:
 
-$$
+```math
 \text{Problema físico}
 +
 \text{Condiciones iniciales}
 +
 \text{Método numérico}
-$$
+```
 
 constantes, modificando únicamente:
 
-$$
+```math
 \boxed{
 \text{Modelo de ejecución}
 }
-$$
+```
 
 De esta manera será posible realizar una comparación experimental entre:
 
-$$
+```math
 \text{Sequential}
 \rightarrow
 \text{Fine-Grained}
@@ -1530,6 +1451,6 @@ $$
 \text{CMP}
 \rightarrow
 \text{SMT}
-$$
+```
 
 manteniendo el mismo problema computacional como referencia.
