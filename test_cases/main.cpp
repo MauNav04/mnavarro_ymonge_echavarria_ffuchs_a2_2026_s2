@@ -285,7 +285,7 @@ int main(int argc, char* argv[]) {
 
     std::cout << "\n";
     std::cout << "==============================================================================\n";
-    std::cout << "     CE 4302 - FRAMEWORK EXPERIMENTAL DE MODELOS MULTITHREADING (DEMO 2)      \n";
+    std::cout << "     CE 4302 - FRAMEWORK DE MODELOS MULTITHREADING (DEMO 2)      \n";
     std::cout << "==============================================================================\n";
     std::cout << "Parámetros de Prueba:\n";
     std::cout << "  - Límite N:                 " << N << "\n";
@@ -325,7 +325,7 @@ int main(int argc, char* argv[]) {
 
     std::cout << "\n";
     std::cout << "==============================================================================\n";
-    std::cout << "                       TABLA CONSOLIDADA DE RESULTADOS                        \n";
+    std::cout << "                       TABLA DE RESULTADOS                        \n";
     std::cout << "==============================================================================\n";
     std::cout << std::left 
               << std::setw(34) << "Modelo de Ejecución"
