@@ -1,120 +1,148 @@
-# Compresor fractal en C++17 — primera versión didáctica
+# Compresor fractal RGB — C++17 y OpenCV
 
-## Arquitectura
+Esta versión extiende el proyecto gris con tres búsquedas independientes, una
+por canal R, G y B. Continúa siendo secuencial: sirve como base para medir y
+paralelizar posteriormente. El núcleo de cada canal es el algoritmo original.
 
-La biblioteca `fractal_codec` no abre archivos ni imprime mensajes. Recibe una
-imagen en memoria y devuelve reglas; reconstruye una imagen a partir de reglas.
-El controlador utiliza OpenCV para cargar/guardar imágenes y file_io para FRC.
-La conversión cv::Mat -> fractal::Image permite probar la matemática sin OpenCV.
+## Compilar
 
-| Archivo | Responsabilidad |
-|---|---|
-| include/fractal/codec.hpp | Contrato público: Image, Config, Rule, Encoded |
-| src/codec.cpp | Reducción, simetrías, ajuste, búsqueda, decodificación, MSE |
-| app/file_io.hpp y .cpp | Serialización binaria FRC1 |
-| app/main.cpp | Argumentos, OpenCV, tiempos y coordinación |
-| tests/test_codec.cpp | Constante, gradiente, convergencia, serialización y errores |
-| examples/ | Imagen sintética gris y resultado de referencia |
-
-C++ y C son lenguajes distintos: este proyecto usa .cpp, g++ y C++17. Si el curso
-exige C puro, es necesario modificar esta elección y la integración de OpenCV.
-
-## 1. Dependencias (Ubuntu, Linux Mint o Ubuntu dentro de WSL)
+Ubuntu, Linux Mint o Ubuntu en WSL:
 
 ```bash
 sudo apt update
 sudo apt install build-essential cmake libopencv-dev
-```
-
-## 2. Compilar, desde esta carpeta
-
-```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_APP=ON
 cmake --build build -j2
 ctest --test-dir build --output-on-failure
 ```
 
-CMake crea libfractal_codec.a, el programa fractal y codec_tests dentro de build.
+Descomprime esta versión en una carpeta nueva y ejecuta desde ella. No copies un
+build anterior: sus rutas de CMake apuntan a la carpeta de origen. El -j2 de la
+compilación no paraleliza el algoritmo del compresor.
 
-## 3. Primera prueba completa
+## Primera prueba RGB
 
 ```bash
-./build/fractal compress examples/gris.pgm prueba.frc 8 8
-./build/fractal decompress prueba.frc reconstruida.png 80
-./build/fractal compare examples/gris.pgm reconstruida.png
+./build/fractal compress examples/color.png prueba_color.frc 8 8
+./build/fractal decompress prueba_color.frc reconstruida_color.png 80
+./build/fractal compare examples/color.png reconstruida_color.png
 ```
 
-No hace falta la imagen original para ejecutar decompress. `compare` sí la usa.
-La imagen PGM incluida es un mapa de píxeles gris de 64x64, generado para esta prueba.
-Puedes cambiarla por un PNG; imread lo convierte a gris de 8 bits. Empieza con
-64x64 o 128x128. Los lados deben ser múltiplos del range y al menos 2*range.
-Se rechazan dimensiones incompatibles; no se recorta ni agrega relleno.
+Para tu propia imagen, cópiala a examples y sustituye el nombre completo:
 
-Argumentos opcionales de compress: lado del range (8 por defecto) y stride del
-dominio (8 por defecto). El dominio siempre tiene lado 2*range. Si cambias range,
-el stride no cambia automáticamente. Cada regla corresponde a un range en orden
-por filas. Los dominios comienzan en múltiplos del stride mientras quepan completos.
-
-## 4. Orden para estudiar y extender
-
-1. Leer codec.hpp: define los datos compartidos por todos los componentes.
-2. Leer reduce y transform en codec.cpp: promedio 2x2 y ocho simetrías.
-3. Leer encode: targets, dominios, ajuste de contraste/brillo y mínimo error.
-4. Leer decode: imagen inicial 0.5, dos buffers y aplicación repetida de reglas.
-5. Leer file_io.cpp: el disco guarda campos individuales, nunca memoria de structs.
-6. Leer main.cpp: el controlador conecta archivos y biblioteca.
-
-Ejemplo conceptual de las llamadas:
-
-```cpp
-fractal::Config cfg{8, 8};
-fractal::Encoded rules = fractal::encode(image, cfg);
-fractal::Image recovered = fractal::decode(rules, 80);
+```bash
+./build/fractal compress examples/foreman128.png foreman_color.frc 8 8
+./build/fractal decompress foreman_color.frc foreman_color.png 80
+./build/fractal compare examples/foreman128.png foreman_color.png
 ```
 
-## Matemática y límites
+foreman128.png no viene incluido. Usa una fuente realmente a color: si el
+original es gris, trabajar con tres canales no inventa colores.
 
-Promedio de cada grupo 2x2 para reducir el dominio. Simetrías 0..3: rotaciones
-horarias de 0,90,180,270 grados. Simetrías 4..7: reflexión izquierda-derecha seguida
-de esas rotaciones. Ajuste por mínimos cuadrados r ≈ s*d+b. Se restringe s a
-[-0.9,0.9] y se recalcula b; dominios constantes usan s=0. Selección por SSE antes
-del recorte; al decodificar se recorta a [0,1]. Iteraciones en float; parada por
-número fijo (40 por defecto), no por tolerancia. La imagen reconstruida es con pérdida.
+Argumentos: compress entrada salida [range=8] [stride=8]. Dominio=2*range.
+Decompress: entrada salida [iteraciones=40]. El 80 aplica 80 iteraciones a cada
+canal. Los tres planos reconstruidos se reúnen al guardar la imagen. No se
+necesita el original para descomprimir. Compare calcula MSE y PSNR por canal,
+y global (PSNR calculado desde MSE global, no promedio de los PSNR individuales).
 
-Versión secuencial con búsqueda exhaustiva. Precalcula dominios reducidos, pero
-calcula simetrías dentro de la búsqueda por claridad. No incluye color, GPU,
-paralelismo, quadtree ni cuantización compacta. El límite de 4096 por lado es de
-validación, no una promesa de rendimiento: imágenes grandes pueden tardar mucho
-y consumir mucha memoria, especialmente con stride pequeño.
+## Cómo se implementó
 
-## Formato FRC1
+1. app/image_io.cpp carga IMREAD_COLOR. OpenCV devuelve BGR y lo convertimos
+   explícitamente a tres matrices en orden RGB con intensidades entre 0 y 1.
+2. MultiImage contiene una colección de Image (uno o tres planos).
+3. encode(MultiImage) llama a encode(Image) por cada plano. Se busca dominio,
+   simetría, contraste y brillo independientemente para cada canal y range.
+4. MultiEncoded contiene una colección de Encoded con todas esas reglas.
+5. color_io escribe RGB en FRC2 y gris en el formato previo FRC1.
+6. decode(MultiEncoded) reconstruye cada plano desde gris uniforme 0.5 usando
+   dos buffers por plano. image_io reordena RGB a BGR al entregar datos a OpenCV.
 
-Todos los enteros son uint32 little-endian, salvo symmetry (uint8).
-Parámetros float: IEEE754 binary32, bits little-endian.
-Cabecera de 20 bytes: magic ASCII FRC1, ancho, alto, range, cantidad de reglas.
-Cada regla de 17 bytes: x, y, symmetry, contrast, brightness.
-Dominio=2*range y reducción por promedio fijados por FRC1. La posición del range
-se deduce del índice. No se necesita stride para decodificar.
-Para range 8: 64 bytes de píxeles gris por regla de 17 bytes, más cabecera.
-No necesariamente ocupa menos que PNG/JPEG. Los archivos de salida se sobrescriben;
-usa rutas nuevas y distintas de la entrada (también evita alias a la misma ruta).
+| Archivo | Papel |
+|---|---|
+| include/fractal/codec.hpp, src/codec.cpp | Núcleo original para un canal, sin E/S |
+| include/fractal/color.hpp, src/color.cpp | Coordinación de los canales en memoria |
+| app/file_io.hpp y .cpp | Lectura/escritura FRC1 (gris) |
+| app/color_io.hpp y .cpp | Lectura FRC1/FRC2 y escritura multicanal |
+| app/image_io.hpp y .cpp | Adaptación OpenCV ↔ matrices propias |
+| app/main.cpp | Argumentos, llamadas, tamaños, tiempos y métricas |
+| tests/test_codec.cpp | Regresión del núcleo gris |
+| tests/test_color.cpp | RGB, independencia de canales, FRC2, FRC1 y errores |
+| tests/test_image_io.cpp | Orden de canales RGB/BGR y PNG con OpenCV |
 
-## Validación realizada al preparar este proyecto
+La biblioteca sigue sin conocer rutas de archivos ni imprimir en consola.
+CMake incorpora src/color.cpp en fractal_codec y los adaptadores en el ejecutable.
+Los tiempos de codificación/decodificación excluyen E/S; también se informa el
+tiempo total. Compilar con Release importa para una comparación de rendimiento.
 
-Se compiló la biblioteca, la serialización y las pruebas con g++ C++17 usando
--Wall -Wextra -Wpedantic. Todas las pruebas incluidas pasaron. También se ejecutó
-el ciclo completo del núcleo con examples/gris.pgm (64x64), guardando y leyendo
-examples/gris.frc y reconstruyendo examples/reconstruida.pgm con 80 iteraciones.
-MSE normalizado antes de convertir a 8 bits: 0.000120174; PSNR: 39.2019 dB.
-El archivo FRC mide 1108 bytes frente a 4096 bytes de intensidades originales.
-El comando compare trabaja sobre imágenes de 8 bits y puede dar una cifra distinta
-por redondeo. Estos resultados corresponden a una imagen sintética, no a una
-comparación general frente a otros compresores.
+## Comparación controlada gris vs. RGB
 
-El entorno de preparación no disponía de cabeceras/bibliotecas C++ de OpenCV ni
-CMake y su instalación no fue posible. Por eso main.cpp y el proceso CMake deben
-verificarse en tu equipo con las dependencias indicadas. No se afirma haberlos
-compilado aquí. Para comprobar solo el núcleo sin OpenCV (con CMake instalado):
+```bash
+./build/fractal compress-gray examples/color.png gris_nuevo.frc 8 8
+./build/fractal decompress gris_nuevo.frc gris_nuevo.png 80
+./build/fractal compare-gray examples/color.png gris_nuevo.png
+```
+
+compress ahora significa RGB; compress-gray reproduce el modo gris. El nuevo
+decodificador detecta automáticamente FRC1 y FRC2. El ejecutable anterior no
+puede leer FRC2. La extensión de ambos sigue siendo .frc.
+
+Para igual tamaño, range y stride, RGB evalúa tres veces tantos candidatos como
+un solo canal: costo O(3*N_ranges*N_domains*8*range²). No garantiza exactamente
+triple tiempo de reloj; mide con igual compilación y parámetros. El bucle por
+canales y los ranges son oportunidades de paralelización. No se comparte una
+búsqueda geométrica de luminancia entre canales en esta versión.
+
+## Formato binario y tamaños
+
+FRC1: cabecera 20 bytes y 17 bytes por regla, un canal.
+FRC2: magic ASCII FRC2, width, height, range, channels=3, rules_per_channel.
+Cabecera total de 24 bytes. Campos numéricos de cabecera uint32 little-endian.
+Luego todas las reglas R, después G, después B; dentro de cada canal, ranges
+por filas. Cada regla: x uint32, y uint32, symmetry uint8, contrast float32,
+brightness float32. Son 17 bytes, con enteros y bits IEEE754 little-endian.
+
+Para 128x128 y range=8 hay 256 ranges por canal:
+- RGB original de 8 bits por canal: 128*128*3 = 49152 bytes de píxeles.
+- FRC2: 24 + 256*3*17 = 13080 bytes.
+- Relación contra píxeles sin comprimir: aproximadamente 3.76:1.
+
+El tamaño no depende del stride porque solo se guarda la mejor regla por range
+por canal. No se promete mejorar el tamaño de un PNG o JPEG ya comprimido.
+
+## Alcance
+
+Escala de grises o RGB, 8 bits por canal al cargar/guardar; no conserva alfa,
+metadatos ni precisión original de 16 bits. Los lados deben ser múltiplos del
+range y al menos 2*range. Range 2..64; dimensiones <=4096. No agrega relleno.
+El límite máximo no garantiza tiempos prácticos: comienza con 128x128.
+La salida existente puede sobrescribirse: usa nombres nuevos.
+
+Dominio reducido con promedio 2x2, ocho simetrías, ajuste r ≈ s*d+b por mínimos
+cuadrados y s en [-0.9,0.9]. Decodificación con recorte [0,1] y número fijo de
+iteraciones. Es un método con pérdida; puede producir bordes de bloques y errores
+de color. Una mayor cantidad de iteraciones no recupera detalles que las reglas
+no representan. La búsqueda exhaustiva en esta base es deliberadamente sencilla.
+
+## Validación real de esta entrega
+
+Se compilaron con g++ C++17, -O2 -Wall -Wextra -Wpedantic el núcleo gris, RGB,
+serializadores y sus pruebas. Pasaron ambas suites. Se verificaron canales
+constantes distintos, gradientes, convergencia, equivalencia con búsquedas
+monocanal, round-trip FRC2, lectura FRC1 y rechazo de entradas inválidas.
+
+También se ejecutó codificación, guardado, lectura y reconstrucción RGB de una
+imagen sintética 64x64. examples/color.png y color_reconstruida.png muestran el
+original y resultado; examples/color.frc es el código correspondiente (3288 bytes).
+MSE antes del redondeo a 8 bits: 0.000174575; PSNR: 37.5802 dB, con 80 iteraciones.
+Los PNG de referencia se exportaron desde PPM con Pillow; no se usó OpenCV aquí.
+Compare mide después del redondeo y puede reportar otra cifra.
+
+Este entorno no dispone de CMake ni de las dependencias C++ de OpenCV. Por ello
+el ejecutable completo, la configuración CMake y test_image_io todavía deben
+compilarse/ejecutarse en tu equipo. La prueba de canales del núcleo pasó; la
+prueba específica de conversión OpenCV está incluida pero no ejecutada aquí.
+
+Para construir solamente el núcleo con CMake y sin OpenCV:
 
 ```bash
 cmake -S . -B build-core -DBUILD_APP=OFF
@@ -122,9 +150,6 @@ cmake --build build-core
 ctest --test-dir build-core --output-on-failure
 ```
 
-## Referencias
-
-- Explicación del método: https://janosmeny.com/blog/fractal-compression/index.html
-- Lectura/escritura OpenCV: https://docs.opencv.org/4.x/d4/da8/group__imgcodecs.html
-
-Esta implementación es propia y didáctica, inspirada en el procedimiento explicado.
+Referencias:
+- https://janosmeny.com/blog/fractal-compression/index.html
+- https://docs.opencv.org/4.x/d4/da8/group__imgcodecs.html
