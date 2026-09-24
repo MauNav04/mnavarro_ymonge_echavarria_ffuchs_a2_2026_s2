@@ -1,5 +1,5 @@
 # CE 4302 — Arquitectura de Computadores II
-## Proyecto Grupal 1: Framework Experimental de Modelos de Ejecución Multithreading
+## Proyecto Grupal 1
 ### Rama de Evaluación: `demostracion2/avance2`
 
 **Instituto Tecnológico de Costa Rica (TEC)**  
