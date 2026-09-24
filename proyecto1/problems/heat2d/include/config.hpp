@@ -2,6 +2,8 @@
 
 #include <cstddef>  // Proporciona std::size_t para tamaños de malla y cantidad de pasos.
 
+#include <cmath>  // Proporciona std::llround para convertir correctamente la cantidad calculada de pasos.
+
 namespace heat2d {  // Agrupa la configuración dentro del namespace del proyecto Heat2D.
 
 /**
@@ -60,8 +62,8 @@ struct SimulationConfig {
      * @return Número de iteraciones temporales de la simulación.
      */
     std::size_t steps() const {
-
-        return static_cast<std::size_t>(totalTime / dt);  // Convierte el tiempo total en una cantidad entera de pasos temporales.
+        const double calculatedSteps = totalTime / dt;  // Calcula la cantidad de pasos como un valor de punto flotante.
+        return static_cast<std::size_t>(std::llround(calculatedSteps));  // Redondea y convierte a entero sin signo.
     }
 };
 

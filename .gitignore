@@ -18,3 +18,5 @@ results/
 # Generated graphs
 *.png
 *.pdf
+
+heat2d_stress_test
