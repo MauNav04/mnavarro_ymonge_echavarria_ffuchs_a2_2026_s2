@@ -20,3 +20,4 @@ results/
 *.pdf
 
 heat2d_stress_test
+heatd2d_sequential
