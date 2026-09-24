@@ -1,3 +1,9 @@
+/**
+ * ============================================================================
+ * Modelo: Reacción-Difusión Gray-Scott (Esquema FTCS - Stencil de 5 puntos)
+ * ============================================================================
+ */
+
 #include "gray_scott_core.hpp"
 
 #include <algorithm>
@@ -24,18 +30,44 @@ void init_simulation(Grid2D& grid) {
     }
 }
 
+// --- VARIABLES CRÍTICAS PARA PARALELIZACIÓN  ---
+// [Variable 1]: 'width' y 'height' -> Espacio total de tareas discretas (Grilla N x M)
+// [Variable 2]: 'total_steps'      -> Cadena de dependencias temporales estrictas (t -> t+1)
+// [Variable 3]: 'Du', 'Dv', 'dt'   -> Coeficientes de difusión y paso temporal (Estabilidad num.)
+
 void step_simulation_sequential(const Grid2D& current, Grid2D& next, const GrayScottParams& params) {
+    // --- VARIABLES CLAVE DE DOMINIO (Avance 2) ---
+    // [Variable 1]: Espacio bidimensional continuo (w x h celdas independientes)
     int w = current.width;
     int h = current.height;
 
-    // Se omiten los bordes externos para simplificar las condiciones de frontera.
+    // =========================================================================
+    // [PUNTO 1 DE PARALELIZACIÓN - Descomposición 1D / CMP / SMT / Coarse-Grained]
+    // Bucle exterior por filas (y):
+    // - Cada hilo toma un bloque contiguo de filas: [start_y, end_y).
+    // - Máxima localidad espacial en Caché L1/L2 al iterar en orden Row-Major.
+    // - Mínimo falso compartimiento (False Sharing) entre líneas de caché.
+    // =========================================================================
     for (int y = 1; y < h - 1; ++y) {
+
+        // =====================================================================
+        // [PUNTO 2 DE PARALELIZACIÓN - Descomposición 2D / Mosaicos / Fine-Grained]
+        // Bucle interior por columnas (x):
+        // - Permite dividir la matriz en bloques 2D (ej. baldosas de 16x16 o 32x32).
+        // - Base para esquemas de grano fino o colas dinámicas de trabajo.
+        // =====================================================================
         for (int x = 1; x < w - 1; ++x) {
             size_t idx = current.index(x, y);
 
+            // =================================================================
+            // [LECTURA COMPARTIDA - LIBRE DE CONDICIONES DE CARRERA]
+            // Todos los hilos leen concurrentemente del búfer 'current'.
+            // Al ser de solo lectura durante el paso (t), no requiere cerrojos (locks).
+            // =================================================================
             float u_center = current.u[idx];
             float v_center = current.v[idx];
 
+            // Cálculo del Laplaciano mediante Stencil de 5 puntos (vecinos inmediatos)
             float lap_u = current.u[current.index(x + 1, y)] +
                           current.u[current.index(x - 1, y)] +
                           current.u[current.index(x, y + 1)] +
@@ -48,11 +80,18 @@ void step_simulation_sequential(const Grid2D& current, Grid2D& next, const GrayS
                           current.v[current.index(x, y - 1)] -
                           4.0f * v_center;
 
+            // Reacción química autocatalítica local: U + 2V -> 3V
             float reaction = u_center * v_center * v_center;
 
+            // Tasas de cambio temporal
             float du = params.Du * lap_u - reaction + params.F * (1.0f - u_center);
             float dv = params.Dv * lap_v + reaction - (params.F + params.K) * v_center;
 
+            // =================================================================
+            // [RESOLUCIÓN DE RACE CONDITIONS: DOUBLE BUFFERING EN RAM]
+            // Cada celda escribe de manera exclusiva en su índice correspondiente de 'next'.
+            // Ningún hilo lee de 'next' mientras se calcula el paso actual.
+            // =================================================================
             next.u[idx] = u_center + du * params.dt;
             next.v[idx] = v_center + dv * params.dt;
         }

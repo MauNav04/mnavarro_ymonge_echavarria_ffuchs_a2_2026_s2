@@ -8,9 +8,17 @@
 namespace fs = std::filesystem;
 
 int main(int argc, char* argv[]) {
+    // =========================================================================
+    // --- VARIABLES CLAVE PARA PARALELIZACIÓN Y BENCHMARKING ---
+    // =========================================================================
+    // [Variable 1]: Espacio total de tareas independientes en RAM (Resolución N x N)
     int width = 512;
     int height = 512;
+
+    // [Variable 2]: Longitud de la cadena de dependencias temporales estrictas (t -> t+1)
     int total_steps = 16000;
+
+    // [Variable 3]: Desacoplamiento de I/O para evitar contaminación de contadores de hardware
     bool save_frames = false;
     int frame_interval = 100;
     std::string output_dir = "../videos/temp_frames";
@@ -29,6 +37,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    // [ESTRUCTURA DE DATOS BASE]: Double Buffering contiguo en RAM para evitar data races
     Grid2D current(width, height);
     Grid2D next(width, height);
     GrayScottParams params;
@@ -38,12 +47,26 @@ int main(int argc, char* argv[]) {
 
     if (!save_frames) {
         // =====================================================================
-        // RUTA 1: BENCHMARK PURO (Máxima fidelidad, cero overhead de timers)
+        // RUTA 1: BENCHMARK PURO (Máxima fidelidad, cero overhead de timers/IO)
         // =====================================================================
         auto start = std::chrono::high_resolution_clock::now();
 
+        // =====================================================================
+        // [CUELLO DE BOTELLA TEMPORAL: BUCLE NO PARALELIZABLE DIRECTAMENTE]
+        // El paso (t + 1) depende estrictamente del resultado del paso (t).
+        // El paralelismo se explota DENTRO de cada paso, no a través de los pasos.
+        // =====================================================================
         for (int step = 1; step <= total_steps; ++step) {
+            
+            // --- Región donde trabajarán los hilos en CMP / SMT / Coarse / Fine ---
             step_simulation_sequential(current, next, params);
+
+            // =================================================================
+            // [PUNTO DE SINCRONIZACIÓN OBLIGATORIO: BARRERA GLOBAL]
+            // En versiones multihilo, ningún hilo puede ejecutar el swap ni
+            // comenzar el paso (t + 1) hasta que TODOS los hilos hayan terminado
+            // de escribir su bloque asignado en 'next' (std::barrier).
+            // =================================================================
             std::swap(current, next);
         }
 
@@ -59,13 +82,13 @@ int main(int argc, char* argv[]) {
                   << elapsed.count() << " ms (" << elapsed.count() / 1000.0 << " s)\n";
         std::cout << "========================================\n";
 
-        // Salida limpia a stderr para scripts automatizados
+        // Salida estandarizada para recolección automatizada de 200+ corridas
         std::cerr << "sequential," << width << "," << height << "," 
                   << total_steps << "," << elapsed.count() << "\n";
 
     } else {
         // =====================================================================
-        // RUTA 2: GENERACIÓN DE VIDEO (Exclusiva para material audiovisual)
+        // RUTA 2: GENERACIÓN DE VIDEO (Aislada para no contaminar métricas)
         // =====================================================================
         fs::create_directories(output_dir);
         export_frame_ppm(current, 0, output_dir);
