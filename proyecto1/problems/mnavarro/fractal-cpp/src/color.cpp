@@ -27,11 +27,17 @@ MultiEncoded encode(const MultiImage& a,Config cfg) {
     MultiEncoded c;
     // Tres busquedas completas, secuenciales e independientes: R, G y B.
     // Cada canal puede elegir un dominio y una simetria diferentes.
+
+    // PAR-03: los canales RGB son independientes; este nivel ofrece hasta 3 tareas.
+    // El diseno principal reparte ranges dentro de cada canal y procesa canales en orden.
     for(const auto& p:a.planes) c.planes.push_back(fractal::encode(p,cfg));
     return c;
 }
 MultiImage decode(const MultiEncoded& c,int iterations) {
     validate(c); MultiImage a;
+
+    // PAR-04: leer solo current y escribir ranges disjuntos de next.
+    // Completar todos los ranges antes de intercambiar buffers e iniciar otra iteracion.
     for(const auto& p:c.planes) a.planes.push_back(fractal::decode(p,iterations));
     return a;
 }

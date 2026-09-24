@@ -55,6 +55,11 @@ Encoded encode(const Image& a, Config cfg) {
         for (int x=0; x<=a.width-2*r; x+=cfg.stride)
             domains.push_back({x,y,reduce(a,x,y,r)});
     Encoded result{a.width,a.height,r,{}};
+
+    // PAR-01: cada range calcula una regla independiente.
+    // Lectura compartida: imagen a, dominios precalculados y configuracion.
+    // Privados por tarea: target, meanR, bestError, best y temporales de candidatos.
+
     for (int ry=0; ry<a.height; ry+=r) for (int rx=0; rx<a.width; rx+=r) {
         std::vector<float> target(n);
         double meanR=0;
@@ -75,6 +80,11 @@ Encoded encode(const Image& a, Config cfg) {
             for(int i=0;i<n;++i) { double e=target[i]-(s*block[i]+b); error+=e*e; }
             if(error<bestError) { bestError=error; best={static_cast<std::uint32_t>(d.x),static_cast<std::uint32_t>(d.y),static_cast<std::uint8_t>(sym),s,b}; }
         }
+
+        // PAR-02: push_back no debe ejecutarse concurrentemente sobre el mismo vector.
+        // Propuesta: resize(N_R) antes de iniciar hilos y escribir rules[rangeIndex].
+        // rangeIndex = (ry / r) * (a.width / r) + (rx / r).
+
         result.rules.push_back(best);
     }
     return result;
