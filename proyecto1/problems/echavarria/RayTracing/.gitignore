@@ -1,0 +1,33 @@
+# Directorios de compilación / Build outputs
+build/
+bin/
+obj/
+
+# Archivos temporales de CMake
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+
+# Binarios y objetos compilados
+inOneWeekend
+*.o
+*.obj
+*.exe
+*.out
+*.app
+
+# Archivos de salida de render (imágenes generadas)
+*.ppm
+
+# Archivos del sistema y editor
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Permitir imágenes de documentación y diagramas
+!images/*.png
+!docs/*.png

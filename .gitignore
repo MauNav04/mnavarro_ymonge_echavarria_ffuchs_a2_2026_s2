@@ -16,8 +16,10 @@ results/
 *.log
 
 # Generated graphs
-*.png
 *.pdf
 
-heat2d_stress_test
-heat2d_sequential
+# Gray-Scott compilation output
+proyecto1/problems/gray-scott/scripts/gray_scott_seq
+
+# Gray-Scott generated videos and temporary frames
+proyecto1/problems/gray-scott/videos/
