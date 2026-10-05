@@ -23,3 +23,6 @@ proyecto1/problems/gray-scott/scripts/gray_scott_seq
 
 # Gray-Scott generated videos and temporary frames
 proyecto1/problems/gray-scott/videos/
+
+heat2d_sequential
+heat2d_stress_test
