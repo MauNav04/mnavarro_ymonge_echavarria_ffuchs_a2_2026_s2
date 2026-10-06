@@ -158,6 +158,51 @@ Implementar el modelo arquitectónico de multihilo de grano grueso (*Coarse-Grai
 
 ---
 
+## 6. Multihilo de Grano Fino — Fine-Grained (`fine-grained/main.cpp`)
+
+### Propósito
+Modelar y evaluar el comportamiento microarquitectónico de **Multihilo de Grano Fino (*Fine-Grained / Interleaved Multithreading*)**, donde múltiples flujos lógicos o hilos de ejecución rotan de manera **intercalada e incondicional** en cada ciclo de reloj o cuantum mínimo de trabajo (por defecto $Q = 1$ fila), **independientemente de si el hilo en curso sufrió un bloqueo (*stall*) o no**.
+
+En cumplimiento con la especificación del curso (Sección 4.1.a y Nota 4.1.5 que exige comparar al menos 2 propuestas de diseño), se desarrollaron dos enfoques arquitectónicos:
+
+1. **Propuesta 1 — Simulación por Planificación Cooperativa (*User-Space Round-Robin Scheduler*, `--mode cooperative`):**  
+   Modela fielmente la microarquitectura de procesadores de grano fino históricos (como el Denelcor HEP o Tera MTA / Cray MTA). Un conjunto de $T$ hilos virtuales rotan estrictamente procesando un cuantum mínimo ($Q = 1$ fila). Cada cuantum fuerza un cambio de contexto formal, permitiendo cuantificar con precisión el número masivo de conmutaciones (más de **8.16 millones** en 16,000 pasos) y el impacto del *scheduling overhead*.
+2. **Propuesta 2 — Paralelismo Cíclico Intercalado en Hardware (*Cyclic POSIX Threads*, `--mode parallel`):**  
+   Distribuye las filas de la grilla entre $T$ hilos del sistema operativo en modo cíclico ($y \pmod T = id$). Cada hilo procesa fragmentos de 1 fila intercalados espacialmente. Esto permite evidenciar en la práctica la pérdida de localidad espacial en memoria caché L1/L2 y el efecto de contención sobre líneas de caché adyacentes frente al esquema por bloques de Coarse-Grained.
+
+### Cómo utiliza el Núcleo (`core`)
+1. **Descomposición Cíclica / Cuantums Mínimos de Fila:**  
+   En lugar de bloques continuos grandes, el dominio de filas interiores $[1, H-1)$ se recorre en fragmentos mínimos de longitud $Q$ (por defecto $Q = 1$ fila):
+   ```cpp
+   step_simulation_slice(cur, nxt, y, y + chunk_size, params);
+   ```
+   donde `chunk_size = std::min(quantum, (height - 1) - y)`.
+2. **Conmutación Incondicional por Cuantum:**  
+   Tras completar cada fragmento de 1 fila, el planificador cambia inmediatamente al siguiente hilo lógico:
+   ```cpp
+   stats[turno_hilo].conmutaciones++;
+   total_context_switches++;
+   turno_hilo = (turno_hilo + 1) % num_threads;
+   ```
+   No se espera a ningún fallo de caché o barrera para ceder el turno.
+
+### Métodos y Mecanismos Clave
+* **Cuantificación Masiva de Conmutaciones:**  
+  Para una grilla de $512 \times 512$ con 510 filas interiores y $16{,}000$ pasos temporales:
+  $$\text{Conmutaciones} = 510 \times 16{,}000 = 8{,}160{,}000 \text{ cambios de contexto}$$
+* **Degradación Teórica en Arquitecturas Modernas de Escritorio:**  
+  Los procesadores x86-64 modernos carecen de pipelines de conmutación de registros a nivel de ciclo (como los que tenía el Tera MTA). Por tanto, la alternancia forzada de grano fino evidencia:
+  * En modo cooperativo: Desempeño cercano a 1x con sobrecarga de control.
+  * En modo paralelo cíclico: Speedup moderado (~3.05x vs 5.04x de CMP) producto de la pérdida de streaming contiguo del prefetcher de hardware y la contención en líneas de caché adyacentes.
+* **Reglas del Makefile:**  
+  * `make fine`: Compila el binario `gray_scott_fine`.
+  * `make run_fine`: Ejecuta el modelo cooperativo por cuantums con 8 hilos virtuales y $Q=1$.
+  * `make run_fine_parallel`: Ejecuta la propuesta cíclica paralela con hilos POSIX.
+  * `make verify_fine`: Verifica la coherencia matemática celda a celda contra el secuencial ($|diff| < 10^{-5}$).
+  * `make run_fine_video`: Genera el video sincronizado con el tiempo medido en CPU.
+
+---
+
 ## Tabla Resumen de Modelos
 
 | Modelo | Unidad de Trabajo en Core | Sincronización Inter-paso | Asignación de CPU / Afinidad | Evento de Conmutación |
@@ -166,3 +211,5 @@ Implementar el modelo arquitectónico de multihilo de grano grueso (*Coarse-Grai
 | **CMP** | Franja 1D contigua $[start\_y, end\_y)$ | `pthread_barrier_t` | 1 hilo por núcleo físico (CPUs 0 a 7) | No hay conmutación (hilos dedicados) |
 | **SMT** | Franja 1D contigua (16 divisiones) | `pthread_barrier_t` | 2 hilos por core (HW) / Sobre-suscripción (SW) | Concurrente en pipeline (HW) o Time-slice (SW) |
 | **Coarse-Grained** | Ráfagas continuas de grandes bloques | `pthread_barrier_t` | Hilos tradicionales (8 por defecto) | **Únicamente** ante evento de bloqueo (*stall* / barrera) |
+| **Fine-Grained** | Cuantum mínimo ($Q = 1$ fila) | Cooperativo / `pthread_barrier_t` | Hilos virtuales / Cíclico en cores | **Incondicional** en cada cuantum (Round-Robin) |
+

@@ -8,16 +8,19 @@ SRC_SEQ = $(SRC_CORE) ../sequential/main.cpp
 SRC_CMP = $(SRC_CORE) ../CMP/main.cpp
 SRC_SMT = $(SRC_CORE) ../SMT/main.cpp
 SRC_COARSE = $(SRC_CORE) ../coarse-grained/main.cpp
+SRC_FINE = $(SRC_CORE) ../fine-grained/main.cpp
 
 TARGET_SEQ = gray_scott_seq
 TARGET_CMP = gray_scott_cmp
 TARGET_SMT = gray_scott_smt
 TARGET_COARSE = gray_scott_coarse
+TARGET_FINE = gray_scott_fine
 VIDEOS_DIR = ../videos
 TEMP_FRAMES_SEQ = $(VIDEOS_DIR)/temp_frames_seq
 TEMP_FRAMES_CMP = $(VIDEOS_DIR)/temp_frames_cmp
 TEMP_FRAMES_SMT = $(VIDEOS_DIR)/temp_frames_smt
 TEMP_FRAMES_COARSE = $(VIDEOS_DIR)/temp_frames_coarse
+TEMP_FRAMES_FINE = $(VIDEOS_DIR)/temp_frames_fine
 
 # 3. Parámetros estándar para campañas de benchmarking (200 corridas estadísticas)
 # Calibrados: ~4.0s en secuencial y ~0.8s en CMP (8 hilos) para evitar thermal throttling y tiempos excesivos
@@ -26,20 +29,24 @@ STEPS ?= 16000
 THREADS ?= 8
 SMT_THREADS ?= 16
 COARSE_THREADS ?= 8
+FINE_THREADS ?= 8
+FINE_QUANTUM ?= 1
+FINE_MODE ?= cooperative
 
 # Parámetros para generación de videos demostrativos de alta resolución
 VIDEO_SIZE ?= 512
 VIDEO_STEPS ?= 16000
 
-.PHONY: all seq cmp smt coarse run_seq run_cmp verify_cmp run_smt run_smt_sw verify_smt run_coarse verify_coarse run_seq_video run_cmp_video run_smt_video run_coarse_video clean
+.PHONY: all seq cmp smt coarse fine run_seq run_cmp verify_cmp run_smt run_smt_sw verify_smt run_coarse verify_coarse run_fine run_fine_parallel verify_fine run_seq_video run_cmp_video run_smt_video run_coarse_video run_fine_video clean
 
 # Compilación por defecto: todos los ejecutables
-all: $(TARGET_SEQ) $(TARGET_CMP) $(TARGET_SMT) $(TARGET_COARSE)
+all: $(TARGET_SEQ) $(TARGET_CMP) $(TARGET_SMT) $(TARGET_COARSE) $(TARGET_FINE)
 
 seq: $(TARGET_SEQ)
 cmp: $(TARGET_CMP)
 smt: $(TARGET_SMT)
 coarse: $(TARGET_COARSE)
+fine: $(TARGET_FINE)
 
 $(TARGET_SEQ): $(SRC_SEQ)
 	$(CXX) $(CXXFLAGS) $(SRC_SEQ) -o $(TARGET_SEQ)
@@ -53,8 +60,11 @@ $(TARGET_SMT): $(SRC_SMT)
 $(TARGET_COARSE): $(SRC_COARSE)
 	$(CXX) $(CXXFLAGS) $(SRC_COARSE) -o $(TARGET_COARSE)
 
+$(TARGET_FINE): $(SRC_FINE)
+	$(CXX) $(CXXFLAGS) $(SRC_FINE) -o $(TARGET_FINE)
+
 # Ejecución de benchmark puro secuencial (calibrado para 200 corridas)
-run_seq: $(TARGET_SEQ)
+run_sequential: $(TARGET_SEQ)
 	./$(TARGET_SEQ) --size $(SIZE) --steps $(STEPS)
 
 # Ejecución de benchmark CMP (8 hilos por defecto, calibrado para 200 corridas)
@@ -177,7 +187,40 @@ run_coarse_video: $(TARGET_COARSE)
 	@rm -rf $(TEMP_FRAMES_COARSE)
 	@echo "--> Video Coarse-Grained generado con éxito en $(VIDEOS_DIR)/gray-scott-coarse.mp4"
 
+# ==============================================================================
+# Fine-Grained: Planificación cooperativa o cíclica con conmutación incondicional
+# ==============================================================================
+run_fine: $(TARGET_FINE)
+	./$(TARGET_FINE) --threads $(FINE_THREADS) --quantum $(FINE_QUANTUM) --mode $(FINE_MODE) --size $(SIZE) --steps $(STEPS)
+
+run_fine_parallel: $(TARGET_FINE)
+	./$(TARGET_FINE) --threads $(FINE_THREADS) --quantum $(FINE_QUANTUM) --mode parallel --size $(SIZE) --steps $(STEPS)
+
+# Verificación numérica cruzada Fine-Grained vs Secuencial
+verify_fine: $(TARGET_FINE)
+	./$(TARGET_FINE) --threads $(FINE_THREADS) --quantum $(FINE_QUANTUM) --mode $(FINE_MODE) --size $(SIZE) --steps $(STEPS) --verify
+
+# ==============================================================================
+# TARGET: Generar video Fine-Grained sincronizado con el tiempo real de CPU
+# ==============================================================================
+run_fine_video: $(TARGET_FINE)
+	@mkdir -p $(TEMP_FRAMES_FINE) $(VIDEOS_DIR)
+	@echo "--> [1/3] Midiendo tiempo de cómputo puro en CPU (Fine-Grained)..."
+	@TIME_MS=$$(./$(TARGET_FINE) --threads $(FINE_THREADS) --quantum $(FINE_QUANTUM) --mode $(FINE_MODE) --size $(VIDEO_SIZE) --steps $(VIDEO_STEPS) 2>&1 >/dev/null | cut -d',' -f9) ; \
+	echo "--> Tiempo CPU obtenido: $$TIME_MS ms" ; \
+	echo "--> [2/3] Exportando fotogramas de la simulación con conmutación fina..." ; \
+	./$(TARGET_FINE) --threads $(FINE_THREADS) --quantum $(FINE_QUANTUM) --mode $(FINE_MODE) --size $(VIDEO_SIZE) --steps $(VIDEO_STEPS) --save-frames --output-dir $(TEMP_FRAMES_FINE) > /dev/null ; \
+	TOTAL_FRAMES=$$(ls -1 $(TEMP_FRAMES_FINE)/frame_*.ppm | wc -l) ; \
+	FACTOR=$$(LC_ALL=C awk -v t="$$TIME_MS" -v f="$$TOTAL_FRAMES" 'BEGIN { printf "%.2f", t / (f > 1 ? f - 1 : 1) }' | tr ',' '.') ; \
+	echo "--> Fotogramas: $$TOTAL_FRAMES | Factor temporal: $$FACTOR ms/frame" ; \
+	echo "--> [3/3] Compilando video con ffmpeg..." ; \
+	ffmpeg -y -loglevel error -framerate 20 -i $(TEMP_FRAMES_FINE)/frame_%d.ppm \
+		-vf "scale=$(VIDEO_SIZE):$(VIDEO_SIZE):flags=neighbor,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='Gray-Scott Fine-Grained (Q=$(FINE_QUANTUM))':fontcolor=white:fontsize=18:box=1:boxcolor=black@0.6:boxborderw=4:x=15:y=15,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='Step\: %{eif\:n*100\:d}':fontcolor=lime:fontsize=15:box=1:boxcolor=black@0.6:boxborderw=4:x=15:y=45,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='Tiempo CPU (Fine)\: %{eif\:trunc((n*'$$FACTOR')/1000)\:d}.%{eif\:trunc(mod(n*'$$FACTOR'\,1000)/10)\:d\:2} s':fontcolor=yellow:fontsize=15:box=1:boxcolor=black@0.6:boxborderw=4:x=15:y=72" \
+		-c:v libx264 -pix_fmt yuv420p $(VIDEOS_DIR)/gray-scott-fine.mp4
+	@rm -rf $(TEMP_FRAMES_FINE)
+	@echo "--> Video Fine-Grained generado con éxito en $(VIDEOS_DIR)/gray-scott-fine.mp4"
+
 # Limpieza de binarios y temporales
 clean:
-	rm -f $(TARGET_SEQ) $(TARGET_CMP) $(TARGET_SMT) $(TARGET_COARSE)
-	rm -rf $(TEMP_FRAMES_SEQ) $(TEMP_FRAMES_CMP) $(TEMP_FRAMES_SMT) $(TEMP_FRAMES_COARSE)
+	rm -f $(TARGET_SEQ) $(TARGET_CMP) $(TARGET_SMT) $(TARGET_COARSE) $(TARGET_FINE)
+	rm -rf $(TEMP_FRAMES_SEQ) $(TEMP_FRAMES_CMP) $(TEMP_FRAMES_SMT) $(TEMP_FRAMES_COARSE) $(TEMP_FRAMES_FINE)
