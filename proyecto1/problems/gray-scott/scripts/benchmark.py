@@ -151,8 +151,17 @@ def main():
     # Asegurar compilación
     compilar_binarios(scripts_dir)
 
-    # Definición de configuraciones de prueba
+    # Definición de configuraciones de prueba (smt_sw primero para pedir sudo al inicio)
     catalogo_modelos = {
+        "smt_sw": {
+            "nombre": "SMT (Sobre-suscripción SW)",
+            "modo": "software_oversubscription",
+            "bin": "./gray_scott_smt",
+            "cmd_args": ["--threads", str(args.smt_threads), "--size", str(args.size), "--steps", str(args.steps)],
+            "hilos": args.smt_threads,
+            "quantum": 0,
+            "requiere_smt_off": True
+        },
         "seq": {
             "nombre": "Secuencial",
             "modo": "baseline",
@@ -180,15 +189,7 @@ def main():
             "quantum": 0,
             "requiere_smt_off": False
         },
-        "smt_sw": {
-            "nombre": "SMT (Sobre-suscripción SW)",
-            "modo": "software_oversubscription",
-            "bin": "./gray_scott_smt",
-            "cmd_args": ["--threads", str(args.smt_threads), "--size", str(args.size), "--steps", str(args.steps)],
-            "hilos": args.smt_threads,
-            "quantum": 0,
-            "requiere_smt_off": True
-        },
+
         "coarse": {
             "nombre": "Coarse-Grained",
             "modo": "burst_block",
@@ -221,12 +222,11 @@ def main():
     # Filtrar modelos solicitados
     if args.models.strip().lower() == "all":
         modelos_a_ejecutar = list(catalogo_modelos.keys())
-        if not args.include_smt_sw:
-            modelos_a_ejecutar.remove("smt_sw")
     else:
         modelos_a_ejecutar = [m.strip() for m in args.models.split(",") if m.strip()]
         if args.include_smt_sw and "smt_sw" not in modelos_a_ejecutar:
             modelos_a_ejecutar.append("smt_sw")
+
 
     for m in modelos_a_ejecutar:
         if m not in catalogo_modelos:

@@ -38,11 +38,11 @@ RUNS ?= 200
 # all: ejecuta todos
 # seq: secuencial
 # cmp: CMP (Chip Multiprocessing)
-# smt_hw: SMT hardware (16 hilos sobre 8 núcleos)
+# smt_sw: SMT software (16 hilos sobre 8 núcleos físicos con SMT OFF)
 # coarse: coarse-grained multithreading
 # fine_coop: fine-grained cooperative multithreading
 # fine_parallel: fine-grained parallel multithreading
-BENCHMARK_MODELS ?= all	
+BENCHMARK_MODELS ?= all
 
 # Parámetros para generación de videos demostrativos de alta resolución
 VIDEO_SIZE ?= 512

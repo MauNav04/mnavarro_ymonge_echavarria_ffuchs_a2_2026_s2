@@ -1,3 +1,8 @@
 modelo,modo,hilos,corridas,media_ms,std_dev_ms,min_ms,max_ms,mediana_ms,speedup,eficiencia
-Secuencial,baseline,1,3,4059.127,35.371,4020.13,4089.14,4068.11,1.00x,100.0%
-CMP,dedicated_cores,8,3,1087.15,49.973,1035.28,1134.98,1091.19,3.73x,46.7%
+SMT (Sobre-suscripción SW),software_oversubscription,16,200,869.015,16.158,844.12,939.639,863.336,4.52x,28.3%
+Secuencial,baseline,1,200,3929.676,230.936,3846.28,7025.05,3886.755,1.00x,100.0%
+CMP,dedicated_cores,8,200,734.467,80.486,710.246,1544.43,722.716,5.35x,66.9%
+SMT (HW Real),hardware_smt,16,200,709.741,23.66,674.396,834.93,704.88,5.54x,34.6%
+Coarse-Grained,burst_block,8,200,863.161,28.399,783.311,954.364,863.322,4.55x,56.9%
+Fine-Grained (Cooperativo),cooperative_quantum,8,200,3949.258,133.797,3876.28,5384.25,3917.595,1.00x,12.4%
+Fine-Grained (Paralelo Cíclico),cyclic_threads,8,200,1044.983,57.243,956.893,1431.11,1040.44,3.76x,47.0%
