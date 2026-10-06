@@ -1,0 +1,14 @@
+
+# Dependencias globales de Python para Benchmarking, Análisis y Visualización
+
+
+# Computación numérica y manipulación de datos tabulares
+numpy>=1.24.0
+pandas>=2.0.0
+
+# Generación de gráficos y visualización científica
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Análisis estadístico avanzado y pruebas de hipótesis
+scipy>=1.10.0
