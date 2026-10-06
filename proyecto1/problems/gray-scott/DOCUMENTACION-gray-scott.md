@@ -127,11 +127,34 @@ Evaluar el comportamiento microarquitectónico de 16 hilos de trabajo compitiend
 
 ---
 
-## 5. Multihilo de Grano Grueso — Coarse-Grained 
+## 5. Multihilo de Grano Grueso — Coarse-Grained (`coarse-grained/main.cpp`)
 
----
+### Propósito
+Implementar el modelo arquitectónico de multihilo de grano grueso (*Coarse-Grained / Block Multithreading*), donde los hilos de ejecución tradicionales ejecutan **ráfagas de cómputo continuas y extensas** sobre grandes bloques de datos, y el cambio de contexto o cesión del procesador ocurre **únicamente ante eventos de bloqueo costosos** (como la barrera de sincronización global inter-paso o las operaciones de E/S en disco).
 
-## 6. Multihilo de Grano Fino — Fine-Grained 
+### Cómo utiliza el Núcleo (`core`)
+1. **Ráfagas Ininterrumpidas de Cómputo (32,640 celdas por ráfaga/hilo):**
+   Cada hilo tradicional recibe un bloque contiguo de filas $[start\_y, end\_y)$ (típicamente $64$ filas en una grilla de $512 \times 512$). El hilo invoca:
+   ```cpp
+   step_simulation_slice(cur, nxt, ctx->start_y, ctx->end_y, *(ctx->params));
+   ```
+   ejecutando decenas de miles de evaluaciones de stencil consecutivas sin ceder la CPU, manteniendo las líneas de caché calientes y el pipeline saturado.
+2. **Punto Estricto de Conmutación / Bloqueo:**
+   El hilo solo se detiene ante eventos de bloqueo de alta latencia:
+   * **Barrera Inter-paso:** `pthread_barrier_wait(ctx->barrera)` (exactamente 16,000 eventos de bloqueo en la simulación).
+   * **Operación de E/S:** Bloqueo de espera cuando el hilo 0 vuelca un fotograma a disco.
+
+### Métodos y Mecanismos Clave
+* **Métricas de Ráfaga y Bloqueo:**
+  El programa contabiliza explícitamente:
+  * El tamaño de la ráfaga continua (`burst_cells` = $32{,}640$ celdas).
+  * El número total de eventos de bloqueo/sincronización (`stall_events` = $16{,}000$).
+* **Hilos Persistentes Tradicionales:**  
+  Se crean al inicio mediante `pthread_create` y perduran a lo largo de toda la simulación, evitando el overhead del kernel en la creación de procesos o hilos efímeros.
+* **Reglas del Makefile:**  
+  * `make run_coarse`: Ejecuta el modelo de grano grueso con 8 hilos sobre $512 \times 512$ y $16{,}000$ pasos.
+  * `make verify_coarse`: Valida la coherencia numérica celda a celda contra el secuencial ($|diff| < 10^{-5}$).
+  * `make run_coarse_video`: Genera el video representativo con las métricas en pantalla.
 
 ---
 
@@ -142,3 +165,4 @@ Evaluar el comportamiento microarquitectónico de 16 hilos de trabajo compitiend
 | **Secuencial** | Dominio completo $[1, H-1)$ | Ninguna | 1 solo hilo (SO por defecto) | Ninguno |
 | **CMP** | Franja 1D contigua $[start\_y, end\_y)$ | `pthread_barrier_t` | 1 hilo por núcleo físico (CPUs 0 a 7) | No hay conmutación (hilos dedicados) |
 | **SMT** | Franja 1D contigua (16 divisiones) | `pthread_barrier_t` | 2 hilos por core (HW) / Sobre-suscripción (SW) | Concurrente en pipeline (HW) o Time-slice (SW) |
+| **Coarse-Grained** | Ráfagas continuas de grandes bloques | `pthread_barrier_t` | Hilos tradicionales (8 por defecto) | **Únicamente** ante evento de bloqueo (*stall* / barrera) |

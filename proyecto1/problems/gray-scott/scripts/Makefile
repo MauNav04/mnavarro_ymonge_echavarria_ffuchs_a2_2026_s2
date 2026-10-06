@@ -7,14 +7,17 @@ SRC_CORE = ../src/gray_scott_core.cpp
 SRC_SEQ = $(SRC_CORE) ../sequential/main.cpp
 SRC_CMP = $(SRC_CORE) ../CMP/main.cpp
 SRC_SMT = $(SRC_CORE) ../SMT/main.cpp
+SRC_COARSE = $(SRC_CORE) ../coarse-grained/main.cpp
 
 TARGET_SEQ = gray_scott_seq
 TARGET_CMP = gray_scott_cmp
 TARGET_SMT = gray_scott_smt
+TARGET_COARSE = gray_scott_coarse
 VIDEOS_DIR = ../videos
 TEMP_FRAMES_SEQ = $(VIDEOS_DIR)/temp_frames_seq
 TEMP_FRAMES_CMP = $(VIDEOS_DIR)/temp_frames_cmp
 TEMP_FRAMES_SMT = $(VIDEOS_DIR)/temp_frames_smt
+TEMP_FRAMES_COARSE = $(VIDEOS_DIR)/temp_frames_coarse
 
 # 3. Parámetros estándar para campañas de benchmarking (200 corridas estadísticas)
 # Calibrados: ~4.0s en secuencial y ~0.8s en CMP (8 hilos) para evitar thermal throttling y tiempos excesivos
@@ -22,19 +25,21 @@ SIZE ?= 512
 STEPS ?= 16000
 THREADS ?= 8
 SMT_THREADS ?= 16
+COARSE_THREADS ?= 8
 
 # Parámetros para generación de videos demostrativos de alta resolución
 VIDEO_SIZE ?= 512
 VIDEO_STEPS ?= 16000
 
-.PHONY: all seq cmp smt run_seq run_cmp verify_cmp run_smt run_smt_sw verify_smt run_seq_video run_cmp_video run_smt_video clean
+.PHONY: all seq cmp smt coarse run_seq run_cmp verify_cmp run_smt run_smt_sw verify_smt run_coarse verify_coarse run_seq_video run_cmp_video run_smt_video run_coarse_video clean
 
 # Compilación por defecto: todos los ejecutables
-all: $(TARGET_SEQ) $(TARGET_CMP) $(TARGET_SMT)
+all: $(TARGET_SEQ) $(TARGET_CMP) $(TARGET_SMT) $(TARGET_COARSE)
 
 seq: $(TARGET_SEQ)
 cmp: $(TARGET_CMP)
 smt: $(TARGET_SMT)
+coarse: $(TARGET_COARSE)
 
 $(TARGET_SEQ): $(SRC_SEQ)
 	$(CXX) $(CXXFLAGS) $(SRC_SEQ) -o $(TARGET_SEQ)
@@ -44,6 +49,9 @@ $(TARGET_CMP): $(SRC_CMP)
 
 $(TARGET_SMT): $(SRC_SMT)
 	$(CXX) $(CXXFLAGS) $(SRC_SMT) -o $(TARGET_SMT)
+
+$(TARGET_COARSE): $(SRC_COARSE)
+	$(CXX) $(CXXFLAGS) $(SRC_COARSE) -o $(TARGET_COARSE)
 
 # Ejecución de benchmark puro secuencial (calibrado para 200 corridas)
 run_seq: $(TARGET_SEQ)
@@ -139,7 +147,37 @@ run_smt_video: $(TARGET_SMT)
 	@rm -rf $(TEMP_FRAMES_SMT)
 	@echo "--> Video SMT generado con éxito en $(VIDEOS_DIR)/gray-scott-smt.mp4"
 
+# ==============================================================================
+# Coarse-Grained: Ejecución con ráfagas largas y bloqueo por sincronización/barrera
+# ==============================================================================
+run_coarse: $(TARGET_COARSE)
+	./$(TARGET_COARSE) --threads $(COARSE_THREADS) --size $(SIZE) --steps $(STEPS)
+
+# Verificación numérica cruzada Coarse-Grained vs Secuencial
+verify_coarse: $(TARGET_COARSE)
+	./$(TARGET_COARSE) --threads $(COARSE_THREADS) --size $(SIZE) --steps $(STEPS) --verify
+
+# ==============================================================================
+# TARGET: Generar video Coarse-Grained sincronizado con el tiempo real de CPU
+# ==============================================================================
+run_coarse_video: $(TARGET_COARSE)
+	@mkdir -p $(TEMP_FRAMES_COARSE) $(VIDEOS_DIR)
+	@echo "--> [1/3] Midiendo tiempo de cómputo puro en CPU (Coarse-Grained)..."
+	@TIME_MS=$$(./$(TARGET_COARSE) --threads $(COARSE_THREADS) --size $(VIDEO_SIZE) --steps $(VIDEO_STEPS) 2>&1 >/dev/null | cut -d',' -f7) ; \
+	echo "--> Tiempo CPU obtenido: $$TIME_MS ms" ; \
+	echo "--> [2/3] Exportando fotogramas de la simulación con ráfagas continuas..." ; \
+	./$(TARGET_COARSE) --threads $(COARSE_THREADS) --size $(VIDEO_SIZE) --steps $(VIDEO_STEPS) --save-frames --output-dir $(TEMP_FRAMES_COARSE) > /dev/null ; \
+	TOTAL_FRAMES=$$(ls -1 $(TEMP_FRAMES_COARSE)/frame_*.ppm | wc -l) ; \
+	FACTOR=$$(LC_ALL=C awk -v t="$$TIME_MS" -v f="$$TOTAL_FRAMES" 'BEGIN { printf "%.2f", t / (f > 1 ? f - 1 : 1) }' | tr ',' '.') ; \
+	echo "--> Fotogramas: $$TOTAL_FRAMES | Factor temporal: $$FACTOR ms/frame" ; \
+	echo "--> [3/3] Compilando video con ffmpeg..." ; \
+	ffmpeg -y -loglevel error -framerate 20 -i $(TEMP_FRAMES_COARSE)/frame_%d.ppm \
+		-vf "scale=$(VIDEO_SIZE):$(VIDEO_SIZE):flags=neighbor,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='Gray-Scott Coarse-Grained (Ráfagas)':fontcolor=white:fontsize=18:box=1:boxcolor=black@0.6:boxborderw=4:x=15:y=15,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='Step\: %{eif\:n*100\:d}':fontcolor=lime:fontsize=15:box=1:boxcolor=black@0.6:boxborderw=4:x=15:y=45,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='Tiempo CPU (Coarse)\: %{eif\:trunc((n*'$$FACTOR')/1000)\:d}.%{eif\:trunc(mod(n*'$$FACTOR'\,1000)/10)\:d\:2} s':fontcolor=yellow:fontsize=15:box=1:boxcolor=black@0.6:boxborderw=4:x=15:y=72" \
+		-c:v libx264 -pix_fmt yuv420p $(VIDEOS_DIR)/gray-scott-coarse.mp4
+	@rm -rf $(TEMP_FRAMES_COARSE)
+	@echo "--> Video Coarse-Grained generado con éxito en $(VIDEOS_DIR)/gray-scott-coarse.mp4"
+
 # Limpieza de binarios y temporales
 clean:
-	rm -f $(TARGET_SEQ) $(TARGET_CMP) $(TARGET_SMT)
-	rm -rf $(TEMP_FRAMES_SEQ) $(TEMP_FRAMES_CMP) $(TEMP_FRAMES_SMT)
+	rm -f $(TARGET_SEQ) $(TARGET_CMP) $(TARGET_SMT) $(TARGET_COARSE)
+	rm -rf $(TEMP_FRAMES_SEQ) $(TEMP_FRAMES_CMP) $(TEMP_FRAMES_SMT) $(TEMP_FRAMES_COARSE)
