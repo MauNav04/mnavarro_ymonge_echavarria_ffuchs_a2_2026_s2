@@ -92,9 +92,38 @@ Implementa **paralelismo real sobre múltiples núcleos físicos independientes*
 
 ---
 
-## 4. SMT — Simultaneous Multithreading 
+## 4. SMT — Simultaneous Multithreading (`SMT/main.cpp`)
 
+### Propósito
+Evaluar el comportamiento microarquitectónico de 16 hilos de trabajo compitiendo sobre los 8 núcleos físicos de la CPU bajo dos regímenes de ejecución:
+1. **SMT por Hardware Real (`SMT ON`):** Dos hilos lógicos coexisten en el mismo núcleo físico, compitiendo directamente por las unidades de punto flotante (FPUs), puertos de despacho y la memoria caché L1/L2 a nivel de ciclo de reloj.
+2. **Sobre-suscripción por Software (`SMT OFF`):** Con SMT apagado en el kernel, solo existen 8 núcleos disponibles, forzando al planificador del sistema operativo a alternar los 16 hilos mediante conmutaciones de contexto por software (*time-slicing*).
 
+### Cómo utiliza el Núcleo (`core`)
+1. **Descomposición 1D en 16 Franjas:**
+   Divide las $(H - 2)$ filas interiores entre los 16 hilos lógicos en franjas horizontales continuas:
+   $$\text{start\_y} = 1 + id \times \text{filas\_base} + \min(id, \text{residuo})$$
+   $$\text{end\_y} = \text{start\_y} + \text{filas\_base} + (id < \text{residuo} ? 1 : 0)$$
+2. **Invocación Unificada:**
+   Cada hilo ejecuta independientemente:
+   ```cpp
+   step_simulation_slice(cur, nxt, ctx->start_y, ctx->end_y, *(ctx->params));
+   ```
+   manteniendo el acceso en orden *Row-Major* y eliminando el falso compartimiento (*false sharing*).
+
+### Métodos y Mecanismos Clave
+* **Diagnóstico de Topología en Linux (`obtener_estado_smt_linux()`):**  
+  Lee dinámicamente `/sys/devices/system/cpu/smt/control` para detectar si el procesador tiene SMT activo (`on`) o inactivo (`off`).
+* **Mapeo de Afinidad Adaptativo (`pthread_setaffinity_np`):**  
+  * Con **SMT ON** (16 CPUs online): Asigna el hilo $t$ a la CPU lógica $t$. De esta forma, el Hilo 0 (CPU 0) y el Hilo 8 (CPU 8) se ejecutan físicamente sobre el Core 0 compartiendo hardware.
+  * Con **SMT OFF** (8 CPUs online): Asigna el hilo $t$ a la CPU $(t \pmod 8)$. El Hilo 0 y el Hilo 8 quedan enlazados a la misma CPU física 0, obligando al kernel de Linux a realizar *preemptive multitasking* por software.
+* **Hilos Persistentes + Barrera:**  
+  Los 16 hilos se crean una única vez al inicio y se sincronizan al final de cada paso temporal mediante `pthread_barrier_t`.
+* **Reglas Automatizadas en el Makefile:**  
+  * `make run_smt`: Ejecuta SMT con los 16 hilos lógicos en hardware real.
+  * `make run_smt_sw`: Deshabilita temporalmente SMT en el kernel (`echo off`), ejecuta los 16 hilos en sobre-suscripción, y restaura SMT a `on` de forma segura mediante un manejador `trap` de bash.
+  * `make verify_smt`: Comprueba la exactitud matemática contra el secuencial asegurando $|diff| < 10^{-5}$.
+  * `make run_smt_video`: Genera el video con superposición de métricas de SMT.
 
 ---
 
@@ -103,6 +132,7 @@ Implementa **paralelismo real sobre múltiples núcleos físicos independientes*
 ---
 
 ## 6. Multihilo de Grano Fino — Fine-Grained 
+
 ---
 
 ## Tabla Resumen de Modelos
@@ -111,3 +141,4 @@ Implementa **paralelismo real sobre múltiples núcleos físicos independientes*
 | :--- | :--- | :--- | :--- | :--- |
 | **Secuencial** | Dominio completo $[1, H-1)$ | Ninguna | 1 solo hilo (SO por defecto) | Ninguno |
 | **CMP** | Franja 1D contigua $[start\_y, end\_y)$ | `pthread_barrier_t` | 1 hilo por núcleo físico (CPUs 0 a 7) | No hay conmutación (hilos dedicados) |
+| **SMT** | Franja 1D contigua (16 divisiones) | `pthread_barrier_t` | 2 hilos por core (HW) / Sobre-suscripción (SW) | Concurrente en pipeline (HW) o Time-slice (SW) |

@@ -21,6 +21,7 @@ results/
 # Gray-Scott compilation output
 proyecto1/problems/gray-scott/scripts/gray_scott_seq
 proyecto1/problems/gray-scott/scripts/gray_scott_cmp
+proyecto1/problems/gray-scott/scripts/gray_scott_smt
 
 # Gray-Scott generated videos and temporary frames
 proyecto1/problems/gray-scott/videos/
