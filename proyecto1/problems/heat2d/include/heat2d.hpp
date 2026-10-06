@@ -1,28 +1,27 @@
-#pragma once  // Evita que este archivo de cabecera sea incluido más de una vez durante la compilación.
+#pragma once
 
-#include "grid.hpp"  // Incluye la clase Grid utilizada para representar las temperaturas de la superficie.
+#include "grid.hpp"
 
-namespace heat2d {  // Agrupa las funciones relacionadas con la simulación Heat Diffusion 2D.
+#include <cstddef>
+
+namespace heat2d {
 
 /**
- * @brief Comprueba si los parámetros numéricos cumplen la condición de estabilidad.
+ * @brief Coeficientes constantes del esquema explícito de difusión.
+ */
+struct DiffusionCoefficients {
+    double x;
+    double y;
+};
+
+/**
+ * @brief Comprueba la estabilidad numérica del esquema explícito 2D.
  *
- * El método explícito de diferencias finitas utilizado para resolver la
- * ecuación del calor en dos dimensiones requiere cumplir:
+ * Se requiere:
  *
  * alpha * dt * (1 / dx^2 + 1 / dy^2) <= 1 / 2
- *
- * Si dx == dy == h, esta expresión se reduce a:
- *
- * alpha * dt / h^2 <= 1 / 4
- *
- * @param alpha Difusividad térmica del material.
- * @param dt Tamaño del paso temporal.
- * @param dx Separación espacial entre columnas.
- * @param dy Separación espacial entre filas.
- * @return true si la configuración es numéricamente estable.
- * @return false si la configuración viola la condición de estabilidad.
  */
+[[nodiscard]]
 bool isStable(
     double alpha,
     double dt,
@@ -31,22 +30,46 @@ bool isStable(
 );
 
 /**
- * @brief Calcula un único paso temporal de difusión de calor bidimensional.
+ * @brief Valida los parámetros físicos y genera los coeficientes
+ *        utilizados durante un paso de difusión.
  *
- * La función utiliza las temperaturas almacenadas en current para calcular
- * las temperaturas correspondientes al instante siguiente y las almacena
- * dentro de next.
+ * @throws std::invalid_argument si algún parámetro es inválido
+ *         o si la configuración es numéricamente inestable.
+ */
+[[nodiscard]]
+DiffusionCoefficients makeDiffusionCoefficients(
+    double alpha,
+    double dt,
+    double dx,
+    double dy
+);
+
+/**
+ * @brief Calcula la temperatura de una única celda interior.
  *
- * current nunca se modifica durante el cálculo. Esto evita utilizar valores
- * parcialmente actualizados dentro de una misma iteración temporal.
+ * Lee exclusivamente de current y escribe únicamente en next.
+ * Esta función representa la unidad mínima de trabajo que utilizará
+ * el modelo Fine-Grained.
  *
- * @param current Malla correspondiente al tiempo actual.
- * @param next Malla donde se almacenará el siguiente estado.
- * @param alpha Difusividad térmica del material.
- * @param dt Tamaño del paso temporal.
- * @param dx Separación espacial entre columnas.
- * @param dy Separación espacial entre filas.
- * @param boundaryTemperature Temperatura fija utilizada en los cuatro bordes.
+ * @param current Estado térmico actual.
+ * @param next Estado térmico siguiente.
+ * @param row Fila interior a actualizar.
+ * @param column Columna interior a actualizar.
+ * @param coefficients Coeficientes precalculados de difusión.
+ */
+void computeCell(
+    const Grid& current,
+    Grid& next,
+    std::size_t row,
+    std::size_t column,
+    const DiffusionCoefficients& coefficients
+);
+
+/**
+ * @brief Calcula un timestep completo de difusión.
+ *
+ * Todas las celdas interiores se calculan utilizando current.
+ * Los resultados se almacenan en next.
  */
 void diffusionStep(
     const Grid& current,
