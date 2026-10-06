@@ -35,11 +35,10 @@ void init_simulation(Grid2D& grid) {
 // [Variable 2]: 'total_steps'      -> Cadena de dependencias temporales estrictas (t -> t+1)
 // [Variable 3]: 'Du', 'Dv', 'dt'   -> Coeficientes de difusión y paso temporal (Estabilidad num.)
 
-void step_simulation_sequential(const Grid2D& current, Grid2D& next, const GrayScottParams& params) {
-    // --- VARIABLES CLAVE DE DOMINIO (Avance 2) ---
+void step_simulation_slice(const Grid2D& current, Grid2D& next, int start_y, int end_y, const GrayScottParams& params) {
+    // --- VARIABLES CLAVE DE DOMINIO (Descomposición 1D) ---
     // [Variable 1]: Espacio bidimensional continuo (w x h celdas independientes)
     int w = current.width;
-    int h = current.height;
 
     // =========================================================================
     // [PUNTO 1 DE PARALELIZACIÓN - Descomposición 1D / CMP / SMT / Coarse-Grained]
@@ -48,7 +47,7 @@ void step_simulation_sequential(const Grid2D& current, Grid2D& next, const GrayS
     // - Máxima localidad espacial en Caché L1/L2 al iterar en orden Row-Major.
     // - Mínimo falso compartimiento (False Sharing) entre líneas de caché.
     // =========================================================================
-    for (int y = 1; y < h - 1; ++y) {
+    for (int y = start_y; y < end_y; ++y) {
 
         // =====================================================================
         // [PUNTO 2 DE PARALELIZACIÓN - Descomposición 2D / Mosaicos / Fine-Grained]
@@ -96,6 +95,11 @@ void step_simulation_sequential(const Grid2D& current, Grid2D& next, const GrayS
             next.v[idx] = v_center + dv * params.dt;
         }
     }
+}
+
+void step_simulation_sequential(const Grid2D& current, Grid2D& next, const GrayScottParams& params) {
+    // La versión secuencial computa todas las filas interiores [1, height - 1)
+    step_simulation_slice(current, next, 1, current.height - 1, params);
 }
 
 //Logica para renderizar la bacteria V en una imagen PPM ultraligera, donde la intensidad del verde representa la concentración de V.
