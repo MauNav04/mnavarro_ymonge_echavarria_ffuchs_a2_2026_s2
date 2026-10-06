@@ -23,6 +23,7 @@ proyecto1/problems/gray-scott/scripts/gray_scott_seq
 proyecto1/problems/gray-scott/scripts/gray_scott_cmp
 proyecto1/problems/gray-scott/scripts/gray_scott_smt
 proyecto1/problems/gray-scott/scripts/gray_scott_coarse
+proyecto1/problems/gray-scott/scripts/gray_scott_fine
 
 # Gray-Scott generated videos and temporary frames
 proyecto1/problems/gray-scott/videos/
