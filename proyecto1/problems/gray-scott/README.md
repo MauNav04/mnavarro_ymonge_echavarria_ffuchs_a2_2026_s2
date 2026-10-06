@@ -56,8 +56,30 @@ El proyecto está implementado en **C++17** con optimizaciones de compilador `-O
 ### Requisitos en Linux:
 ```bash
 sudo apt update
-sudo apt install -y g++ make ffmpeg fonts-dejavu-core
+sudo apt install -y g++ make ffmpeg fonts-dejavu-core python3 python3-pip python3-venv python3.14-venv
 ```
+
+### Configuración del Entorno de Python:
+Para la campaña de benchmarking automatizado, análisis estadístico y generación de gráficos, se cuenta con un archivo global de dependencias en `proyecto1/requirements.txt`.
+
+**Opción A (Recomendada con entorno virtual):**
+```bash
+# Desde la raíz de proyecto1/:
+cd /ruta/hacia/proyecto1
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+**Opción B (Instalación directa):**
+```bash
+# Desde esta carpeta (gray-scott/):
+pip install -r ../../requirements.txt
+```
+
+> **Nota:** El script de medición `scripts/benchmark.py` utiliza exclusivamente la biblioteca estándar de Python para registrar las corridas y escribir los `.csv`, por lo que funcionará de forma nativa incluso sin instalar paquetes adicionales. Las dependencias externas (`pandas`, `matplotlib`, `seaborn`) son utilizadas para el análisis avanzado y la generación de gráficos en la carpeta `metricas/`.
+
+---
 
 ### Compilación:
 Desde la carpeta de scripts:
@@ -75,14 +97,26 @@ Diseñado para la toma rigurosa de métricas de hardware y tiempos de CPU sin in
 make run_seq
 ```
 
-#### Salida de Terminal Obtenida:
-![Ejecución Benchmark Puro](docs/images/secuencial_no_video.png)
+---
 
-> **Nota de Rendimiento:** En una prueba de esfuerzo a alta resolución ($1024 \times 1024$ celdas) y $128{,}000$ pasos temporales, el cómputo puro del procesador tomó **139.929 segundos**, procesando más de 134 mil millones de evaluaciones de stencil sin overhead de disco.
+### Modo 2: Campaña Automatizada de 200 Corridas (Generación de CSV)
+Ejecuta la batería estadística completa para los modelos concurrentes (Secuencial, CMP, SMT, Coarse-Grained, Fine-Grained), exportando las métricas en tiempo real a la carpeta `metricas/`:
+
+```bash
+# Campaña completa estándar (200 corridas por modelo):
+make benchmark
+
+# O prueba rápida de verificación (3 corridas por modelo):
+make benchmark_fast
+```
+
+*Los resultados se almacenan en:*
+* `metricas/gray_scott_benchmark.csv`: Muestras crudas corrida por corrida.
+* `metricas/resumen_estadistico.csv`: Tabla consolidada con Media, Desviación Estándar, Mínimo, Máximo, Mediana, Speedup y Eficiencia.
 
 ---
 
-### Modo 2: Generación de Video Sincronizado
+### Modo 3: Generación de Video Sincronizado
 Compila la simulación, exporta los fotogramas PPM temporales e invoca `ffmpeg` con un filtro que calcula dinámicamente el tiempo de CPU por fotograma:
 
 ```bash
@@ -104,30 +138,25 @@ make run_seq_video
 ## 4. Estructura de Archivos del Módulo
 
 ```text
-gray-scott/
-├── CMP/                        # Implementación con hilos físicos persistentes 
-├── coarse-grained/             # Paralelización con bloques de granularidad gruesa
-├── fine-grained/               # Paralelización con granularidad fina y balance dinámico
-├── SMT/                        # Variante optimizada para núcleos lógicos hipertróficos
-├── docs/                       # Documentación formal para evaluación
-│   ├── Propuestas.md           # Comparativa formal de diseños de descomposición
-│   └── images/                 # Diagramas de arquitectura y capturas de validación
-│       ├── diagrama_simulacion-paralelo-secuencial_gray-scott.png
-│       ├── frame1_secuencial.png
-│       ├── frame2_secuencial.png
-│       ├── frame3_secuencial.png
-│       └── secuencial_no_video.png
-├── include/
-│   ├── gray_scott_core.hpp     # Parámetros físicos, estructuras e interfaces del stencil
-│   └── grid.hpp                # Contenedor plano contiguo 1D para la malla 2D
-├── scripts/
-│   ├── gray_scott_seq          # Binario compilado con -O3
-│   └── Makefile                # Automatización de benchmarks y pipeline de video
-├── sequential/
-│   └── main.cpp                # Punto de entrada del baseline y medición de tiempo
-├── src/
-│   └── gray_scott_core.cpp     # Núcleo de reacción-difusión FTCS y exportación PPM
-├── videos/                     # Carpeta de salida de video (.gitignore)
-├── .gitkeep
-└── README.md                   # Esta guía de evaluación
+proyecto1/
+├── requirements.txt            # Dependencias globales de Python (numpy, pandas, matplotlib, seaborn)
+└── problems/
+    └── gray-scott/
+        ├── CMP/                # Implementación con hilos físicos persistentes 
+        ├── coarse-grained/     # Bloques continuos y bloqueo por barrera inter-paso
+        ├── fine-grained/       # Planificación cooperativa por cuantums (Q=1) y cíclica
+        ├── SMT/                # Variante para hilos simultáneos (HW real y sobre-suscripción SW)
+        ├── docs/               # Documentación formal para evaluación
+        ├── metricas/           # Salida de benchmarking y reproducibilidad experimental
+        │   ├── gray_scott_benchmark.csv  # Datos crudos de las corridas estadísticas
+        │   ├── resumen_estadistico.csv   # Estadísticas agregadas (Media, StdDev, Speedup)
+        │   └── graficas/                 # Visualizaciones comparativas (.png / .pdf)
+        ├── include/            # Encabezados del núcleo de reacción-difusión
+        ├── scripts/            # Automatización de compilación y pruebas
+        │   ├── benchmark.py    # Script maestro de benchmarking estadístico
+        │   └── Makefile        # Reglas para ejecución, videos y benchmarks
+        ├── sequential/         # Baseline de comparación secuencial
+        ├── src/                # Implementación matemática del stencil FTCS
+        ├── videos/             # Videos MP4 sincronizados con el tiempo real de CPU
+        └── README.md           # Esta guía de evaluación
 ```

@@ -1,0 +1,3 @@
+modelo,modo,hilos,corridas,media_ms,std_dev_ms,min_ms,max_ms,mediana_ms,speedup,eficiencia
+Secuencial,baseline,1,3,4059.127,35.371,4020.13,4089.14,4068.11,1.00x,100.0%
+CMP,dedicated_cores,8,3,1087.15,49.973,1035.28,1134.98,1091.19,3.73x,46.7%

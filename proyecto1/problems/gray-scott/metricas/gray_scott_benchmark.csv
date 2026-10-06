@@ -1,0 +1,7 @@
+run_id,modelo,modo,hilos,quantum,size,steps,eventos_contexto,tiempo_ms,tiempo_s,timestamp
+1,Secuencial,baseline,1,0,512,16000,0,4020.130,4.0201,2026-10-05T22:09:34.705815
+2,Secuencial,baseline,1,0,512,16000,0,4068.110,4.0681,2026-10-05T22:09:38.828462
+3,Secuencial,baseline,1,0,512,16000,0,4089.140,4.0891,2026-10-05T22:09:42.973336
+1,CMP,dedicated_cores,8,0,512,16000,0,1035.280,1.0353,2026-10-05T22:09:44.063647
+2,CMP,dedicated_cores,8,0,512,16000,0,1134.980,1.1350,2026-10-05T22:09:45.253613
+3,CMP,dedicated_cores,8,0,512,16000,0,1091.190,1.0912,2026-10-05T22:09:46.399626

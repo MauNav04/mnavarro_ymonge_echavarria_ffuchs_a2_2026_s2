@@ -32,12 +32,23 @@ COARSE_THREADS ?= 8
 FINE_THREADS ?= 8
 FINE_QUANTUM ?= 1
 FINE_MODE ?= cooperative
+RUNS ?= 200
+
+# Modelos a incluir en el benchmark
+# all: ejecuta todos
+# seq: secuencial
+# cmp: CMP (Chip Multiprocessing)
+# smt_hw: SMT hardware (16 hilos sobre 8 núcleos)
+# coarse: coarse-grained multithreading
+# fine_coop: fine-grained cooperative multithreading
+# fine_parallel: fine-grained parallel multithreading
+BENCHMARK_MODELS ?= all	
 
 # Parámetros para generación de videos demostrativos de alta resolución
 VIDEO_SIZE ?= 512
 VIDEO_STEPS ?= 16000
 
-.PHONY: all seq cmp smt coarse fine run_seq run_cmp verify_cmp run_smt run_smt_sw verify_smt run_coarse verify_coarse run_fine run_fine_parallel verify_fine run_seq_video run_cmp_video run_smt_video run_coarse_video run_fine_video clean
+.PHONY: all seq cmp smt coarse fine run_seq run_cmp verify_cmp run_smt run_smt_sw verify_smt run_coarse verify_coarse run_fine run_fine_parallel verify_fine run_seq_video run_cmp_video run_smt_video run_coarse_video run_fine_video benchmark benchmark_fast clean
 
 # Compilación por defecto: todos los ejecutables
 all: $(TARGET_SEQ) $(TARGET_CMP) $(TARGET_SMT) $(TARGET_COARSE) $(TARGET_FINE)
@@ -219,6 +230,16 @@ run_fine_video: $(TARGET_FINE)
 		-c:v libx264 -pix_fmt yuv420p $(VIDEOS_DIR)/gray-scott-fine.mp4
 	@rm -rf $(TEMP_FRAMES_FINE)
 	@echo "--> Video Fine-Grained generado con éxito en $(VIDEOS_DIR)/gray-scott-fine.mp4"
+
+# ==============================================================================
+# Benchmarking Automatizado Masivo (200 corridas estadísticas y generación CSV)
+# ==============================================================================
+benchmark: $(TARGET_SEQ) $(TARGET_CMP) $(TARGET_SMT) $(TARGET_COARSE) $(TARGET_FINE)
+	python3 benchmark.py --runs $(RUNS) --size $(SIZE) --steps $(STEPS) --models "$(BENCHMARK_MODELS)"
+
+# Prueba rápida de benchmarking (3 corridas por modelo) para validación de pipeline
+benchmark_fast: $(TARGET_SEQ) $(TARGET_CMP) $(TARGET_SMT) $(TARGET_COARSE) $(TARGET_FINE)
+	python3 benchmark.py --runs 3 --size $(SIZE) --steps $(STEPS) --models "$(BENCHMARK_MODELS)"
 
 # Limpieza de binarios y temporales
 clean:

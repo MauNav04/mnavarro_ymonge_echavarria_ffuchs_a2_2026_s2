@@ -203,6 +203,53 @@ En cumplimiento con la especificación del curso (Sección 4.1.a y Nota 4.1.5 qu
 
 ---
 
+## 7. Infraestructura de Benchmarking Automatizado y Métricas (`scripts/benchmark.py`)
+
+### Propósito
+Automatizar la campaña de **200 corridas estadísticas por modelo** sobre la configuración estándar ($512 \times 512$, $16{,}000$ pasos temporales) para obtener muestras científicas robustas y analizar rigurosamente el comportamiento de la CPU sin distorsiones provocadas por el planificador del sistema operativo.
+
+### Arquitectura del Módulo de Métricas
+Los resultados y el código de medición se organizan de forma desacoplada:
+```text
+proyecto1/problems/gray-scott/
+├── scripts/
+│   ├── benchmark.py              <-- Script maestro en Python 3 (sin dependencias externas)
+│   └── Makefile                  <-- Objetivos: make benchmark y make benchmark_fast
+└── metricas/                     <-- Carpeta dedicada para reproducibilidad experimental
+    ├── gray_scott_benchmark.csv  <-- Datos crudos de las corridas (escritura incremental en disco)
+    ├── resumen_estadistico.csv   <-- Estadísticas agregadas (Media, StdDev, Mín, Máx, Speedup)
+    └── graficas/                 <-- Directorio reservado para gráficos comparativos (.png / .pdf)
+```
+
+### Características Técnicas del Script Maestro (`benchmark.py`)
+1. **Escritura Incremental Segura (`flush` continuo):**
+   Cada corrida completada se formatea y escribe de inmediato en `gray_scott_benchmark.csv`. Si el proceso se interrumpe, no se pierde ninguna medición previa.
+2. **Prevención de *Thermal Throttling* (`--cooldown`):**
+   Introduce pausas configurables (por defecto 0.05 s) entre corridas sucesivas para evitar el sobrecalentamiento del silicio del Ryzen y asegurar que las frecuencias de reloj permanezcan estables a lo largo de las 200 iteraciones.
+3. **Cero Dependencias de Terceros para Medición:**
+   Utiliza exclusivamente módulos estándar de Python (`csv`, `subprocess`, `time`, `statistics`, `argparse`, `pathlib`), permitiendo ejecutar las mediciones en cualquier entorno Linux sin requerir instalación previa de bibliotecas externas.
+4. **Métricas Consolidadas:**
+   Calcula en tiempo real Media ($\mu$), Desviación Estándar ($\sigma$), Mínimo, Máximo, Mediana, Speedup vs Secuencial y Eficiencia Paralela, exportándolos a `resumen_estadistico.csv`.
+
+### Estructura de Campos en `gray_scott_benchmark.csv`
+* `run_id`: Número de iteración (1 a $N$).
+* `modelo`: Nombre del modelo (`Secuencial`, `CMP`, `SMT`, `Coarse-Grained`, `Fine-Grained`).
+* `modo`: Sub-régimen (`baseline`, `dedicated_cores`, `hardware_smt`, `software_oversubscription`, `burst_block`, `cooperative_quantum`, `cyclic_threads`).
+* `hilos`: Cantidad de hilos lógicos/físicos.
+* `quantum`: Tamaño del cuantum mínimo (en filas).
+* `size`: Tamaño de la matriz ($N \times N$).
+* `steps`: Cantidad de pasos temporales.
+* `eventos_contexto`: Conmutaciones forzadas o eventos de bloqueo registrados.
+* `tiempo_ms`: Tiempo de cómputo puro en CPU (milisegundos).
+* `tiempo_s`: Tiempo de cómputo (segundos).
+* `timestamp`: Fecha y hora ISO de la ejecución.
+
+### Reglas de Ejecución en el Makefile:
+* `make benchmark`: Ejecuta la campaña completa estándar de 200 corridas para todos los modelos.
+* `make benchmark_fast`: Ejecuta una campaña rápida (3 corridas por modelo) para validar el flujo completo.
+
+---
+
 ## Tabla Resumen de Modelos
 
 | Modelo | Unidad de Trabajo en Core | Sincronización Inter-paso | Asignación de CPU / Afinidad | Evento de Conmutación |

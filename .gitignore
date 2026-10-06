@@ -1,6 +1,13 @@
 # macOS
 .DS_Store
 
+# Python virtual environments & cache
+venv/
+.venv/
+env/
+__pycache__/
+*.pyc
+
 # C / C++
 *.o
 *.out
@@ -17,6 +24,11 @@ results/
 
 # Generated graphs
 *.pdf
+
+# Allow tracking curated project metrics and graphs
+!proyecto1/problems/gray-scott/metricas/*.csv
+!proyecto1/problems/gray-scott/metricas/graficas/*.png
+!proyecto1/problems/gray-scott/metricas/graficas/*.pdf
 
 # Gray-Scott compilation output
 proyecto1/problems/gray-scott/scripts/gray_scott_seq
