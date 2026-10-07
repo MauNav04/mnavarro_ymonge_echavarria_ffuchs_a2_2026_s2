@@ -124,6 +124,11 @@ def main():
     )
     parser.add_argument("--include-smt-sw", action="store_true", help="Incluye la prueba de SMT por software (requiere sudo para desactivar SMT)")
     parser.add_argument(
+        "--append",
+        action="store_true",
+        help="Si se especifica, anexa las nuevas corridas al CSV existente. Por defecto (sin este flag), inicia un archivo limpio sobrescribiendo datos previos."
+    )
+    parser.add_argument(
         "--output-csv",
         type=str,
         default="../metricas/gray_scott_benchmark.csv",
@@ -259,10 +264,10 @@ def main():
         "timestamp"
     ]
 
-    es_archivo_nuevo = not csv_output_path.exists()
-    csv_file = open(csv_output_path, "a", newline="", encoding="utf-8")
+    modo_apertura = "a" if (args.append and csv_output_path.exists()) else "w"
+    csv_file = open(csv_output_path, modo_apertura, newline="", encoding="utf-8")
     writer = csv.writer(csv_file)
-    if es_archivo_nuevo:
+    if modo_apertura == "w":
         writer.writerow(encabezados)
         csv_file.flush()
 
