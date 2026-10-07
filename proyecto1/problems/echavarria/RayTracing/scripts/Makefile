@@ -90,9 +90,13 @@ run_cmp: $(TARGET_CMP)
 		echo "--> [IMAGEN GENERADA] Visualiza el render en: $(PPM_CMP)"; \
 	fi
 
-run_smt: $(TARGET_SMT)
+# ==============================================================================
+# SMT: ON (Hardware Real) vs OFF (Kernel o Simulado)
+# ==============================================================================
+# SMT Encendido (Hardware Real - 16 hilos en 16 procesadores lógicos)
+run_smt_on: $(TARGET_SMT)
 	@mkdir -p $(IMAGES_DIR)
-	./$(TARGET_SMT) --threads $(SMT_THREADS) --width $(WIDTH) --samples $(SAMPLES) --depth $(DEPTH) --save-ppm $(PPM_SMT)
+	./$(TARGET_SMT) --mode hw --threads $(SMT_THREADS) --width $(WIDTH) --samples $(SAMPLES) --depth $(DEPTH) --save-ppm $(PPM_SMT)
 	@if command -v ffmpeg >/dev/null 2>&1; then \
 		ffmpeg -y -loglevel error -i $(PPM_SMT) $(PNG_SMT) && rm -f $(PPM_SMT); \
 		echo "--> [IMAGEN GENERADA] Visualiza el render en: $(PNG_SMT)"; \
@@ -100,14 +104,34 @@ run_smt: $(TARGET_SMT)
 		echo "--> [IMAGEN GENERADA] Visualiza el render en: $(PPM_SMT)"; \
 	fi
 
-# SMT con Sobre-suscripción por Software (Desactiva SMT en el kernel con trap seguro)
-run_smt_sw: $(TARGET_SMT)
+run_smt: run_smt_on
+
+# SMT Apagado en Hardware Real (Kernel / sysfs con sudo y trap seguro)
+run_smt_off: $(TARGET_SMT)
+	@mkdir -p $(IMAGES_DIR)
 	@bash -c 'trap "echo on | sudo tee /sys/devices/system/cpu/smt/control > /dev/null" EXIT INT TERM; \
-		echo "--> [SMT SW] Deshabilitando SMT en kernel (/sys/devices/system/cpu/smt/control)..."; \
+		echo "--> [SMT KERNEL] Deshabilitando SMT físicamente en Linux (/sys/devices/system/cpu/smt/control)..."; \
 		echo off | sudo tee /sys/devices/system/cpu/smt/control > /dev/null; \
-		echo "--> [SMT SW] Ejecutando 16 hilos sobre núcleos físicos (sobre-suscripción por software)..."; \
-		./$(TARGET_SMT) --threads $(SMT_THREADS) --width $(WIDTH) --samples $(SAMPLES) --depth $(DEPTH); \
-		echo "--> [SMT SW] Restaurando SMT a ON en el hardware..."'
+		echo "--> [SMT KERNEL] Ejecutando 16 hilos con SMT apagado en el hardware..."; \
+		./$(TARGET_SMT) --threads $(SMT_THREADS) --width $(WIDTH) --samples $(SAMPLES) --depth $(DEPTH) --save-ppm $(PPM_SMT); \
+		echo "--> [SMT KERNEL] Restaurando SMT a ON en el hardware..."'
+	@if [ -f $(PPM_SMT) ] && command -v ffmpeg >/dev/null 2>&1; then \
+		ffmpeg -y -loglevel error -i $(PPM_SMT) $(PNG_SMT) && rm -f $(PPM_SMT); \
+		echo "--> [IMAGEN GENERADA] Visualiza el render en: $(PNG_SMT)"; \
+	fi
+
+# SMT Apagado Simulado por Afinidad (Sin requerir sudo)
+run_smt_sw: $(TARGET_SMT)
+	@mkdir -p $(IMAGES_DIR)
+	./$(TARGET_SMT) --mode sw --threads $(SMT_THREADS) --width $(WIDTH) --samples $(SAMPLES) --depth $(DEPTH) --save-ppm $(PPM_SMT)
+	@if command -v ffmpeg >/dev/null 2>&1; then \
+		ffmpeg -y -loglevel error -i $(PPM_SMT) $(PNG_SMT) && rm -f $(PPM_SMT); \
+		echo "--> [IMAGEN GENERADA] Visualiza el render en: $(PNG_SMT)"; \
+	else \
+		echo "--> [IMAGEN GENERADA] Visualiza el render en: $(PPM_SMT)"; \
+	fi
+
+run_smt_kernel_off: run_smt_off
 
 run_coarse: $(TARGET_COARSE)
 	@mkdir -p $(IMAGES_DIR)
@@ -129,6 +153,8 @@ run_fine: $(TARGET_FINE)
 		echo "--> [IMAGEN GENERADA] Visualiza el render en: $(PPM_FINE)"; \
 	fi
 
+run_fine_coop: run_fine
+
 run_fine_parallel: $(TARGET_FINE)
 	@mkdir -p $(IMAGES_DIR)
 	./$(TARGET_FINE) --threads $(THREADS) --quantum $(QUANTUM) --mode parallel --width $(WIDTH) --samples $(SAMPLES) --depth $(DEPTH) --save-ppm $(PPM_FINE)
@@ -145,14 +171,32 @@ run_fine_parallel: $(TARGET_FINE)
 verify_cmp: $(TARGET_CMP)
 	./$(TARGET_CMP) --threads $(THREADS) --width $(WIDTH) --samples $(SAMPLES) --depth $(DEPTH) --verify
 
-verify_smt: $(TARGET_SMT)
-	./$(TARGET_SMT) --threads $(SMT_THREADS) --width $(WIDTH) --samples $(SAMPLES) --depth $(DEPTH) --verify
+verify_smt_on: $(TARGET_SMT)
+	./$(TARGET_SMT) --mode hw --threads $(SMT_THREADS) --width $(WIDTH) --samples $(SAMPLES) --depth $(DEPTH) --verify
+
+verify_smt: verify_smt_on
+
+verify_smt_off: $(TARGET_SMT)
+	@bash -c 'trap "echo on | sudo tee /sys/devices/system/cpu/smt/control > /dev/null" EXIT INT TERM; \
+		echo "--> [SMT KERNEL] Deshabilitando SMT físicamente en Linux (/sys/devices/system/cpu/smt/control)..."; \
+		echo off | sudo tee /sys/devices/system/cpu/smt/control > /dev/null; \
+		echo "--> [SMT KERNEL] Verificando 16 hilos con SMT apagado..."; \
+		./$(TARGET_SMT) --threads $(SMT_THREADS) --width $(WIDTH) --samples $(SAMPLES) --depth $(DEPTH) --verify; \
+		echo "--> [SMT KERNEL] Restaurando SMT a ON en el hardware..."'
+
+verify_smt_sw: $(TARGET_SMT)
+	./$(TARGET_SMT) --mode sw --threads $(SMT_THREADS) --width $(WIDTH) --samples $(SAMPLES) --depth $(DEPTH) --verify
 
 verify_coarse: $(TARGET_COARSE)
 	./$(TARGET_COARSE) --threads $(THREADS) --width $(WIDTH) --samples $(SAMPLES) --depth $(DEPTH) --verify
 
 verify_fine: $(TARGET_FINE)
 	./$(TARGET_FINE) --threads $(THREADS) --quantum $(QUANTUM) --mode parallel --width $(WIDTH) --samples $(SAMPLES) --depth $(DEPTH) --verify
+
+verify_fine_parallel: verify_fine
+
+verify_fine_coop: $(TARGET_FINE)
+	./$(TARGET_FINE) --threads $(THREADS) --quantum $(QUANTUM) --mode cooperative --width $(WIDTH) --samples $(SAMPLES) --depth $(DEPTH) --verify
 
 # ==============================================================================
 # LIMPIEZA

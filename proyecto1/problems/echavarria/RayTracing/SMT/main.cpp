@@ -37,6 +37,7 @@
 #include <cmath>
 #include <iomanip>
 #include <unistd.h>
+#include <set>
 
 // ============================================================================
 // Detección del Estado de SMT en Linux
@@ -50,15 +51,62 @@ std::string obtener_estado_smt_linux() {
     return estado;
 }
 
+// Verifica si un CPU específico se encuentra en estado online
+bool cpu_esta_online(int cpu) {
+    if (cpu == 0) return true;
+    std::ifstream f("/sys/devices/system/cpu/cpu" + std::to_string(cpu) + "/online");
+    int val = 0;
+    if (f >> val) return val == 1;
+    // Si el archivo no existe pero el directorio sí, asumimos que está activo
+    std::ifstream f_core("/sys/devices/system/cpu/cpu" + std::to_string(cpu) + "/topology/core_id");
+    return f_core.good();
+}
+
 // Obtiene la lista de CPUs lógicos actualmente online en el sistema operativo
 std::vector<int> obtener_cpus_online() {
     std::vector<int> cpus;
-    long num_cpus = sysconf(_SC_NPROCESSORS_ONLN);
-    if (num_cpus <= 0) num_cpus = 8;
-    for (int i = 0; i < num_cpus; ++i) {
-        cpus.push_back(i);
+    for (int cpu = 0; cpu < 64; ++cpu) {
+        std::string ruta = "/sys/devices/system/cpu/cpu" + std::to_string(cpu);
+        std::ifstream check_online(ruta + "/online");
+        std::ifstream check_topo(ruta + "/topology/core_id");
+        if (cpu > 0 && !check_online.good() && !check_topo.good()) {
+            break; // No existen más procesadores en sysfs
+        }
+        if (cpu_esta_online(cpu)) {
+            cpus.push_back(cpu);
+        }
+    }
+    if (cpus.empty()) {
+        long num_cpus = sysconf(_SC_NPROCESSORS_ONLN);
+        if (num_cpus <= 0) num_cpus = 8;
+        for (int i = 0; i < num_cpus; ++i) cpus.push_back(i);
     }
     return cpus;
+}
+
+// Obtiene los núcleos físicos reales inspeccionando core_id entre los CPUs online
+std::vector<int> obtener_cpus_fisicos() {
+    std::vector<int> cpus_fisicos;
+    std::set<int> core_ids_vistos;
+    std::vector<int> cpus_online = obtener_cpus_online();
+
+    for (int cpu : cpus_online) {
+        std::string ruta = "/sys/devices/system/cpu/cpu" + std::to_string(cpu) + "/topology/core_id";
+        std::ifstream archivo(ruta);
+        int core_id = -1;
+        if (archivo >> core_id) {
+            if (core_ids_vistos.find(core_id) == core_ids_vistos.end()) {
+                core_ids_vistos.insert(core_id);
+                cpus_fisicos.push_back(cpu);
+            }
+        } else {
+            cpus_fisicos.push_back(cpu);
+        }
+    }
+    if (cpus_fisicos.empty()) {
+        cpus_fisicos = cpus_online;
+    }
+    return cpus_fisicos;
 }
 
 // ============================================================================
@@ -100,6 +148,7 @@ int main(int argc, char* argv[]) {
     int samples = 10;
     int max_depth = 50;
     int num_threads = 16;       // 16 hilos lógicos por defecto para SMT
+    std::string mode = "hw";    // "hw" para SMT Real de Hardware, "sw" para Sobre-suscripción por Software
     bool verify = false;
     std::string output_ppm = "";
 
@@ -108,6 +157,8 @@ int main(int argc, char* argv[]) {
         std::string arg = argv[i];
         if (arg == "--threads" && i + 1 < argc) {
             num_threads = std::stoi(argv[++i]);
+        } else if (arg == "--mode" && i + 1 < argc) {
+            mode = argv[++i];
         } else if (arg == "--width" && i + 1 < argc) {
             width = std::stoi(argv[++i]);
         } else if (arg == "--samples" && i + 1 < argc) {
@@ -126,7 +177,25 @@ int main(int argc, char* argv[]) {
     // Diagnóstico de topología y CPUs online
     std::string smt_status = obtener_estado_smt_linux();
     std::vector<int> cpus_online = obtener_cpus_online();
+    std::vector<int> cpus_fisicos = obtener_cpus_fisicos();
     int total_cpus_online = static_cast<int>(cpus_online.size());
+
+    // Si SMT en Linux está "off" en el kernel, forzar mode = "sw"
+    if (smt_status == "off") {
+        mode = "sw";
+    }
+
+    // Determinar la lista de CPUs para afinar los hilos
+    std::vector<int> cpus_target;
+    if (mode == "sw") {
+        // En modo sobre-suscripción (SMT OFF): usamos los núcleos físicos para forzar time-slicing
+        cpus_target = cpus_fisicos;
+    } else {
+        // En modo hardware SMT: usamos los procesadores lógicos online
+        cpus_target = cpus_online;
+    }
+    int num_target_cores = static_cast<int>(cpus_target.size());
+    if (num_target_cores <= 0) num_target_cores = 1;
 
     // Creación de la escena determinista
     hittable_list world = create_scene();
@@ -150,7 +219,7 @@ int main(int argc, char* argv[]) {
     // Creación del Framebuffer en RAM contigua
     Framebuffer fb(width, height);
 
-    // Particionado 1D en 16 franjas de scanlines [0, height)
+    // Particionado 1D en franjas de scanlines [0, height)
     int filas_base = height / num_threads;
     int residuo = height % num_threads;
 
@@ -162,9 +231,9 @@ int main(int argc, char* argv[]) {
         int filas_asignadas = filas_base + (t < residuo ? 1 : 0);
         contextos[t].id = t;
         // Asignación de afinidad:
-        // Si SMT ON (16 CPUs online): Hilo t se fija a CPU t
-        // Si SMT OFF (8 CPUs online): Hilo t se fija a CPU (t % 8), forzando sobre-suscripción
-        contextos[t].cpu_afinidad = cpus_online[t % total_cpus_online];
+        // Si SMT ON (HW): se reparte entre los 16 CPUs lógicos
+        // Si SMT OFF (SW): se fuerza sobre-suscripción repartiendo entre los núcleos físicos
+        contextos[t].cpu_afinidad = cpus_target[t % num_target_cores];
         contextos[t].start_y = fila_actual;
         contextos[t].end_y = fila_actual + filas_asignadas;
         contextos[t].cam = &cam;
@@ -201,9 +270,11 @@ int main(int argc, char* argv[]) {
     std::cout << "Muestras / Píxel   : " << samples << "\n";
     std::cout << "Profundidad Rebote : " << max_depth << "\n";
     std::cout << "Hilos Solicitados  : " << num_threads << "\n";
+    std::cout << "Modo de Ejecución  : " << (mode == "sw" ? "Sobre-suscripción por Software (SMT OFF)" : "Hardware SMT Real (SMT ON)") << "\n";
     std::cout << "Estado SMT Linux   : " << smt_status 
-              << (smt_status == "on" ? " [Hardware SMT Activo]" : " [Sobre-suscripción por Software]") << "\n";
+              << (smt_status == "on" ? " [Kernel SMT Activo]" : " [Kernel SMT Apagado]") << "\n";
     std::cout << "CPUs Online Detect.: " << total_cpus_online << "\n";
+    std::cout << "Cores Destino      : " << num_target_cores << " núcleos (" << (mode == "sw" ? "Físicos aislados" : "Lógicos del HW") << ")\n";
     std::cout << "Asignación Cores   : ";
     for (int t = 0; t < num_threads; ++t) {
         std::cout << "[H" << t << "->CPU" << contextos[t].cpu_afinidad << "] ";
@@ -236,7 +307,7 @@ int main(int argc, char* argv[]) {
     std::cout << "========================================================\n";
 
     // Salida estructurada CSV por stderr para benchmarking automatizado
-    std::cerr << "smt," << num_threads << "," << width << "," << height << "," 
+    std::cerr << "smt," << mode << "," << num_threads << "," << width << "," << height << "," 
               << samples << "," << max_depth << "," << smt_status << "," << elapsed_smt.count() << "\n";
 
     // Exportación opcional a PPM
