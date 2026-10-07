@@ -48,7 +48,7 @@ BENCHMARK_MODELS ?= all
 VIDEO_SIZE ?= 512
 VIDEO_STEPS ?= 16000
 
-.PHONY: all seq cmp smt coarse fine run_seq run_cmp verify_cmp run_smt run_smt_sw verify_smt run_coarse verify_coarse run_fine run_fine_parallel verify_fine run_seq_video run_cmp_video run_smt_video run_coarse_video run_fine_video benchmark benchmark_fast clean
+.PHONY: all seq cmp smt coarse fine run_seq run_cmp verify_cmp run_smt run_smt_sw verify_smt run_coarse verify_coarse run_fine run_fine_parallel verify_fine run_seq_video run_cmp_video run_smt_video run_coarse_video run_fine_video benchmark benchmark_fast plot graficas clean
 
 # Compilación por defecto: todos los ejecutables
 all: $(TARGET_SEQ) $(TARGET_CMP) $(TARGET_SMT) $(TARGET_COARSE) $(TARGET_FINE)
@@ -238,10 +238,24 @@ benchmark: $(TARGET_SEQ) $(TARGET_CMP) $(TARGET_SMT) $(TARGET_COARSE) $(TARGET_F
 	python3 benchmark.py --runs $(RUNS) --size $(SIZE) --steps $(STEPS) --models "$(BENCHMARK_MODELS)"
 
 # Prueba rápida de benchmarking (3 corridas por modelo) para validación de pipeline
+# Usa archivos independientes para no contaminar los datos oficiales de 200 corridas
 benchmark_fast: $(TARGET_SEQ) $(TARGET_CMP) $(TARGET_SMT) $(TARGET_COARSE) $(TARGET_FINE)
-	python3 benchmark.py --runs 3 --size $(SIZE) --steps $(STEPS) --models "$(BENCHMARK_MODELS)"
+	python3 benchmark.py --runs 3 --size $(SIZE) --steps $(STEPS) --models "$(BENCHMARK_MODELS)" \
+		--output-csv ../metricas/gray_scott_benchmark_fast.csv \
+		--summary-csv ../metricas/resumen_estadistico_fast.csv
+
+# ==============================================================================
+# Generación de Gráficos de Rendimiento y Análisis Estadístico (300 DPI)
+# ==============================================================================
+VENV_PYTHON = $(shell if [ -f ../../../venv/bin/python3 ]; then echo "$$(realpath ../../../venv)/bin/python3"; else echo python3; fi)
+
+plot:
+	$(VENV_PYTHON) -W ignore plot_metrics.py
+
+graficas: plot
 
 # Limpieza de binarios y temporales
 clean:
 	rm -f $(TARGET_SEQ) $(TARGET_CMP) $(TARGET_SMT) $(TARGET_COARSE) $(TARGET_FINE)
 	rm -rf $(TEMP_FRAMES_SEQ) $(TEMP_FRAMES_CMP) $(TEMP_FRAMES_SMT) $(TEMP_FRAMES_COARSE) $(TEMP_FRAMES_FINE)
+	rm -f ../metricas/*_fast.csv

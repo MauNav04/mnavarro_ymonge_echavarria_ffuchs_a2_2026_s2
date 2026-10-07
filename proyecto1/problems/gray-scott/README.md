@@ -81,49 +81,157 @@ pip install -r ../../requirements.txt
 
 ---
 
-### Compilación:
-Desde la carpeta de scripts:
+### 3.1 Compilación de los Ejecutables
+Todas las reglas de compilación se ejecutan desde el directorio `scripts/` utilizando `g++` con estándar **C++17**, flags de máxima optimización arquitectónica (`-O3`), advertencias estrictas (`-Wall -Wextra`), inclusión de encabezados (`-I../include`) y soporte multihilo (`-pthread`):
+
 ```bash
 cd scripts/
+
+# Compilar todos los modelos simultáneamente (5 binarios):
 make
+# o equivalentemente:
+make all
+
+# Compilación individual de binarios específicos:
+make seq      # Genera: gray_scott_seq
+make cmp      # Genera: gray_scott_cmp
+make smt      # Genera: gray_scott_smt
+make coarse   # Genera: gray_scott_coarse
+make fine     # Genera: gray_scott_fine
+
+# Limpieza de binarios compilados y carpetas temporales de video:
+make clean
 ```
 
 ---
 
-### Modo 1: Benchmark Puro (Sin Video)
-Diseñado para la toma rigurosa de métricas de hardware y tiempos de CPU sin interferencia de operaciones de I/O en disco:
+### 3.2 Ejecución de los 4 Modelos y sus Variantes Arquitectónicas (7 en Total)
+El proyecto implementa los 4 modelos de cómputo multihilo requeridos en la especificación, los cuales se desglosan experimentalmente en **7 variantes de ejecución microarquitectónica**:
 
-```bash
-make run_seq
-```
+1. **Secuencial (Baseline):**
+   * **Comando:** `make run_sequential`  
+     *(Equivalente directo: `./gray_scott_seq --size 512 --steps 16000`)*
+   * **Descripción:** Ejecución de referencia en un único hilo y un solo núcleo de CPU. Opera como la línea base matemática ($S = 1.0\text{x}$) sin costes de sincronización ni contención.
+
+2. **CMP (Chip Multiprocessing):**
+   * **Comando:** `make run_cmp`  
+     *(Equivalente directo: `./gray_scott_cmp --threads 8 --size 512 --steps 16000`)*
+   * **Descripción:** Paralelismo multinúcleo puro utilizando 8 hilos físicos persistentes (1 hilo dedicado por núcleo físico) con barreras de sincronización reutilizables al cierre de cada paso temporal.
+
+3. **SMT en Hardware Real (SMT ON):**
+   * **Comando:** `make run_smt`  
+     *(Equivalente directo: `./gray_scott_smt --threads 16 --size 512 --steps 16000`)*
+   * **Descripción:** Ejecución de 16 hilos compitiendo dinámicamente en el pipeline de hardware de los 8 núcleos físicos con Simultaneous Multithreading activo en el procesador.
+
+4. **SMT con Sobre-suscripción por Software (SMT OFF):**
+   * **Comando:** `make run_smt_sw`  
+     *(Requiere privilegios `sudo` para alternar temporalmente `/sys/devices/system/cpu/smt/control`)*
+   * **Descripción:** Ejecuta 16 hilos lógicos pero desactivando SMT en el kernel Linux para forzar al planificador del sistema operativo a realizar *time-slicing* sobre 8 núcleos físicos, evidenciando el costo del cambio de contexto por software.
+
+5. **Coarse-Grained Multithreading (Grano Grueso):**
+   * **Comando:** `make run_coarse`  
+     *(Equivalente directo: `./gray_scott_coarse --threads 8 --size 512 --steps 16000`)*
+   * **Descripción:** Descomposición del dominio espacial en ráfagas largas de bloques contiguos (chunks de 64 filas por hilo) maximizando la localidad espacial de caché y sincronizándose por barrera al término de cada iteración.
+
+6. **Fine-Grained Cooperativo (Emulación Software por Corutinas):**
+   * **Comando:** `make run_fine`  
+     *(Equivalente directo: `./gray_scott_fine --threads 8 --quantum 1 --mode cooperative --size 512 --steps 16000`)*
+   * **Descripción:** Simulación de grano fino en espacio de usuario mediante corutinas en un único hilo físico de CPU con quantum estricto de 1 fila ($Q=1$), alternando incondicionalmente en round-robin entre 8 tareas lógicas.
+
+7. **Fine-Grained Paralelo Cíclico (Hardware Multihilo):**
+   * **Comando:** `make run_fine_parallel`  
+     *(Equivalente directo: `./gray_scott_fine --threads 8 --quantum 1 --mode parallel --size 512 --steps 16000`)*
+   * **Descripción:** Ejecución de grano fino distribuida en 8 hilos de hardware reales donde las filas se asignan de forma cíclica intercalada (hilo $i$ procesa las filas $i, i+8, \dots$), permitiendo estudiar la degradación de localidad de caché y contención en la interconexión.
 
 ---
 
-### Modo 2: Campaña Automatizada de 200 Corridas (Generación de CSV)
-Ejecuta la batería estadística completa para los modelos concurrentes (Secuencial, CMP, SMT, Coarse-Grained, Fine-Grained), exportando las métricas en tiempo real a la carpeta `metricas/`:
+### 3.3 Verificación Numérica y Corrección Cruzada
+Para garantizar la validez científica y matemática de todas las optimizaciones concurrentes, cada modelo incluye una rutina de validación que compara celda a celda los arreglos finales contra la solución secuencial exacta con tolerancia de punto flotante $\epsilon = 10^{-5}$:
 
 ```bash
-# Campaña completa estándar (200 corridas por modelo):
+# Validar modelo CMP frente a Secuencial:
+make verify_cmp
+
+# Validar modelo SMT frente a Secuencial:
+make verify_smt
+
+# Validar modelo Coarse-Grained frente a Secuencial:
+make verify_coarse
+
+# Validar modelo Fine-Grained frente a Secuencial:
+make verify_fine
+```
+* **Uso directo:** Todos los binarios aceptan el flag `--verify` para realizar la comprobación in-situ con tamaños arbitrarios (ejemplo: `./gray_scott_cmp --threads 8 --size 256 --steps 1000 --verify`).
+
+---
+
+### 3.4 Benchmarking Automatizado Masivo (Generación de CSV)
+El script maestro `scripts/benchmark.py` automatiza la recolección masiva de métricas experimentales sin intervención manual, aplicando temporización precisa en milisegundos (`std::chrono`) y exportando los datos a `metricas/`:
+
+```bash
+# Campaña formal completa (200 corridas estadísticas por cada uno de los 7 modelos = 1,400 ejecuciones):
+# Sobrescribe limpiamente los archivos oficiales para garantizar integridad estadística:
 make benchmark
 
-# O prueba rápida de verificación (3 corridas por modelo):
+# Prueba rápida de validación de pipeline (3 corridas por modelo):
+# Exporta a gray_scott_benchmark_fast.csv para no alterar los datos oficiales de 200 corridas:
 make benchmark_fast
+
+# Opciones avanzadas invocando directamente el script:
+python3 benchmark.py --runs 200 --size 512 --steps 16000 --models all
+
+# Anexar corridas a un CSV existente en lugar de iniciar limpio:
+python3 benchmark.py --runs 10 --models "cmp" --append
 ```
 
-*Los resultados se almacenan en:*
-* `metricas/gray_scott_benchmark.csv`: Muestras crudas corrida por corrida.
-* `metricas/resumen_estadistico.csv`: Tabla consolidada con Media, Desviación Estándar, Mínimo, Máximo, Mediana, Speedup y Eficiencia.
+* **Archivos generados:**
+  * `metricas/gray_scott_benchmark.csv`: Muestras crudas oficiales de tiempo y configuración para las 1,400 corridas de la campaña de 200 repeticiones.
+  * `metricas/resumen_estadistico.csv`: Consolidado estadístico oficial con Media ($\mu$), Desviación Estándar ($\sigma$), Mínimo, Máximo, Mediana, Speedup ($S$) y Eficiencia ($E$).
+  * `metricas/gray_scott_benchmark_fast.csv` y `resumen_estadistico_fast.csv`: Generados únicamente por `make benchmark_fast` para pruebas preliminares aisladas sin tocar el dataset principal.
 
 ---
 
-### Modo 3: Generación de Video Sincronizado
-Compila la simulación, exporta los fotogramas PPM temporales e invoca `ffmpeg` con un filtro que calcula dinámicamente el tiempo de CPU por fotograma:
+### 3.5 Generación de Gráficas de Rendimiento (Visualización Científica en 300 DPI)
+El script `scripts/plot_metrics.py` procesa los datos empíricos de `metricas/gray_scott_benchmark.csv` y genera automáticamente 5 gráficos de calidad de publicación:
 
 ```bash
-make run_seq_video
+# Generar el set completo de gráficas (usa automáticamente el entorno virtual venv):
+make graficas
+# o equivalentemente:
+make plot
 ```
 
-*El video final se almacena en `videos/gray-scott-secuencial.mp4`.*
+* **Visualizaciones exportadas en `metricas/graficas/`:*
+  1. **`01_tiempos_ejecucion_boxplot.png`**: Distribución de tiempos y diagramas de caja (Tukey boxplots) de las 200 corridas por modelo con medias anotadas y dispersión intercuartílica.
+  2. **`02_speedup_comparativo.png`**: Aceleración relativa ($S = T_{sec}/T_{par}$) frente a la línea base secuencial (1.0x).
+  3. **`03_eficiencia_paralela.png`**: Eficiencia porcentual ($E = S/p \times 100\%$) focalizada en los modelos concurrentes ($p \ge 8$).
+  4. **`04_comparativas_microarquitectonicas.png`**: Comparativa de 3 paneles aislando fenómenos de bajo nivel:
+     - *Panel A (SMT HW vs. SW - 16 hilos):* Penalización de sobre-suscripción por software (+22.4% más lento).
+     - *Panel B (Fine-Grained HW vs. Emulación SW):* Penalización de simulación secuencial por corutinas (+277.9% más lento).
+     - *Panel C (Localidad de Caché - 8 hilos HW):* Coarse-Grained vs Fine-Grained cíclico (+21.1% más lento).
+  5. **`05_dashboard_consolidado.png`**: Tablero general de 4 cuadrantes con tiempos, speedup, eficiencia y evolución temporal de las 200 repeticiones consecutivas.
+
+---
+
+### 3.6 Generación de Videos Sincronizados con el Tiempo Real de CPU
+Compila el modelo seleccionado, ejecuta la simulación exportando fotogramas PPM temporales e invoca `ffmpeg` para compilar un video `.mp4` de alta resolución ($512 \times 512$ a 20 FPS). Un filtro dinámico proyecta en pantalla el tiempo de CPU acumulado y el número de paso de la reacción química:
+
+```bash
+# Video para modelo Secuencial:
+make run_seq_video        # Genera: videos/gray-scott-secuencial.mp4
+
+# Video para modelo CMP (8 núcleos físicos):
+make run_cmp_video        # Genera: videos/gray-scott-cmp.mp4
+
+# Video para modelo SMT (16 hilos lógicos):
+make run_smt_video        # Genera: videos/gray-scott-smt.mp4
+
+# Video para modelo Coarse-Grained (ráfagas de bloques):
+make run_coarse_video     # Genera: videos/gray-scott-coarse.mp4
+
+# Video para modelo Fine-Grained (conmutación fina):
+make run_fine_video       # Genera: videos/gray-scott-fine.mp4
+```
 
 #### Progresión Morfológica de la Simulación ($1024 \times 1024$):
 

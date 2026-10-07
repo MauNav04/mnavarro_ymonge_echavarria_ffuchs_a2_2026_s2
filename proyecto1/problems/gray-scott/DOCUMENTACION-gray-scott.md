@@ -260,3 +260,88 @@ proyecto1/problems/gray-scott/
 | **Coarse-Grained** | Ráfagas continuas de grandes bloques | `pthread_barrier_t` | Hilos tradicionales (8 por defecto) | **Únicamente** ante evento de bloqueo (*stall* / barrera) |
 | **Fine-Grained** | Cuantum mínimo ($Q = 1$ fila) | Cooperativo / `pthread_barrier_t` | Hilos virtuales / Cíclico en cores | **Incondicional** en cada cuantum (Round-Robin) |
 
+---
+
+## 8. Resultados Experimentales y Análisis de Rendimiento (Campaña de 1,400 Corridas en procesador ryzen 7 5700G)
+
+### Metodología Experimental
+Para garantizar significancia estadística rigurosa, se ejecutó una campaña automatizada de **200 corridas independientes por modelo** (1,400 ejecuciones totales, tiempo acumulado de cómputo: **41 minutos y 36 segundos**) sobre una grilla estándar de $512 \times 512$ ($262{,}144$ celdas) durante $16{,}000$ pasos temporales ($4.19 \times 10^9$ actualizaciones de stencil).
+
+Las pruebas se ejecutaron en un procesador **AMD Ryzen** (8 núcleos físicos / 16 hilos lógicos) bajo Linux x86-64, compilando con `g++ -O3 -Wall -Wextra -std=c++17 -pthread`. Entre corridas consecutivas se aplicó un enfriamiento (*cooldown*) para evitar distorsiones por *thermal throttling*.
+
+### Tabla Consolidada de Resultados Estadísticos ($N = 200$)
+
+| Modelo de Ejecución | Modo Evaluado | Hilos | Media $\mu$ (ms) | Desv. Estándar $\sigma$ (ms) | Mínimo (ms) | Máximo (ms) | Mediana (ms) | Speedup $S$ | Eficiencia $E$ |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **SMT (HW Real)** | `hardware_smt` | 16 | **709.74** | 23.66 | 674.40 | 834.93 | 704.88 | **5.54x** | 34.6% |
+| **CMP** | `dedicated_cores` | 8 | **734.47** | 80.49 | 710.25 | 1544.43 | 722.72 | **5.35x** | **66.9%** |
+| **Coarse-Grained** | `burst_block` | 8 | **863.16** | 28.40 | 783.31 | 954.36 | 863.32 | **4.55x** | 56.9% |
+| **SMT (Sobre-suscripción SW)** | `software_oversubscription` | 16 | **869.02** | 16.16 | 844.12 | 939.64 | 863.34 | **4.52x** | 28.3% |
+| **Fine-Grained (Paralelo Cíclico)** | `cyclic_threads` | 8 | **1044.98** | 57.24 | 956.89 | 1431.11 | 1040.44 | **3.76x** | 47.0% |
+| **Secuencial (Baseline)** | `baseline` | 1 | **3929.68** | 230.94 | 3846.28 | 7025.05 | 3886.76 | **1.00x** | 100.0% |
+| **Fine-Grained (Cooperativo)** | `cooperative_quantum` | 8 | **3949.26** | 133.80 | 3876.28 | 5384.25 | 3917.60 | **1.00x** | 12.4% |
+
+---
+
+### Análisis Visual de Gráficas de Rendimiento (300 DPI)
+
+#### Gráfica 1: Distribución y Dispersión de Tiempos de Cómputo
+![Distribución de Tiempos de Ejecución](metricas/graficas/01_tiempos_ejecucion_boxplot.png)
+
+* **Observación Clave:** Los modelos paralelos (SMT HW, CMP, Coarse y SMT SW) se agrupan firmemente en la franja sub-segundo ($700 - 870\text{ ms}$), con una dispersión intercuartílica sumamente angosta.
+* **Estabilidad:** La desviación estándar de SMT HW ($\sigma = 23.7\text{ ms}$) y SMT SW ($\sigma = 16.2\text{ ms}$) demuestra la altísima predictibilidad temporal del procesador cuando no hay contención externa.
+* **Degradación del Modelo Cooperativo:** Fine-Grained cooperativo registra una media de $3949.3\text{ ms}$, virtualmente idéntica al secuencial puro ($3929.7\text{ ms}$), confirmando experimentalmente que la sobrecarga de simulación por software y los $8.16 \times 10^6$ cambios de contexto consumen el tiempo que teóricamente se esperaría ahorrar en una máquina de un solo hilo de hardware.
+
+---
+
+#### Gráfica 2: Aceleración Relativa (Speedup) vs. Secuencial
+![Speedup Comparativo](metricas/graficas/02_speedup_comparativo.png)
+
+* **SMT en Hardware Real logra el mayor Speedup absoluto (5.54x):** Al disponer de 16 contextos de registros simultáneos, el procesador satura las unidades de ejecución de punto flotante de los 8 núcleos de cómputo.
+* **CMP (5.35x):** Alcanza un desempeño prácticamente equivalente al SMT HW utilizando únicamente 8 hilos dedicados (1 por core físico), lo que evita la contención en el planificador interno de instrucciones del núcleo.
+* **Coarse-Grained (4.55x) vs Fine-Grained Paralelo (3.76x):** Ambos modelos ejecutan exactamente 8 hilos en 8 núcleos de cómputo; sin embargo, la estrategia de particionamiento continuo en ráfagas de Coarse-Grained aventaja a Fine-Grained por casi **0.8x de speedup**, debido a factores de microarquitectura de memoria.
+
+---
+
+#### Gráfica 3: Eficiencia Paralela por Recurso de Cómputo
+![Eficiencia Paralela](metricas/graficas/03_eficiencia_paralela.png)
+
+* **¿Por qué el modelo Secuencial tiene 100% por definición ($p=1$)?** 
+  La métrica de eficiencia paralela se define como $E = \frac{S}{p} \times 100\% = \frac{T_{sec}}{p \times T_{par}} \times 100\%$. Para el modelo secuencial ($p=1$ núcleo, $S=1.0$), no existen costos de sincronización, barreras ni contención de bus; por tanto, matemáticamente su eficiencia es $100\%$. Sin embargo, graficarlo junto a los sistemas paralelos suele generar confusión visual (parece indicar erróneamente que el secuencial "es superior", a pesar de tardar casi 4 segundos vs 700 ms). Por esta razón, la gráfica enfoca exclusivamente los **modelos concurrentes ($p \ge 8$)**.
+* **CMP es el modelo más eficiente de la arquitectura (66.9%):** Al mapear exactamente 1 hilo por núcleo físico, cada unidad de cómputo opera al máximo de su capacidad sin competir por registros de renombramiento, colas de carga/almacenamiento (*Load/Store Queues*) o cachés L1/L2 privadas.
+* **La paradoja de eficiencia en SMT:** A pesar de que SMT HW entrega el menor tiempo absoluto ($709.7\text{ ms}$), su eficiencia nominal por hilo es del **34.6%** ($5.54 / 16$). Esto ilustra que los 16 hilos lógicos no corresponden a 16 núcleos físicos independientes, sino a 8 núcleos compartiendo el ancho de banda del pipeline. La duplicación de hilos aportó un $3.5\%$ de reducción temporal sobre CMP a cambio de duplicar los recursos lógicos gestionados.
+* **Fine-Grained Cooperativo (12.4%):** Al repartir el trabajo en 8 tareas lógicas pero ejecutarse secuencialmente en un único procesador, el speedup es 1.0x, lo que divide su aprovechamiento por 8 hilos resultando en un magro 12.4%.
+
+---
+
+#### Gráfica 4: Aislamiento de Fenómenos Microarquitectónicos (3 Paneles)
+![Comparativas Microarquitectónicas](metricas/graficas/04_comparativas_microarquitectonicas.png)
+
+Esta figura aísla experimentalmente las tres preguntas clave de la microarquitectura del procesador:
+
+1. **Panel A — Aislamiento SMT (Hardware Real vs. Sobre-suscripción por Software - 16 Hilos):**
+   * **SMT en Hardware Real:** $709.7\text{ ms}$.
+   * **SMT Sobre-suscripción por Software (SMT OFF en kernel Linux):** $869.0\text{ ms}$.
+   * **Conclusión:** La sobre-suscripción por software impone una **penalización del $+22.4\%$ ($+159.3\text{ ms}$)**. El planificador del sistema operativo debe expulsar hilos de los núcleos mediante interrupciones periódicas del temporizador (*timer ticks*), guardando y restaurando el estado arquitectónico (registros vectoriales AVX-512/AVX2, RIP, RSP) en memoria RAM, invalidando la TLB y vaciando el pipeline. Por el contrario, en SMT de hardware real, la alternancia se realiza en la etapa de decodificación y despacho a nivel de ciclo de reloj sin costo de software.
+
+2. **Panel B — Fine-Grained: Hardware Real vs. Emulación en Software (8 Hilos Lógicos / Q=1 fila):**
+   * **Fine-Grained Paralelo Cíclico (8 hilos en hardware):** $1045.0\text{ ms}$.
+   * **Fine-Grained Cooperativo (1 core físico, 8 corutinas, 8.16M switches):** $3949.3\text{ ms}$.
+   * **Conclusión:** La emulación puramente por software impone una **penalización masiva del $+277.9\%$ ($+2904.3\text{ ms}$)**. Este contraste demuestra la diferencia fundamental entre el entrelazado de grano fino implementado en hardware (donde múltiples contextos de ejecución avanzan concurrentemente en los pipelines) frente a la simulación cooperativa por software en un solo núcleo, donde la sobrecarga de saltos indirectos y guardado de contexto de corutinas anula cualquier beneficio de paralelismo.
+
+3. **Panel C — Efecto de la Localidad Espacial de Caché (Coarse vs. Fine Cíclico - Ambos con 8 Hilos HW):**
+   * Ambos modelos ejecutan exactamente 8 hilos en 8 núcleos de CPU.
+   * **Coarse-Grained (Bloques contiguos):** $863.2\text{ ms}$.
+   * **Fine-Grained (Intercalado cíclico fila a fila):** $1045.0\text{ ms}$.
+   * **Conclusión:** Fine-Grained experimenta una **penalización del $+21.1\%$ ($+181.8\text{ ms}$)**. En Coarse-Grained, cada núcleo procesa una franja contigua de 64 filas; el *hardware prefetcher* detecta el patrón secuencial lineal y pre-carga las líneas de caché L1/L2 antes de que las instrucciones las soliciten. En Fine-Grained, el hilo 0 procesa la fila 1, el hilo 1 la fila 2, etc. Al avanzar paso a paso, los hilos leen celdas halo de filas calculadas concurrentemente por hilos vecinos, provocando **invalidaciones de coherencia (MESI/MOESI)** en los bordes de líneas de caché de 64 bytes (*cache line bouncing*) y sobrecargando la interconexión del procesador.
+
+---
+
+#### Gráfica 5: Dashboard Consolidado General (2x2)
+![Dashboard Consolidado](metricas/graficas/05_dashboard_consolidado.png)
+
+El tablero consolidado integra las métricas de rendimiento con la serie temporal completa de las 200 corridas (Panel D):
+* **Estabilidad Temporal:** Muestra que las mediciones se mantuvieron completamente planas a lo largo del tiempo, descartando efectos de *thermal throttling* acumulativo.
+* **Picos aislados en CMP y Fine:** En corridas puntuales (como la corrida #113 en CMP), se aprecian picos ocasionados por interrupciones del kernel del sistema operativo ajenas al proceso de simulación, lo que valida la necesidad metodológica de computar tanto la media como la mediana y la desviación estándar sobre $N = 200$ observaciones.
+
+
