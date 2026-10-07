@@ -344,4 +344,63 @@ El tablero consolidado integra las métricas de rendimiento con la serie tempora
 * **Estabilidad Temporal:** Muestra que las mediciones se mantuvieron completamente planas a lo largo del tiempo, descartando efectos de *thermal throttling* acumulativo.
 * **Picos aislados en CMP y Fine:** En corridas puntuales (como la corrida #113 en CMP), se aprecian picos ocasionados por interrupciones del kernel del sistema operativo ajenas al proceso de simulación, lo que valida la necesidad metodológica de computar tanto la media como la mediana y la desviación estándar sobre $N = 200$ observaciones.
 
+---
+
+## 9. Perfilado Microarquitectónico de Hardware con Linux `perf`
+
+### Fundamento y Requisito del Proyecto
+En estricto cumplimiento con la especificación de las Páginas 3 y 4 del enunciado oficial, se implementó un sistema de perfilado microarquitectónico mediante **Linux `perf stat`** (`scripts/profile_perf.py`), extrayendo directamente los contadores de rendimiento de hardware (*Performance Monitoring Unit* — PMU) del procesador físico.
+
+El objetivo es aislar y contrastar los fenómenos de bajo nivel entre los modelos concurrentes (CMP, SMT HW, Coarse-Grained, Fine-Grained y Secuencial), respondiendo a las preguntas microarquitectónicas centrales del curso:
+
+#### 1. Instrucciones por Ciclo (IPC)
+
+$$\text{IPC} = \frac{\text{Instrucciones Retiradas}}{\text{Ciclos Totales}}$$
+
+Mide la eficiencia con la que el procesador mantiene llenos sus puertos de ejecución (*Execution Ports*) superescalares y evita paradas (*stalls*). En SMT, la duplicación de hilos por núcleo físico permite rellenar las burbujas del pipeline cuando un hilo espera datos de memoria, incrementando el rendimiento global por núcleo físico frente al secuencial.
+
+#### 2. Nivel de Concurrencia y Saturación de CPU
+
+$$\text{CPUs Efectivas} = \frac{\text{task-clock (ms)}}{\text{tiempo real transcurrido (ms)}}$$
+
+Cuantifica cuántos núcleos o hilos lógicos de hardware estuvieron trabajando en paralelo de forma simultánea. Mientras el modelo Secuencial y Fine Cooperativo registran $\approx 1.0$ CPU activa (ejecución puramente serializada), CMP escala a $\approx 6.0$ núcleos físicos y SMT satura hasta $\approx 9.8$ contextos lógicos de hardware.
+
+#### 3. Comportamiento de la Jerarquía de Caché
+
+$$\text{Tasa de Fallos de Caché} = \left( \frac{\text{cache-misses}}{\text{cache-references}} \right) \times 100\%$$
+
+Explica empíricamente la disparidad de rendimiento observada entre **Coarse-Grained** y **Fine-Grained Cíclico**: ambos ejecutan 8 hilos en 8 núcleos, pero el acceso intercalado fila por fila de Fine-Grained fragmenta el trabajo del *hardware prefetcher* y desata invalidaciones de coherencia en los protocolos MESI/MOESI en los límites de cada línea de caché de 64 bytes (*false sharing / halo bouncing*). En las mediciones de hardware, la tasa de fallos de caché se dispara al **$22.75\%$** en Fine-Grained Cíclico frente a solo **$5.48\%$** en Coarse-Grained.
+
+#### 4. Sobrecarga de Sistema Operativo y Conmutaciones
+Mide los cambios de contexto del kernel (`context-switches`) y migraciones entre núcleos (`cpu-migrations`), contrastando el entrelazado por hardware de SMT (conmutación en silicio a cero ciclos de software) frente a las barreras de sincronización inter-paso.
+
+---
+
+### Resultados Empíricos de Contadores de Hardware (PMU)
+
+| Modelo de Ejecución | Tiempo Real (s) | Giga-Ciclos | IPC | CPUs Efectivas | Cache Miss Rate (%) | Cambios de Contexto |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Secuencial** | 4.03 | 18.47 G | **2.64** | 1.0 | **1.45%** | 61 |
+| **CMP (8 Cores)** | **0.85** | 21.14 G | 2.36 | 6.0 | 4.58% | 111,111 |
+| **SMT (HW Real - 16 Hilos)** | 1.00 | 35.82 G | 1.43 | **9.8** | 7.29% | 237,339 |
+| **Coarse-Grained (8 Hilos)** | 1.08 | 25.28 G | 1.98 | 5.7 | 5.48% | 111,689 |
+| **Fine-Grained (Cooperativo)** | 4.08 | 18.68 G | 2.65 | 1.0 | 1.97% | 121 |
+| **Fine-Grained (Paralelo Cíclico)** | 1.45 | 34.08 G | 1.51 | 6.1 | **22.75%** | 109,746 |
+
+---
+
+### Visualización y Salidas de Perfilado
+
+#### Gráfica 6: Perfilado Microarquitectónico de Hardware (Linux perf)
+![Perfilado de Hardware con perf](metricas/graficas/06_perfilado_hardware_perf.png)
+
+* **Archivo CSV generado:** `metricas/perf_hardware_counters.csv`
+* **Gráfica de alta resolución (300 DPI):** `metricas/graficas/06_perfilado_hardware_perf.png`
+* **Comando para re-ejecutar:**
+  ```bash
+  cd scripts/
+  make profile
+  ```
+
+
 
