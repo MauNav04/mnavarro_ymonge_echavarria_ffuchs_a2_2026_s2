@@ -31,4 +31,5 @@ test_fine_grained
 heat2d_fine_grained.vscode/
 heat2d_fine_grained_stress
 heat2d_fine_grained
-.vscode/c_cpp_properties.json
+.vscode/c_cpp_properties.json.venv/
+heat2d_benchmark
