@@ -243,6 +243,28 @@ make run_fine_video       # Genera: videos/gray-scott-fine.mp4
 
 ---
 
+### 3.7 Perfilado Microarquitectónico de Hardware con Linux `perf`
+Permite analizar de forma explícita el comportamiento del pipeline, la contención en el subsistema de memoria y la concurrencia bajo SMT y los distintos modelos mediante contadores de rendimiento de hardware (PMU):
+
+```bash
+# Desde la carpeta scripts/:
+make profile
+# o equivalentemente:
+make perfilado
+```
+
+* **Contadores evaluados:**
+  * **Ciclos de CPU e Instrucciones:** Cálculo del IPC (*Instructions Per Cycle*).
+  * **Saturación de CPU:** CPUs equivalentes activas ($\text{task-clock} / \text{tiempo real}$) para evidenciar el nivel de paralelismo real.
+  * **Jerarquía de Memoria:** Referencias y fallos de caché (`cache-references`, `cache-misses`, *cache miss rate* %) que justifican la diferencia entre Coarse-Grained y Fine-Grained.
+  * **Comportamiento del Kernel:** Cambios de contexto del SO (`context-switches`) y migraciones de CPU (`cpu-migrations`).
+
+* **Archivos generados:**
+  * `metricas/perf_hardware_counters.csv`: Tabla cuantitativa con todas las métricas de hardware extraídas por modelo.
+  * `metricas/graficas/06_perfilado_hardware_perf.png`: Gráfica científica de 4 cuadrantes con análisis de IPC, saturación de núcleos, tasa de fallos de caché y ciclos totales.
+
+---
+
 ## 4. Estructura de Archivos del Módulo
 
 ```text

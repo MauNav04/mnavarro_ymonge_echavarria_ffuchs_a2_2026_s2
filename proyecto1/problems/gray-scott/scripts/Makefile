@@ -48,7 +48,7 @@ BENCHMARK_MODELS ?= all
 VIDEO_SIZE ?= 512
 VIDEO_STEPS ?= 16000
 
-.PHONY: all seq cmp smt coarse fine run_seq run_cmp verify_cmp run_smt run_smt_sw verify_smt run_coarse verify_coarse run_fine run_fine_parallel verify_fine run_seq_video run_cmp_video run_smt_video run_coarse_video run_fine_video benchmark benchmark_fast plot graficas clean
+.PHONY: all seq cmp smt coarse fine run_seq run_cmp verify_cmp run_smt run_smt_sw verify_smt run_coarse verify_coarse run_fine run_fine_parallel verify_fine run_seq_video run_cmp_video run_smt_video run_coarse_video run_fine_video benchmark benchmark_fast profile perfilado plot graficas clean
 
 # Compilación por defecto: todos los ejecutables
 all: $(TARGET_SEQ) $(TARGET_CMP) $(TARGET_SMT) $(TARGET_COARSE) $(TARGET_FINE)
@@ -243,6 +243,14 @@ benchmark_fast: $(TARGET_SEQ) $(TARGET_CMP) $(TARGET_SMT) $(TARGET_COARSE) $(TAR
 	python3 benchmark.py --runs 3 --size $(SIZE) --steps $(STEPS) --models "$(BENCHMARK_MODELS)" \
 		--output-csv ../metricas/gray_scott_benchmark_fast.csv \
 		--summary-csv ../metricas/resumen_estadistico_fast.csv
+
+# ==============================================================================
+# Perfilado Microarquitectónico de Hardware con Linux perf (CE 4302)
+# ==============================================================================
+profile: $(TARGET_SEQ) $(TARGET_CMP) $(TARGET_SMT) $(TARGET_COARSE) $(TARGET_FINE)
+	$(VENV_PYTHON) profile_perf.py --size $(SIZE) --steps $(STEPS)
+
+perfilado: profile
 
 # ==============================================================================
 # Generación de Gráficos de Rendimiento y Análisis Estadístico (300 DPI)

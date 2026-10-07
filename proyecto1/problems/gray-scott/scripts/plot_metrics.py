@@ -548,6 +548,17 @@ def main():
     graficar_comparativas_microarquitectonicas(df)
     graficar_dashboard_consolidado(df)
 
+    # Perfilado de hardware (perf) si existe el CSV
+    csv_perf = metricas_dir / "perf_hardware_counters.csv"
+    if csv_perf.exists():
+        try:
+            from profile_perf import graficar_perfilado_hardware
+            df_perf = pd.read_csv(csv_perf)
+            output_perf = graficas_dir / "06_perfilado_hardware_perf.png"
+            graficar_perfilado_hardware(df_perf, output_perf)
+        except Exception as e:
+            print(f"[AVISO] No se pudo procesar gráfica de perf: {e}")
+
     print("\n==============================================================================")
     print(" ¡Todas las gráficas fueron generadas con éxito en alta resolución (300 DPI)! ")
     print("==============================================================================\n")
