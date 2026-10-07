@@ -28,4 +28,6 @@ test_round_robin_scheduler
 heat2d_stress_test
 heat2d_sequential
 test_fine_grained
+heat2d_fine_grained.vscode/
+heat2d_fine_grained_stress
 heat2d_fine_grained
