@@ -40,6 +40,7 @@ THREADS ?= 8
 SMT_THREADS ?= 16
 QUANTUM ?= 1
 
+.PHONY: all seq cmp smt coarse fine run_sequential run_seq run_cmp run_smt run_smt_sw run_coarse run_fine run_fine_parallel verify_cmp verify_smt verify_coarse verify_fine plot_metrics plot clean
 .PHONY: all seq cmp smt coarse fine run_sequential run_seq run_cmp run_smt run_smt_sw run_coarse run_fine run_fine_parallel verify_cmp verify_smt verify_coarse verify_fine plot_metrics plot setup_perf profile_perf profile_fast profile_plot clean
 
 # Compilar todos los modelos
