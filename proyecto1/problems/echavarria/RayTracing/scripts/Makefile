@@ -40,7 +40,7 @@ THREADS ?= 8
 SMT_THREADS ?= 16
 QUANTUM ?= 1
 
-.PHONY: all seq cmp smt coarse fine run_sequential run_seq run_cmp run_smt run_smt_sw run_coarse run_fine run_fine_parallel verify_cmp verify_smt verify_coarse verify_fine plot_metrics plot clean
+.PHONY: all seq cmp smt coarse fine run_sequential run_seq run_cmp run_smt run_smt_sw run_coarse run_fine run_fine_parallel verify_cmp verify_smt verify_coarse verify_fine plot_metrics plot setup_perf profile_perf profile_fast profile_plot clean
 
 # Compilar todos los modelos
 all: $(TARGET_SEQ) $(TARGET_CMP) $(TARGET_SMT) $(TARGET_COARSE) $(TARGET_FINE)
@@ -213,6 +213,22 @@ plot_metrics:
 	python3 plot_metrics.py
 
 plot: plot_metrics
+ 
+# ==============================================================================
+# PERFILADO MICROARQUITECTÓNICO DE HARDWARE (Linux perf / PMU)
+# ==============================================================================
+setup_perf:
+	@echo "--> Habilitando acceso a contadores PMU de hardware (/proc/sys/kernel/perf_event_paranoid)..."
+	sudo sysctl -w kernel.perf_event_paranoid=-1
+
+profile_perf: all
+	python3 profile_perf.py --runs 3 --width $(WIDTH) --samples $(SAMPLES) --depth $(DEPTH)
+
+profile_fast: all
+	python3 profile_perf.py --runs 1 --width $(WIDTH) --samples $(SAMPLES) --depth $(DEPTH)
+
+profile_plot:
+	python3 profile_perf.py --plot-only
 
 # ==============================================================================
 # LIMPIEZA
