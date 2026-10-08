@@ -1,7 +1,7 @@
 #pragma once  // Evita que este archivo de cabecera sea incluido más de una vez durante la compilación.
 
 #include <cstddef>  // Proporciona std::size_t para tamaños de malla y cantidad de pasos.
-
+#include <cmath>
 namespace heat2d {  // Agrupa la configuración dentro del namespace del proyecto Heat2D.
 
 /**
@@ -54,14 +54,11 @@ struct SimulationConfig {
         return lengthY / static_cast<double>(rows - 1);  // Divide la longitud física entre la cantidad real de intervalos en Y.
     }
 
-    /**
-     * @brief Calcula la cantidad de pasos temporales requeridos.
-     *
-     * @return Número de iteraciones temporales de la simulación.
-     */
+    [[nodiscard]]
     std::size_t steps() const {
-
-        return static_cast<std::size_t>(totalTime / dt);  // Convierte el tiempo total en una cantidad entera de pasos temporales.
+        return static_cast<std::size_t>(
+            std::llround(totalTime / dt)
+        );
     }
 };
 
