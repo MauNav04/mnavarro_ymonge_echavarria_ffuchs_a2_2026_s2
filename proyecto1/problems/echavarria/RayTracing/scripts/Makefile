@@ -40,7 +40,7 @@ THREADS ?= 8
 SMT_THREADS ?= 16
 QUANTUM ?= 1
 
-.PHONY: all seq cmp smt coarse fine run_sequential run_seq run_cmp run_smt run_smt_sw run_coarse run_fine run_fine_parallel verify_cmp verify_smt verify_coarse verify_fine clean
+.PHONY: all seq cmp smt coarse fine run_sequential run_seq run_cmp run_smt run_smt_sw run_coarse run_fine run_fine_parallel verify_cmp verify_smt verify_coarse verify_fine plot_metrics plot clean
 
 # Compilar todos los modelos
 all: $(TARGET_SEQ) $(TARGET_CMP) $(TARGET_SMT) $(TARGET_COARSE) $(TARGET_FINE)
@@ -208,6 +208,11 @@ benchmark_scaling: all
 	python3 benchmark.py --runs 10 --width $(WIDTH) --samples $(SAMPLES) --depth $(DEPTH) --strong-scaling
 
 benchmark_scalling: benchmark_scaling
+ 
+plot_metrics:
+	python3 plot_metrics.py
+
+plot: plot_metrics
 
 # ==============================================================================
 # LIMPIEZA
