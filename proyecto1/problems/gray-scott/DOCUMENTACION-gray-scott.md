@@ -269,25 +269,41 @@ Para garantizar significancia estadística rigurosa, se ejecutó una campaña au
 
 Las pruebas se ejecutaron en un procesador **AMD Ryzen** (8 núcleos físicos / 16 hilos lógicos) bajo Linux x86-64, compilando con `g++ -O3 -Wall -Wextra -std=c++17 -pthread`. Entre corridas consecutivas se aplicó un enfriamiento (*cooldown*) para evitar distorsiones por *thermal throttling*.
 
+### Formulación Formal de Intervalos de Confianza al 95% ($N = 200$)
+
+Para cada modelo de ejecución, habiendo recolectado $N = 200$ observaciones independientes bajo condiciones idénticas de grilla ($512 \times 512$) y pasos ($16{,}000$), se calcula el estimador puntual de la media muestral $\bar{X}$ y la cuasivarianza muestral $s^2$. Dado que $N = 200 \gg 30$, por el **Teorema del Límite Central** la distribución muestral de la media converge a una normal estándar $\mathcal{N}(0, 1)$, permitiendo estimar el margen de error ($ME$) para un nivel de confianza del $95\%$ ($\alpha = 0.05$, $z_{\alpha/2} = 1.95996$):
+
+$$SE = \frac{s}{\sqrt{N}} = \frac{\sigma}{\sqrt{200}}$$
+
+$$ME_{95\%} = z_{0.975} \cdot \frac{\sigma}{\sqrt{N}} = 1.95996 \cdot \frac{\sigma}{\sqrt{200}}$$
+
+$$\text{IC}_{95\%} = \left[ \mu - ME_{95\%}, \; \mu + ME_{95\%} \right]$$
+
 ### Tabla Consolidada de Resultados Estadísticos con Intervalos de Confianza al 95% ($N = 200$)
 
-| Modelo de Ejecución | Modo Evaluado | Hilos | Media $\mu$ (ms) | Desv. Estándar $\sigma$ (ms) | Mínimo (ms) | Máximo (ms) | Mediana (ms) | Speedup $S$ | Eficiencia $E$ |
+| Modelo de Ejecución | Modo Evaluado | Hilos | Media $\mu$ (ms) | Margen Error $\pm ME_{95\%}$ | Intervalo de Confianza 95% (ms) | Desv. Estándar $\sigma$ (ms) | Mediana (ms) | Speedup $S$ | Eficiencia $E$ |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **SMT (HW Real)** | `hardware_smt` | 16 | **709.74** | 23.66 | 674.40 | 834.93 | 704.88 | **5.54x** | 34.6% |
-| **CMP** | `dedicated_cores` | 8 | **734.47** | 80.49 | 710.25 | 1544.43 | 722.72 | **5.35x** | **66.9%** |
-| **Coarse-Grained** | `burst_block` | 8 | **863.16** | 28.40 | 783.31 | 954.36 | 863.32 | **4.55x** | 56.9% |
-| **SMT (Sobre-suscripción SW)** | `software_oversubscription` | 16 | **869.02** | 16.16 | 844.12 | 939.64 | 863.34 | **4.52x** | 28.3% |
-| **Fine-Grained (Paralelo Cíclico)** | `cyclic_threads` | 8 | **1044.98** | 57.24 | 956.89 | 1431.11 | 1040.44 | **3.76x** | 47.0% |
-| **Secuencial (Baseline)** | `baseline` | 1 | **3929.68** | 230.94 | 3846.28 | 7025.05 | 3886.76 | **1.00x** | 100.0% |
-| **Fine-Grained (Cooperativo)** | `cooperative_quantum` | 8 | **3949.26** | 133.80 | 3876.28 | 5384.25 | 3917.60 | **1.00x** | 12.4% |
+| **SMT (HW Real)** | `hardware_smt` | 16 | **709.74** | $\pm 3.28$ | **[706.46, 713.02]** | 23.66 | 704.88 | **5.54x** | 34.6% |
+| **CMP** | `dedicated_cores` | 8 | **734.47** | $\pm 11.16$ | **[723.31, 745.62]** | 80.49 | 722.72 | **5.35x** | **66.9%** |
+| **Coarse-Grained** | `burst_block` | 8 | **863.16** | $\pm 3.94$ | **[859.23, 867.10]** | 28.40 | 863.32 | **4.55x** | 56.9% |
+| **SMT (Sobre-suscripción SW)** | `software_oversubscription` | 16 | **869.02** | $\pm 2.24$ | **[866.78, 871.26]** | 16.16 | 863.34 | **4.52x** | 28.3% |
+| **Fine-Grained (Paralelo Cíclico)** | `cyclic_threads` | 8 | **1044.98** | $\pm 7.93$ | **[1037.05, 1052.92]** | 57.24 | 1040.44 | **3.76x** | 47.0% |
+| **Secuencial (Baseline)** | `baseline` | 1 | **3929.68** | $\pm 32.01$ | **[3897.67, 3961.68]** | 230.94 | 3886.76 | **1.00x** | 100.0% |
+| **Fine-Grained (Cooperativo)** | `cooperative_quantum` | 8 | **3949.26** | $\pm 18.54$ | **[3930.71, 3967.80]** | 133.80 | 3917.60 | **1.00x** | 12.4% |
+
+#### Análisis de Significancia Estadística
+* **Disyunción entre SMT HW y CMP:** El límite superior de SMT HW ($713.02\text{ ms}$) es estrictamente menor que el límite inferior de CMP ($723.31\text{ ms}$). Al no existir solapamiento entre sus intervalos al 95%, se concluye con significancia estadística ($p < 0.05$) que el aprovechamiento de los 16 contextos de hardware en SMT aventaja al paralelismo CMP puro en este kernel de cómputo.
+* **Separación de Coarse-Grained vs Fine-Grained Cíclico:** Los intervalos $[859.23, 867.10]\text{ ms}$ y $[1037.05, 1052.92]\text{ ms}$ están distanciados por más de $170\text{ ms}$, confirmando de manera irrebatible la ventaja del particionamiento por bloques contiguos frente al particionamiento intercalado cíclico afectado por *false sharing*.
+* **Solapamiento entre Secuencial y Fine-Grained Cooperativo:** Los intervalos $[3897.67, 3961.68]\text{ ms}$ y $[3930.71, 3967.80]\text{ ms}$ se intersectan ampliamente, demostrando que la emulación por corutinas en un solo núcleo no introduce ninguna ganancia de velocidad y equivale formalmente al tiempo secuencial puro más el overhead de yield.
 
 ---
 
 ### Análisis Visual de Gráficas de Rendimiento (300 DPI)
 
-#### Gráfica 1: Distribución y Dispersión de Tiempos de Cómputo
+#### Gráfica 1: Distribución y Dispersión de Tiempos de Cómputo e Intervalos de Confianza al 95%
 ![Distribución de Tiempos de Ejecución](metricas/graficas/01_tiempos_ejecucion_boxplot.png)
 
+* **Intervalos de Confianza al 95% Visibles en Badges:** Cada caja del boxplot incluye su badge flotante que detalla explícitamente la media muestral $\mu$, el intervalo formal al 95% ($\text{IC}_{95\%} = [\mu - ME, \mu + ME]$), el margen de error $ME = \pm 1.96 \cdot (\sigma/\sqrt{200})$ y la desviación estándar $\sigma$. Se corrobora visualmente que el intervalo de SMT HW ($[706.5, 713.0]\text{ ms}$) y el de CMP ($[723.3, 745.6]\text{ ms}$) no se solapan.
 * **Observación Clave:** Los modelos paralelos (SMT HW, CMP, Coarse y SMT SW) se agrupan firmemente en la franja sub-segundo ($700 - 870\text{ ms}$), con una dispersión intercuartílica sumamente angosta.
 * **Estabilidad:** La desviación estándar de SMT HW ($\sigma = 23.7\text{ ms}$) y SMT SW ($\sigma = 16.2\text{ ms}$) demuestra la altísima predictibilidad temporal del procesador cuando no hay contención externa.
 * **Degradación del Modelo Cooperativo:** Fine-Grained cooperativo registra una media de $3949.3\text{ ms}$, virtualmente idéntica al secuencial puro ($3929.7\text{ ms}$), confirmando experimentalmente que la sobrecarga de simulación por software y los $8.16 \times 10^6$ cambios de contexto consumen el tiempo que teóricamente se esperaría ahorrar en una máquina de un solo hilo de hardware.

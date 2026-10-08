@@ -2,8 +2,6 @@
 """
 ==============================================================================
 Generador de Gráficos de Rendimiento y Análisis Estadístico - Gray-Scott
-CE 4302 - Arquitectura de Computadores II (Semestre II - 2026)
-Instituto Tecnológico de Costa Rica (TEC)
 ==============================================================================
 Este script procesa los resultados experimentales de las 200 corridas:
   - metricas/gray_scott_benchmark.csv
@@ -98,7 +96,7 @@ def cargar_datos():
 # ==============================================================================
 def graficar_boxplot(df: pd.DataFrame):
     print("--> Generando: 01_tiempos_ejecucion_boxplot.png...")
-    fig, ax = plt.subplots(figsize=(12, 7))
+    fig, ax = plt.subplots(figsize=(13, 7.5))
 
     # Boxplot principal
     bp = sns.boxplot(
@@ -106,7 +104,7 @@ def graficar_boxplot(df: pd.DataFrame):
         x="modelo",
         y="tiempo_ms",
         palette=PALETA_MODELOS,
-        width=0.55,
+        width=0.52,
         fliersize=3.5,
         linewidth=1.4,
         ax=ax,
@@ -114,32 +112,51 @@ def graficar_boxplot(df: pd.DataFrame):
         legend=False
     )
 
-    # Anotaciones con la media de cada modelo
+    # Anotaciones con la media de cada modelo e Intervalo de Confianza al 95%
     medias = df.groupby("modelo", observed=True)["tiempo_ms"].mean()
     desvs = df.groupby("modelo", observed=True)["tiempo_ms"].std()
+    counts = df.groupby("modelo", observed=True)["tiempo_ms"].count()
 
     for i, modelo in enumerate(ORDEN_MODELOS):
         if modelo in medias:
             m_val = medias[modelo]
             s_val = desvs[modelo]
-            ax.text(
-                i, m_val + (df["tiempo_ms"].max() * 0.03),
-                f"μ = {m_val:.1f} ms\n± {s_val:.1f}",
-                ha="center", va="bottom",
-                fontsize=9.5, fontweight="bold",
-                color="#1e293b",
-                bbox=dict(boxstyle="round,pad=0.25", facecolor="white", edgecolor="#cbd5e1", alpha=0.9)
+            n_val = counts[modelo]
+            me_val = 1.95996 * (s_val / np.sqrt(n_val))
+            ci_inf = m_val - me_val
+            ci_sup = m_val + me_val
+
+            badge_text = (
+                f"μ = {m_val:.1f} ms\n"
+                f"IC 95%: [{ci_inf:.1f}, {ci_sup:.1f}]\n"
+                f"ME: ±{me_val:.1f} ms (σ={s_val:.1f})"
             )
 
-    # Elemento explicativo para los puntos atípicos (outliers)
-    ax.scatter([], [], color="#475569", edgecolors="black", s=30, label="Puntos aislados = Valores atípicos (outliers por interrupciones del SO)")
+            ax.text(
+                i, m_val + (df["tiempo_ms"].max() * 0.038),
+                badge_text,
+                ha="center", va="bottom",
+                fontsize=8.5, fontweight="bold",
+                color="#0f172a",
+                bbox=dict(
+                    boxstyle="round,pad=0.3",
+                    facecolor="white",
+                    edgecolor=PALETA_MODELOS.get(modelo, "#cbd5e1"),
+                    linewidth=1.2,
+                    alpha=0.95
+                )
+            )
+
+    # Elemento explicativo para los puntos atípicos (outliers) y el cálculo del IC 95%
+    ax.scatter([], [], color="#475569", edgecolors="black", s=30, label="Puntos aislados = Outliers (ruido de interrupciones del SO)")
+    ax.plot([], [], color="none", label="IC 95% = Media ± 1.96 · (σ / √200) por Teorema del Límite Central")
     ax.legend(loc="upper left", frameon=True, fontsize=9.5)
 
-    ax.set_title("Distribución de Tiempos de Ejecución (200 Corridas)\nSimulación de Gray-Scott (512x512, 16,000 pasos)")
+    ax.set_title("Distribución de Tiempos de Ejecución e Intervalos de Confianza al 95% (200 Corridas)\nSimulación de Gray-Scott (512x512, 16,000 pasos)")
     ax.set_xlabel("Modelo de Ejecución Concurrente", labelpad=10, fontweight="bold")
     ax.set_ylabel("Tiempo de Cómputo CPU (ms)", labelpad=10, fontweight="bold")
     ax.tick_params(axis="x", rotation=15)
-    ax.set_ylim(500, df["tiempo_ms"].max() * 1.18)
+    ax.set_ylim(400, df["tiempo_ms"].max() * 1.20)
 
     plt.tight_layout()
     output_file = graficas_dir / "01_tiempos_ejecucion_boxplot.png"
