@@ -33,6 +33,8 @@ FINE_THREADS ?= 8
 FINE_QUANTUM ?= 1
 FINE_MODE ?= cooperative
 RUNS ?= 200
+RUNS_SCALING ?= 5
+THREADS_SCALING ?= 1,2,4,8,16
 
 # Modelos a incluir en el benchmark
 # all: ejecuta todos
@@ -48,7 +50,7 @@ BENCHMARK_MODELS ?= all
 VIDEO_SIZE ?= 512
 VIDEO_STEPS ?= 16000
 
-.PHONY: all seq cmp smt coarse fine run_seq run_cmp verify_cmp run_smt run_smt_sw verify_smt run_coarse verify_coarse run_fine run_fine_parallel verify_fine run_seq_video run_cmp_video run_smt_video run_coarse_video run_fine_video benchmark benchmark_fast profile perfilado plot graficas clean
+.PHONY: all seq cmp smt coarse fine run_seq run_cmp verify_cmp run_smt run_smt_sw verify_smt run_coarse verify_coarse run_fine run_fine_parallel verify_fine run_seq_video run_cmp_video run_smt_video run_coarse_video run_fine_video benchmark benchmark_fast profile perfilado scalability escalabilidad plot graficas clean
 
 # Compilación por defecto: todos los ejecutables
 all: $(TARGET_SEQ) $(TARGET_CMP) $(TARGET_SMT) $(TARGET_COARSE) $(TARGET_FINE)
@@ -251,6 +253,14 @@ profile: $(TARGET_SEQ) $(TARGET_CMP) $(TARGET_SMT) $(TARGET_COARSE) $(TARGET_FIN
 	$(VENV_PYTHON) profile_perf.py --size $(SIZE) --steps $(STEPS)
 
 perfilado: profile
+
+# ==============================================================================
+# Estudio de Escalabilidad Fuerte (Strong Scaling p in {1,2,4,8,16})
+# ==============================================================================
+scalability: $(TARGET_SEQ) $(TARGET_CMP) $(TARGET_SMT) $(TARGET_COARSE) $(TARGET_FINE)
+	$(VENV_PYTHON) scalability.py --runs $(RUNS_SCALING) --threads "$(THREADS_SCALING)" --size $(SIZE) --steps $(STEPS)
+
+escalabilidad: scalability
 
 # ==============================================================================
 # Generación de Gráficos de Rendimiento y Análisis Estadístico (300 DPI)

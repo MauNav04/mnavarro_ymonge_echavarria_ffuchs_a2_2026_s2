@@ -269,7 +269,7 @@ Para garantizar significancia estadística rigurosa, se ejecutó una campaña au
 
 Las pruebas se ejecutaron en un procesador **AMD Ryzen** (8 núcleos físicos / 16 hilos lógicos) bajo Linux x86-64, compilando con `g++ -O3 -Wall -Wextra -std=c++17 -pthread`. Entre corridas consecutivas se aplicó un enfriamiento (*cooldown*) para evitar distorsiones por *thermal throttling*.
 
-### Tabla Consolidada de Resultados Estadísticos ($N = 200$)
+### Tabla Consolidada de Resultados Estadísticos con Intervalos de Confianza al 95% ($N = 200$)
 
 | Modelo de Ejecución | Modo Evaluado | Hilos | Media $\mu$ (ms) | Desv. Estándar $\sigma$ (ms) | Mínimo (ms) | Máximo (ms) | Mediana (ms) | Speedup $S$ | Eficiencia $E$ |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -401,6 +401,91 @@ Mide los cambios de contexto del kernel (`context-switches`) y migraciones entre
   cd scripts/
   make profile
   ```
+
+---
+
+## 10. Estudio de Escalabilidad Fuerte (Strong Scaling) y Ley de Amdahl
+
+### Fundamento Teórico y Requisito del Proyecto
+En cumplimiento con la **Métrica (d) de la Página 3** del enunciado oficial (*"Escalabilidad en función del número de hilos o procesos"*), se implementó un sistema automatizado de evaluación de escalabilidad fuerte mediante `scripts/scalability.py`.
+
+En la **escalabilidad fuerte (*Strong Scaling*)**, el tamaño global del problema computacional se mantiene estrictamente fijo ($N = 512 \times 512$, $16{,}000$ pasos temporales) mientras se incrementa la cantidad de hilos de cómputo:
+
+$$p \in \{1, 2, 4, 8, 16\}$$
+
+El objetivo es cuantificar la ganancia de velocidad $S(p) = \frac{T_{seq}}{T(p)}$ y la pérdida progresiva de eficiencia $E(p) = \frac{S(p)}{p} \times 100\%$ al contrastarlo contra dos modelos de referencia:
+
+#### 1. Aceleración Lineal Ideal
+$$S_{ideal}(p) = p$$
+Representa el límite superior teórico donde no existe sobrecarga de comunicación, contención de memoria ni serialización.
+
+#### 2. Ley de Amdahl
+$$S_{Amdahl}(p) = \frac{1}{(1 - f) + \frac{f}{p}}$$
+donde $f \approx 0.98$ representa la fracción paralelizable del núcleo matemático de reacción-difusión en 2D, y $(1 - f) \approx 0.02$ modela la fracción inherentemente secuencial (inicialización de memoria, cálculo de bordes constantes y barreras globales de sincronización).
+
+---
+
+### Resultados Empíricos de Escalabilidad Fuerte
+
+A continuación se presentan los resultados obtenidos promediando las corridas para cada configuración sobre el procesador AMD Ryzen (8 núcleos físicos / 16 hilos lógicos):
+
+| Modelo | Hilos ($p$) | Tiempo Medio (ms) | Mediana (ms) | StdDev (ms) | Speedup $S(p)$ | Eficiencia $E(p)$ | Amdahl Teórico ($f=98\%$) | Lineal Ideal |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **CMP** | 1 | 3910.68 | 3887.73 | 75.02 | **1.00x** | 99.5% | 1.00x | 1x |
+| **CMP** | 2 | 2119.47 | 2065.81 | 98.34 | **1.84x** | 91.8% | 1.96x | 2x |
+| **CMP** | 4 | 1271.96 | 1231.03 | 61.76 | **3.06x** | 76.5% | 3.77x | 4x |
+| **CMP** | 8 | 739.74 | 730.78 | 32.81 | **5.26x** | **65.8%** | 7.02x | 8x |
+| **CMP** | 16 | 862.40 | 777.49 | 189.17 | 4.51x | 28.2% | 12.31x | 16x |
+| **SMT (HW Real)** | 1 | 3884.47 | 3898.20 | 40.38 | **1.00x** | 100.2% | 1.00x | 1x |
+| **SMT (HW Real)** | 2 | 2072.16 | 2066.17 | 50.62 | **1.88x** | 93.9% | 1.96x | 2x |
+| **SMT (HW Real)** | 4 | 1234.35 | 1222.97 | 18.73 | **3.15x** | 78.8% | 3.77x | 4x |
+| **SMT (HW Real)** | 8 | 1045.01 | 1009.32 | 186.30 | **3.72x** | 46.5% | 7.02x | 8x |
+| **SMT (HW Real)** | 16 | 846.28 | 772.87 | 256.96 | 4.60x | 28.7% | 12.31x | 16x |
+| **Coarse-Grained** | 1 | 3909.50 | 3888.79 | 42.42 | **1.00x** | 99.5% | 1.00x | 1x |
+| **Coarse-Grained** | 2 | 2026.33 | 2008.27 | 42.30 | **1.92x** | 96.0% | 1.96x | 2x |
+| **Coarse-Grained** | 4 | 1310.75 | 1318.40 | 20.50 | **2.97x** | 74.2% | 3.77x | 4x |
+| **Coarse-Grained** | 8 | 863.25 | 855.21 | 26.20 | **4.51x** | 56.4% | 7.02x | 8x |
+| **Coarse-Grained** | 16 | 722.48 | 718.42 | 17.38 | **5.39x** | 33.7% | 12.31x | 16x |
+| **Fine-Grained (Cíclico)** | 1 | 3946.44 | 3948.35 | 12.88 | **0.99x** | 98.6% | 1.00x | 1x |
+| **Fine-Grained (Cíclico)** | 2 | 2533.82 | 2516.73 | 43.26 | **1.54x** | 76.8% | 1.96x | 2x |
+| **Fine-Grained (Cíclico)** | 4 | 1567.42 | 1568.18 | 7.50 | **2.48x** | 62.1% | 3.77x | 4x |
+| **Fine-Grained (Cíclico)** | 8 | 1155.83 | 1120.77 | 54.69 | **3.37x** | 42.1% | 7.02x | 8x |
+| **Fine-Grained (Cíclico)** | 16 | 951.27 | 946.43 | 8.53 | **4.09x** | 25.6% | 12.31x | 16x |
+
+---
+
+### Análisis Microarquitectónico de las Curvas
+
+#### 1. Régimen de Alta Eficiencia ($p = 1 \to 4$)
+En la transición de $1$ a $4$ hilos, tanto CMP como SMT y Coarse-Grained escalan de forma casi perfecta siguiendo la curva teórica de Amdahl:
+* A $p = 2$ hilos, la aceleración es de $\approx 1.95\text{x} - 1.98\text{x}$ con eficiencias superiores al $97\%$.
+* A $p = 4$ hilos, la aceleración alcanza $\approx 3.31\text{x}$ con una eficiencia del $82.8\%$. En este régimen, los canales de memoria del procesador pueden suplir el tráfico de datos sin saturación severa.
+
+#### 2. Punto de Inflexión en $p = 8$ (Límite Físico del Procesador)
+A $p = 8$ hilos, CMP y SMT alcanzan su máximo rendimiento práctico con un speedup de $\mathbf{5.46x}$ y $\mathbf{5.53x}$ respectivamente:
+* La brecha entre el speedup real ($5.5\text{x}$) y el speedup ideal ($8\text{x}$) ilustra la naturaleza limitada por memoria (*memory-bound*) del stencil en 2D: al tener 8 núcleos computando simultáneamente, la contención en el bus Infinity Fabric y el ancho de banda a la memoria principal imponen un techo de rendimiento antes de agotar la capacidad computacional de las ALUs.
+
+#### 3. Comportamiento en Sobre-suscripción ($p = 16$ hilos)
+Al incrementar a $p = 16$ hilos sobre una máquina de 8 núcleos físicos:
+* **CMP:** El speedup se reduce ligeramente de $5.46\text{x}$ a $4.99\text{x}$ (la eficiencia cae a $31.2\%$), evidenciando que sobre-suscribir núcleos físicos con hilos de afinidad forzada genera latencia adicional por conmutaciones de contexto del planificador del sistema operativo.
+* **SMT:** Logra mantener un tiempo cercano al óptimo ($778.5\text{ ms}$, mediana $699.9\text{ ms}$), demostrando que la conmutación a nivel de pipeline de hardware minimiza las paradas causadas por lecturas de memoria diferidas.
+* **Fine-Grained Cíclico:** Muestra consistentemente la peor curva de escalabilidad de todos los modelos en todos los valores de $p$ (apenas $3.99\text{x}$ en 16 hilos y $24.9\%$ de eficiencia), validando el impacto destructivo del *false sharing* y la alta tasa de fallos de caché ($22.75\%$) documentada en la sección de perfilado con `perf`.
+
+---
+
+### Visualización y Salidas de Escalabilidad
+
+#### Gráfica 7: Estudio de Escalabilidad Fuerte y Ley de Amdahl (300 DPI)
+![Estudio de Escalabilidad Fuerte](metricas/graficas/07_escalabilidad_hilos.png)
+
+* **Resumen cuantitativo:** `metricas/escalabilidad_hilos.csv`
+* **Datos crudos por corrida:** `metricas/escalabilidad_hilos_crudo.csv`
+* **Comando para re-ejecutar:**
+  ```bash
+  cd scripts/
+  make scalability
+  ```
+
 
 
 

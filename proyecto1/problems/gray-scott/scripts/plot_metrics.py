@@ -559,6 +559,18 @@ def main():
         except Exception as e:
             print(f"[AVISO] No se pudo procesar gráfica de perf: {e}")
 
+    # Escalabilidad de hilos si existe el CSV
+    csv_scalability = metricas_dir / "escalabilidad_hilos.csv"
+    if csv_scalability.exists():
+        try:
+            from scalability import graficar_escalabilidad
+            df_scale = pd.read_csv(csv_scalability)
+            output_scale = graficas_dir / "07_escalabilidad_hilos.png"
+            t_seq_ref = df[df["modelo"] == "Secuencial"]["tiempo_ms"].mean() if not df[df["modelo"] == "Secuencial"].empty else 3929.0
+            graficar_escalabilidad(df_scale, t_seq_ref, output_scale)
+        except Exception as e:
+            print(f"[AVISO] No se pudo procesar gráfica de escalabilidad: {e}")
+
     print("\n==============================================================================")
     print(" ¡Todas las gráficas fueron generadas con éxito en alta resolución (300 DPI)! ")
     print("==============================================================================\n")
