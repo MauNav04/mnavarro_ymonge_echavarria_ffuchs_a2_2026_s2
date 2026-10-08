@@ -1,4 +1,4 @@
-# Gray-Scott — Guía de Evaluación (Avance 2 / Demostración 2)
+# Gray-Scott — Guía 
 **CE 4302 — Arquitectura de Computadores II**  
 **Instituto Tecnológico de Costa Rica (TEC)**  
 **Semestre II - 2026**
@@ -93,11 +93,11 @@ make
 make all
 
 # Compilación individual de binarios específicos:
-make seq      # Genera: gray_scott_seq
-make cmp      # Genera: gray_scott_cmp
-make smt      # Genera: gray_scott_smt
-make coarse   # Genera: gray_scott_coarse
-make fine     # Genera: gray_scott_fine
+make sequential  # Genera: gray_scott_sequential
+make cmp         # Genera: gray_scott_cmp
+make smt         # Genera: gray_scott_smt
+make coarse      # Genera: gray_scott_coarse
+make fine        # Genera: gray_scott_fine
 
 # Limpieza de binarios compilados y carpetas temporales de video:
 make clean
@@ -186,13 +186,25 @@ python3 benchmark.py --runs 10 --models "cmp" --append
 
 * **Archivos generados:**
   * `metricas/gray_scott_benchmark.csv`: Muestras crudas oficiales de tiempo y configuración para las 1,400 corridas de la campaña de 200 repeticiones.
-  * `metricas/resumen_estadistico.csv`: Consolidado estadístico oficial con Media ($\mu$), Desviación Estándar ($\sigma$), Mínimo, Máximo, Mediana, Speedup ($S$) y Eficiencia ($E$).
+  * `metricas/resumen_estadistico.csv`: Consolidado estadístico oficial con Media ($\mu$), Margen de Error ($ME_{95\%}$), Intervalo de Confianza al 95% ($[\text{IC}_{inf}, \text{IC}_{sup}]$), Desviación Estándar ($\sigma$), Mediana, Speedup ($S$) y Eficiencia ($E$).
   * `metricas/gray_scott_benchmark_fast.csv` y `resumen_estadistico_fast.csv`: Generados únicamente por `make benchmark_fast` para pruebas preliminares aisladas sin tocar el dataset principal.
+
+#### Tabla Consolidada de Benchmarking Oficial ($N = 200$ corridas por modelo, AMD Ryzen 7 5700G):
+
+| Modelo | Modo | Hilos | Media $\mu$ (ms) | Margen Error $\pm ME_{95\%}$ | Intervalo Confianza 95% (ms) | Speedup $S$ | Eficiencia $E$ |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **SMT (HW Real)** | `hardware_smt` | 16 | **709.74** | $\pm 3.28$ | **[706.46, 713.02]** | **5.54x** | 34.6% |
+| **CMP** | `dedicated_cores` | 8 | **734.47** | $\pm 11.16$ | **[723.31, 745.62]** | **5.35x** | **66.9%** |
+| **Coarse-Grained** | `burst_block` | 8 | **863.16** | $\pm 3.94$ | **[859.23, 867.10]** | **4.55x** | 56.9% |
+| **SMT (Sobre-suscripción SW)** | `software_oversubscription` | 16 | **869.02** | $\pm 2.24$ | **[866.78, 871.26]** | **4.52x** | 28.3% |
+| **Fine-Grained (Paralelo Cíclico)** | `cyclic_threads` | 8 | **1044.98** | $\pm 7.93$ | **[1037.05, 1052.92]** | **3.76x** | 47.0% |
+| **Secuencial (Baseline)** | `baseline` | 1 | **3929.68** | $\pm 32.01$ | **[3897.67, 3961.68]** | **1.00x** | 100.0% |
+| **Fine-Grained (Cooperativo)** | `cooperative_quantum` | 8 | **3949.26** | $\pm 18.54$ | **[3930.71, 3967.80]** | **1.00x** | 12.4% |
 
 ---
 
 ### 3.5 Generación de Gráficas de Rendimiento (Visualización Científica en 300 DPI)
-El script `scripts/plot_metrics.py` procesa los datos empíricos de `metricas/gray_scott_benchmark.csv` y genera automáticamente 5 gráficos de calidad de publicación:
+El script `scripts/plot_metrics.py` procesa los datos empíricos de `metricas/gray_scott_benchmark.csv` y genera automáticamente 7 gráficos de calidad de publicación:
 
 ```bash
 # Generar el set completo de gráficas (usa automáticamente el entorno virtual venv):
@@ -202,7 +214,7 @@ make plot
 ```
 
 * **Visualizaciones exportadas en `metricas/graficas/`:*
-  1. **`01_tiempos_ejecucion_boxplot.png`**: Distribución de tiempos y diagramas de caja (Tukey boxplots) de las 200 corridas por modelo con medias anotadas y dispersión intercuartílica.
+  1. **`01_tiempos_ejecucion_boxplot.png`**: Distribución de tiempos y diagramas de caja (Tukey boxplots) de las 200 corridas por modelo con badges flotantes que detallan explícitamente la media ($\mu$), los Intervalos de Confianza al 95% ($\text{IC}_{95\%}$), el Margen de Error ($ME$) y la desviación estándar ($\sigma$).
   2. **`02_speedup_comparativo.png`**: Aceleración relativa ($S = T_{sec}/T_{par}$) frente a la línea base secuencial (1.0x).
   3. **`03_eficiencia_paralela.png`**: Eficiencia porcentual ($E = S/p \times 100\%$) focalizada en los modelos concurrentes ($p \ge 8$).
   4. **`04_comparativas_microarquitectonicas.png`**: Comparativa de 3 paneles aislando fenómenos de bajo nivel:

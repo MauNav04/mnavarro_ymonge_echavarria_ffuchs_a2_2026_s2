@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """
 ==============================================================================
-Módulo de Perfilado Microarquitectónico de Hardware con perf (CE 4302)
+Módulo de Perfilado Microarquitectónico de Hardware con perf 
 Problema: Reacción-Difusión de Gray-Scott
-Instituto Tecnológico de Costa Rica (TEC)
 ==============================================================================
 Este script automatiza la recolección de contadores de rendimiento de hardware
 (PMU) mediante Linux `perf stat` para caracterizar los modelos de ejecución:
