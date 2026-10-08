@@ -45,3 +45,17 @@ heat2d_benchmark
 benchmark_test.csv
 benchmark_test_summary.csv
 heat2d_benchmark.csv
+# Build products
+build/
+
+# Python virtual environment
+.venv/
+
+# IDE
+.vscode/
+
+# Generated benchmark results
+proyecto1/problems/heat2d/benchmark_results/
+
+# perf profiling output
+perf.data
