@@ -1,0 +1,7 @@
+run_id,modelo,modo,hilos,quantum,width,height,samples,depth,eventos_contexto,tiempo_ms,tiempo_s,timestamp
+1,Secuencial,baseline,1,0,100,56,2,5,0,55.726,0.0557,2026-10-07T20:39:24.104262
+2,Secuencial,baseline,1,0,100,56,2,5,0,54.266,0.0543,2026-10-07T20:39:24.161647
+1,CMP,dedicated_cores,8,0,100,56,2,5,0,9.911,0.0099,2026-10-07T20:39:24.174862
+2,CMP,dedicated_cores,8,0,100,56,2,5,0,13.460,0.0135,2026-10-07T20:39:24.191911
+1,SMT (Sobre-suscripción SW),software_oversubscription,16,0,100,56,2,5,0,12.217,0.0122,2026-10-07T20:39:24.712924
+2,SMT (Sobre-suscripción SW),software_oversubscription,16,0,100,56,2,5,0,11.448,0.0114,2026-10-07T20:39:24.729231

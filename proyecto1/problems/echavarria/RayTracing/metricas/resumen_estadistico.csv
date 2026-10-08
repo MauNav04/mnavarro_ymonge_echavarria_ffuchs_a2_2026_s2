@@ -1,0 +1,4 @@
+modelo,modo,hilos,corridas,media_ms,std_dev_ms,margen_error_ms,ci_95_inf_ms,ci_95_sup_ms,min_ms,max_ms,mediana_ms,speedup,eficiencia
+Secuencial,baseline,1,2,54.996,1.033,9.278,45.718,64.274,54.266,55.726,54.996,1.00x,100.0%
+CMP,dedicated_cores,8,2,11.686,2.509,22.543,-10.857,34.228,9.911,13.460,11.686,4.71x,58.8%
+SMT (Sobre-suscripción SW),software_oversubscription,16,2,11.833,0.544,4.884,6.949,16.717,11.448,12.217,11.833,4.65x,29.0%

@@ -28,6 +28,8 @@ results/
 # Allow tracking curated project metrics and graphs
 !proyecto1/problems/gray-scott/metricas/*.csv
 !proyecto1/problems/gray-scott/metricas/graficas/*.png
+!proyecto1/problems/echavarria/RayTracing/metricas/*.csv
+!proyecto1/problems/echavarria/RayTracing/metricas/graficas/*.png
 !proyecto1/problems/gray-scott/metricas/graficas/*.pdf
 
 # Gray-Scott compilation output

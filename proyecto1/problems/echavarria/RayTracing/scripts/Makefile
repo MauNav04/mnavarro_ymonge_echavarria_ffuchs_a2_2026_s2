@@ -195,8 +195,19 @@ verify_fine: $(TARGET_FINE)
 
 verify_fine_parallel: verify_fine
 
-verify_fine_coop: $(TARGET_FINE)
-	./$(TARGET_FINE) --threads $(THREADS) --quantum $(QUANTUM) --mode cooperative --width $(WIDTH) --samples $(SAMPLES) --depth $(DEPTH) --verify
+# ==============================================================================
+# CAMPAÑA DE BENCHMARKING EXPERIMENTAL (Python Suite)
+# ==============================================================================
+benchmark_fast: all
+	python3 benchmark.py --runs 5 --width $(WIDTH) --samples $(SAMPLES) --depth $(DEPTH) --cooldown 0.05
+
+benchmark_full: all
+	python3 benchmark.py --runs 200 --width $(WIDTH) --samples $(SAMPLES) --depth $(DEPTH) --cooldown 0.15
+
+benchmark_scaling: all
+	python3 benchmark.py --runs 10 --width $(WIDTH) --samples $(SAMPLES) --depth $(DEPTH) --strong-scaling
+
+benchmark_scalling: benchmark_scaling
 
 # ==============================================================================
 # LIMPIEZA
