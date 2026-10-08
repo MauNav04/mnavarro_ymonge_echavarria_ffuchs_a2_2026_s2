@@ -12,6 +12,7 @@
 
 #include "hittable.h"
 #include "material.h"
+#include "framebuffer.h"
 #include <chrono>
 
 // Clase que representa una cámara en un espacio 3D.
@@ -90,18 +91,9 @@ class camera {
         std::clog << "======================================================\n\n";
     }
 
-  private:
-    int    image_height;   // Rendered image height
-    double pixel_samples_scale;
-    point3 center;         // Camera center
-    point3 pixel00_loc;    // Location of pixel 0, 0
-    vec3   pixel_delta_u;  // Offset to pixel to the right
-    vec3   pixel_delta_v;  // Offset to pixel below
-    vec3   u, v, w; // Camera coordinate system
-    vec3   defocus_disk_u;       // Defocus disk horizontal radius
-    vec3   defocus_disk_v;       // Defocus disk vertical radius
+    int get_image_height() const { return image_height; }
 
-    // Inicializa los parámetros de la cámara y calcula las dimensiones de la imagen.
+    // Inicializa la cámara y la geometría del viewport (público para concurrencia)
     void initialize() {
         image_height = int(image_width / aspect_ratio);
         image_height = (image_height < 1) ? 1 : image_height;
@@ -110,7 +102,6 @@ class camera {
         center = lookfrom;
 
         // Calcula la longitud focal y las dimensiones del viewport.
-
         auto theta = degrees_to_radians(vfov);
         auto h = std::tan(theta/2);
         auto viewport_height = 2 * h * focus_dist;
@@ -122,22 +113,75 @@ class camera {
         v = cross(w, u);
 
         // Calcula los vectores de desplazamiento de píxel a píxel en las direcciones horizontal y vertical.
-        vec3 viewport_u = viewport_width * u;    // Vector across viewport horizontal edge
-        vec3 viewport_v = viewport_height * -v;  // Vector down viewport vertical edge
+        vec3 viewport_u = viewport_width * u;
+        vec3 viewport_v = viewport_height * -v;
 
-        // Calcula el delta de pixel a pixel en las direcciones horizontal y vertical.
         pixel_delta_u = viewport_u / image_width;
         pixel_delta_v = viewport_v / image_height;
 
-        // Calcula la ubicación de la esquina superior izquierda del viewport y la ubicación del primer píxel.
         auto viewport_upper_left = center - (focus_dist * w) - viewport_u/2 - viewport_v/2;
         pixel00_loc = viewport_upper_left + 0.5 * (pixel_delta_u + pixel_delta_v);
 
-        // Calcula el radio del disco de desenfoque y los vectores de desplazamiento del disco de desenfoque.
         auto defocus_radius = focus_dist * std::tan(degrees_to_radians(defocus_angle / 2));
         defocus_disk_u = u * defocus_radius;
         defocus_disk_v = v * defocus_radius;
     }
+
+    // =========================================================================
+    // NÚCLEO COMPUTACIONAL DESACOPLADO (Lock-Free y Thread-Safe)
+    // =========================================================================
+    // Calcula el color de un único píxel promediando samples_per_pixel rayos
+    color render_pixel(int i, int j, const hittable& world) const {
+        color pixel_color(0, 0, 0);
+        for (int sample = 0; sample < samples_per_pixel; ++sample) {
+            ray r = get_ray(i, j);
+            pixel_color += ray_color(r, max_depth, world);
+        }
+        return pixel_samples_scale * pixel_color;
+    }
+
+    // Cómputo de píxel con conteo de eventos de bloqueo/rebotes profundos (Coarse-Grained)
+    color render_pixel_counted(int i, int j, const hittable& world, int& stalls, int stall_threshold = 15) const {
+        color pixel_color(0, 0, 0);
+        for (int sample = 0; sample < samples_per_pixel; ++sample) {
+            ray r = get_ray(i, j);
+            int bounces = 0;
+            pixel_color += ray_color_counted(r, max_depth, world, bounces);
+            if (bounces >= stall_threshold) {
+                stalls++;
+            }
+        }
+        return pixel_samples_scale * pixel_color;
+    }
+
+    // Renderiza una franja continua de filas [start_y, end_y) directamente al Framebuffer en RAM
+    void render_slice(const hittable& world, Framebuffer& fb, int start_y, int end_y) const {
+        for (int j = start_y; j < end_y; ++j) {
+            for (int i = 0; i < image_width; ++i) {
+                fb.set_pixel(i, j, render_pixel(i, j, world));
+            }
+        }
+    }
+
+    // Renderiza una franja con instrumentación de stalls para Coarse-Grained
+    void render_slice_counted(const hittable& world, Framebuffer& fb, int start_y, int end_y, int& stalls) const {
+        for (int j = start_y; j < end_y; ++j) {
+            for (int i = 0; i < image_width; ++i) {
+                fb.set_pixel(i, j, render_pixel_counted(i, j, world, stalls));
+            }
+        }
+    }
+
+  private:
+    int    image_height;   // Rendered image height
+    double pixel_samples_scale;
+    point3 center;         // Camera center
+    point3 pixel00_loc;    // Location of pixel 0, 0
+    vec3   pixel_delta_u;  // Offset to pixel to the right
+    vec3   pixel_delta_v;  // Offset to pixel below
+    vec3   u, v, w; // Camera coordinate system
+    vec3   defocus_disk_u;       // Defocus disk horizontal radius
+    vec3   defocus_disk_v;       // Defocus disk vertical radius
 
 
     ray get_ray(int i, int j) const {
@@ -182,6 +226,26 @@ class camera {
             color attenuation;
             if (rec.mat->scatter(r, rec, attenuation, scattered))
                 return attenuation * ray_color(scattered, depth-1, world);
+            return color(0,0,0);
+        }
+
+        vec3 unit_direction = unit_vector(r.direction());
+        auto a = 0.5*(unit_direction.y() + 1.0);
+        return (1.0-a)*color(1.0, 1.0, 1.0) + a*color(0.5, 0.7, 1.0);
+    }
+
+    // Variante que contabiliza rebotes profundos para cuantificar stalls en Coarse-Grained
+    color ray_color_counted(const ray& r, int depth, const hittable& world, int& bounces) const {
+        if (depth <= 0)
+            return color(0,0,0);
+
+        hit_record rec;
+        if (world.hit(r, interval(0.001, infinity), rec)) {
+            bounces++;
+            ray scattered;
+            color attenuation;
+            if (rec.mat->scatter(r, rec, attenuation, scattered))
+                return attenuation * ray_color_counted(scattered, depth-1, world, bounces);
             return color(0,0,0);
         }
 
