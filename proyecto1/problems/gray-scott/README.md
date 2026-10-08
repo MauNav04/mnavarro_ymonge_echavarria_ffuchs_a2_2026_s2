@@ -210,6 +210,8 @@ make plot
      - *Panel B (Fine-Grained HW vs. Emulación SW):* Penalización de simulación secuencial por corutinas (+277.9% más lento).
      - *Panel C (Localidad de Caché - 8 hilos HW):* Coarse-Grained vs Fine-Grained cíclico (+21.1% más lento).
   5. **`05_dashboard_consolidado.png`**: Tablero general de 4 cuadrantes con tiempos, speedup, eficiencia y evolución temporal de las 200 repeticiones consecutivas.
+  6. **`06_perfilado_hardware_perf.png`**: Perfilado microarquitectónico con Linux `perf` (IPC, CPUs activas, fallos de caché L1/L2/LLC y giga-ciclos).
+  7. **`07_escalabilidad_hilos.png`**: Curvas de escalabilidad fuerte ($p \in \{1, 2, 4, 8, 16\}$ hilos) contrastadas con aceleración lineal ideal y Ley de Amdahl ($f = 98\%$), junto con la curva de degradación de eficiencia paralela.
 
 ---
 
@@ -265,6 +267,25 @@ make perfilado
 
 ---
 
+### 3.8 Estudio de Escalabilidad Fuerte (Strong Scaling) y Ley de Amdahl
+Evalúa la métrica (d) del enunciado oficial realizando un barrido sistemático del número de hilos de ejecución ($p \in \{1, 2, 4, 8, 16\}$) sobre una grilla constante de $512 \times 512$ y $16{,}000$ pasos temporales:
+
+```bash
+# Desde la carpeta scripts/:
+make scalability
+# o con parámetros personalizados (ej. 10 corridas por punto):
+make scalability RUNS_SCALING=10 THREADS_SCALING="1,2,4,8,16"
+```
+
+* **Modelos evaluados:** CMP, SMT (HW Real), Coarse-Grained y Fine-Grained (Paralelo Cíclico).
+* **Contraste teórico:** Aceleración Lineal Ideal ($S = p$) y Ley de Amdahl ($S(p) = \frac{1}{(1-f) + f/p}$) con fracción paralelizable estimada $f = 98\%$.
+* **Archivos generados:**
+  * `metricas/escalabilidad_hilos.csv`: Resumen estadístico (media, mediana, speedup, eficiencia y referencias teóricas por hilo).
+  * `metricas/escalabilidad_hilos_crudo.csv`: Datos crudos corrida a corrida para trazabilidad.
+  * `metricas/graficas/07_escalabilidad_hilos.png`: Visualización de doble panel (Speedup vs. Hilos y Eficiencia Paralela vs. Hilos).
+
+---
+
 ## 4. Estructura de Archivos del Módulo
 
 ```text
@@ -278,13 +299,18 @@ proyecto1/
         ├── SMT/                # Variante para hilos simultáneos (HW real y sobre-suscripción SW)
         ├── docs/               # Documentación formal para evaluación
         ├── metricas/           # Salida de benchmarking y reproducibilidad experimental
-        │   ├── gray_scott_benchmark.csv  # Datos crudos de las corridas estadísticas
-        │   ├── resumen_estadistico.csv   # Estadísticas agregadas (Media, StdDev, Speedup)
-        │   └── graficas/                 # Visualizaciones comparativas (.png / .pdf)
+        │   ├── gray_scott_benchmark.csv    # Datos crudos de las 200 corridas estadísticas
+        │   ├── resumen_estadistico.csv     # Estadísticas agregadas con IC 95% (Media, StdDev, Margen Error)
+        │   ├── perf_hardware_counters.csv  # Contadores de hardware Linux PMU (IPC, ciclos, fallos caché)
+        │   ├── escalabilidad_hilos.csv     # Barrido de escalabilidad fuerte (p = 1, 2, 4, 8, 16)
+        │   └── graficas/                   # Visualizaciones comparativas 300 DPI (01 a 07)
         ├── include/            # Encabezados del núcleo de reacción-difusión
         ├── scripts/            # Automatización de compilación y pruebas
-        │   ├── benchmark.py    # Script maestro de benchmarking estadístico
-        │   └── Makefile        # Reglas para ejecución, videos y benchmarks
+        │   ├── benchmark.py    # Script maestro de benchmarking estadístico (200 corridas)
+        │   ├── profile_perf.py # Script de perfilado microarquitectónico con Linux perf
+        │   ├── scalability.py  # Script de barrido de escalabilidad fuerte
+        │   ├── plot_metrics.py # Generador integral de todas las figuras (01 a 07)
+        │   └── Makefile        # Reglas para ejecución, videos, perfiles y benchmarks
         ├── sequential/         # Baseline de comparación secuencial
         ├── src/                # Implementación matemática del stencil FTCS
         ├── videos/             # Videos MP4 sincronizados con el tiempo real de CPU

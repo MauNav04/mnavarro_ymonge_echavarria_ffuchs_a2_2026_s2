@@ -391,6 +391,11 @@ def main():
             f"{nombre:<28} | {n_count:<4} | {media:10.2f} | {desv:9.2f} | {min_v:9.2f} | {max_v:9.2f} | {speedup_str:<8} | {eficiencia_str:<10}"
         )
 
+        # Intervalo de confianza al 95%: CI = media +- 1.95996 * (desv / sqrt(N))
+        error_margin = 1.95996 * (desv / (n_count ** 0.5)) if n_count > 1 else 0.0
+        ci_inf = media - error_margin
+        ci_sup = media + error_margin
+
         filas_resumen.append([
             nombre,
             cfg["modo"],
@@ -398,6 +403,9 @@ def main():
             n_count,
             round(media, 3),
             round(desv, 3),
+            round(error_margin, 3),
+            round(ci_inf, 3),
+            round(ci_sup, 3),
             round(min_v, 3),
             round(max_v, 3),
             round(mediana, 3),
@@ -412,6 +420,7 @@ def main():
         w_sum = csv.writer(f_sum)
         w_sum.writerow([
             "modelo", "modo", "hilos", "corridas", "media_ms", "std_dev_ms",
+            "margen_error_ms", "ci_95_inf_ms", "ci_95_sup_ms",
             "min_ms", "max_ms", "mediana_ms", "speedup", "eficiencia"
         ])
         w_sum.writerows(filas_resumen)
