@@ -62,7 +62,7 @@ int main(int argc, char* argv[]) {
     Framebuffer fb(width, height);
 
     // =========================================================================
-    // MEDICIÓN DE TIEMPO PURO DE CÓMPUTO (Desacoplado de I/O)
+    // MEDICIÓN DE TIEMPO PURO DE CÓMPUTO 
     // =========================================================================
     auto start = std::chrono::high_resolution_clock::now();
 

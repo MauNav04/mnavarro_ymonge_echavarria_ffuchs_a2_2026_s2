@@ -1,25 +1,23 @@
 /**
  * ============================================================================
  * Modelo de Ejecución: Fine-Grained Multithreading (Multihilo de Grano Fino)
- * Problema: Trazado de Rayos 3D (Ray Tracing)
  * ============================================================================
  *
  * Características Arquitectónicas:
- * 1. Conmutación Incondicional por Cuantums Mínimos (Round-Robin Interleaving):
+ * 1. Conmutación por Cuantums (Round-Robin Interleaving):
  *    A diferencia de Coarse-Grained (donde el hilo se ejecuta en ráfagas largas y solo
  *    conmuta ante bloqueos costosos), en Fine-Grained la conmutación de hilo ocurre
- *    DE FORMA INCONDICIONAL en cada cuantum mínimo (Q = 1 fila por defecto),
- *    independientemente de si el hilo actual sufrió un stall o no.
+ *    DE FORMA INCONDICIONAL en cada cuantum mínimo (Q = 1 fila por defecto).
  * 2. Propuestas de Implementación Comparadas:
  *    - Propuesta 1 (Por defecto: --mode cooperative):
- *      Simulación rigurosa del modelo de grano fino mediante planificación cooperativa
+ *      Simulación del modelo de grano fino mediante planificación cooperativa
  *      en espacio de usuario. Modela un procesador multihilo intercalado donde T hilos
  *      lógicos rotan por turno estricto ejecutando un cuantum mínimo (Q = 1 fila).
  *      En cada cuantum se registra una conmutación forzada de contexto, demostrando
  *      la sobrecarga masiva de software en ausencia de conmutación por hardware.
  *    - Propuesta 2 (--mode parallel):
  *      Implementación paralela intercalada mediante hilos del SO (POSIX threads) con
- *      descomposición cíclica (Cyclic Distribution). Cada hilo procesa filas intercaladas
+ *      (Cyclic Distribution). Cada hilo procesa filas intercaladas
  *      en bloques mínimos (Q filas), evidenciando el impacto de la pérdida de localidad
  *      espacial y la degradación del Hardware Prefetcher de caché L1/L2.
  * ============================================================================
@@ -41,7 +39,7 @@
 #include <iomanip>
 
 // ============================================================================
-// Contexto para el Modo Paralelo Cíclico (POSIX Threads)
+// Contexto para el Modo Paralelo (POSIX Threads)
 // ============================================================================
 struct ContextoHiloFineParallel {
     int id;                         // ID lógico del hilo [0, num_threads - 1]
@@ -49,8 +47,8 @@ struct ContextoHiloFineParallel {
     int height;                     // Altura total de la imagen
     int quantum;                    // Cuantum mínimo (filas por trozo)
     uint64_t context_switches;      // Conmutaciones forzadas registradas
-    const camera* cam;              // Puntero a la cámara calibrada (read-only)
-    const hittable_list* world;     // Puntero a la escena 3D (read-only)
+    const camera* cam;              // Puntero a la cámara calibrada 
+    const hittable_list* world;     // Puntero a la escena 3D 
     Framebuffer* fb;                // Puntero al Framebuffer compartido en RAM
 };
 
@@ -79,7 +77,7 @@ void* worker_thread_fine_parallel(void* arg) {
 }
 
 // ============================================================================
-// Rutina de Ejecución: Modo Cooperativo Round-Robin (Simulación de Grano Fino)
+// Rutina de Ejecución: Modo Cooperativo (Simulación de Grano Fino)
 // ============================================================================
 void ejecutar_fine_grained_cooperativo(const camera& cam, const hittable_list& world,
                                       Framebuffer& fb, int height,
@@ -163,7 +161,7 @@ int main(int argc, char* argv[]) {
     uint64_t total_context_switches = 0;
 
     // =========================================================================
-    // MEDICIÓN DE TIEMPO PURO DE CÓMPUTO FINE-GRAINED
+    // MEDICIÓN DE TIEMPO PURO 
     // =========================================================================
     auto start = std::chrono::high_resolution_clock::now();
 
