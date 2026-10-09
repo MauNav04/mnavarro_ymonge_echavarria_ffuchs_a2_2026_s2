@@ -109,16 +109,20 @@ STRESS_CG_BIN := $(BIN_DIR)/stress_coarse_grained
 RUNS ?= 200
 WARMUPS ?= 5
 
-# Coarse-Grained development/profiling parameters.
+# Coarse-Grained development / profiling parameters.
 #
-# IMPORTANT:
-# These are NOT yet the formal experimental parameters.
-# They are configurable values used for development and perf tests.
+# The formal benchmark implementation currently uses:
+#   blocking duration = 100 us
+#   rows per blocking event = 8
+#
+# These Makefile variables are used by standalone CG profiling targets.
 CG_THREADS ?= 4
 CG_BLOCK_US ?= 100
 CG_ROWS_PER_BLOCK ?= 8
 
-# Current formal benchmark:
+# Separate benchmark campaigns:
+#
+# Fine-Grained:
 #   Sequential
 #   FG-1
 #   FG-2
@@ -128,10 +132,27 @@ CG_ROWS_PER_BLOCK ?= 8
 #   FG-32
 #   FG-64
 #
-# Coarse-Grained has NOT yet been integrated into benchmark_heat2d.cpp.
-BENCHMARK_CASES := 15
+# Coarse-Grained:
+#   Sequential
+#   CG-1
+#   CG-2
+#   CG-4
+#   CG-8
+#   CG-16
+#   CG-32
+#   CG-64
+#
+# Full benchmark:
+#   Sequential + all FG + all CG
 
-RESULT_TAG ?= fine_grained_$(shell date +%Y%m%d_%H%M%S)_$(shell uname -m)
+FG_BENCHMARK_CASES := 8
+CG_BENCHMARK_CASES := 8
+ALL_BENCHMARK_CASES := 15
+
+BENCHMARK_CASES ?= $(ALL_BENCHMARK_CASES)
+CAMPAIGN_MODEL ?= all
+
+RESULT_TAG ?= heat2d_$(shell date +%Y%m%d_%H%M%S)_$(shell uname -m)
 RESULT_DIR := $(HEAT2D)/benchmark_results/$(RESULT_TAG)
 
 RAW_RESULTS := $(RESULT_DIR)/raw_results.csv
@@ -158,8 +179,11 @@ ANALYSIS_LOG := $(RESULT_DIR)/analysis.log
 	python-deps \
 	check-clean \
 	metadata \
-	campaign-dev \
+	campaign-dev-fg \
+	campaign-dev-cg \
 	campaign-fg \
+	campaign-cg \
+	campaign-run \
 	perf-soft-seq \
 	perf-soft-fg \
 	perf-soft-cg \
@@ -235,11 +259,14 @@ $(CG_BIN): \
 		-o $@
 
 # ============================================================
-# Benchmark
+# Common benchmark
 #
-# IMPORTANT:
-# This benchmark currently contains only Sequential + Fine-Grained.
-# Coarse-Grained will be integrated in a later step.
+# benchmark_heat2d accepts:
+#
+#   ./heat2d_benchmark RUNS WARMUPS output.csv fg
+#   ./heat2d_benchmark RUNS WARMUPS output.csv cg
+#   ./heat2d_benchmark RUNS WARMUPS output.csv all
+#
 # ============================================================
 
 $(BENCH_BIN): \
@@ -443,9 +470,6 @@ check-clean:
 
 # ============================================================
 # Experimental metadata
-#
-# IMPORTANT:
-# This metadata still describes the current formal FG campaign.
 # ============================================================
 
 metadata: release
@@ -458,6 +482,9 @@ metadata: release
 		echo; \
 		echo "Result tag:"; \
 		echo "$(RESULT_TAG)"; \
+		echo; \
+		echo "Campaign model:"; \
+		echo "$(CAMPAIGN_MODEL)"; \
 		echo; \
 		echo "Git commit:"; \
 		git rev-parse HEAD; \
@@ -472,7 +499,7 @@ metadata: release
 		$(CXX) --version; \
 		echo; \
 		echo "Compilation flags:"; \
-		echo "$(RELEASE_FLAGS)"; \
+		echo "$(RELEASE_FLAGS) $(THREAD_FLAGS)"; \
 		echo; \
 		echo "Benchmark binary SHA256:"; \
 		sha256sum $(BENCH_BIN) 2>/dev/null || true; \
@@ -507,45 +534,111 @@ metadata: release
 		echo "Cell updates per execution: 638401000"; \
 		echo "Measured rounds: $(RUNS)"; \
 		echo "Warm-up rounds: $(WARMUPS)"; \
-		echo "Cases: Sequential + Fine-Grained {1,2,4,8,16,32,64}"; \
-		echo "Fine-Grained scheduler: Round-Robin"; \
-		echo "Fine-Grained quantum: 1 cell update"; \
+		echo "Cases per measured round: $(BENCHMARK_CASES)"; \
+		if [ "$(CAMPAIGN_MODEL)" = "fg" ]; then \
+			echo "Cases: Sequential + Fine-Grained {1,2,4,8,16,32,64}"; \
+			echo "Fine-Grained scheduler: Round-Robin"; \
+			echo "Fine-Grained quantum: 1 cell update"; \
+			echo "Fine-Grained implementation: simulated logical contexts"; \
+		elif [ "$(CAMPAIGN_MODEL)" = "cg" ]; then \
+			echo "Cases: Sequential + Coarse-Grained {1,2,4,8,16,32,64}"; \
+			echo "Coarse-Grained implementation: std::thread workers"; \
+			echo "Coarse-Grained synchronization: reusable timestep barrier"; \
+			echo "Coarse-Grained blocking duration: 100 us"; \
+			echo "Coarse-Grained rows per blocking event: 8"; \
+			echo "Coarse-Grained blocking events per timestep: 100"; \
+			echo "Coarse-Grained blocking events per run: 100000"; \
+		else \
+			echo "Cases: Sequential + Fine-Grained {1,2,4,8,16,32,64} + Coarse-Grained {1,2,4,8,16,32,64}"; \
+		fi; \
 	} > $(METADATA)
 
 	@echo "Metadata written to:"
 	@echo "  $(METADATA)"
 
 # ============================================================
-# Development benchmark
+# Development benchmark campaigns
 #
-# Short campaign used only to validate the complete FG pipeline.
+# Short smoke tests:
+#   3 measured rounds
+#   1 warm-up round
 # ============================================================
 
-campaign-dev: RUNS=3
-campaign-dev: WARMUPS=1
-campaign-dev: campaign-fg
+campaign-dev-fg: RUNS=3
+campaign-dev-fg: WARMUPS=1
+campaign-dev-fg: campaign-fg
+
+campaign-dev-cg: RUNS=3
+campaign-dev-cg: WARMUPS=1
+campaign-dev-cg: campaign-cg
 
 # ============================================================
 # Fine-Grained benchmark campaign
+#
+# Cases:
+#   Sequential
+#   FG-1
+#   FG-2
+#   FG-4
+#   FG-8
+#   FG-16
+#   FG-32
+#   FG-64
 #
 # Default:
 #   200 measured rounds
 #   5 warm-up rounds
 #
-# Produces:
-#   metadata.txt
-#   raw_results.csv
-#   summary.csv
-#   benchmark.log
-#   analysis.log
-#   plots/
+# Expected raw CSV lines with RUNS=200:
+#   200 * 8 + 1 = 1601
 # ============================================================
 
-campaign-fg: check-clean release python-deps
+campaign-fg: CAMPAIGN_MODEL=fg
+campaign-fg: BENCHMARK_CASES=$(FG_BENCHMARK_CASES)
+campaign-fg: campaign-run
+
+# ============================================================
+# Coarse-Grained benchmark campaign
+#
+# Cases:
+#   Sequential
+#   CG-1
+#   CG-2
+#   CG-4
+#   CG-8
+#   CG-16
+#   CG-32
+#   CG-64
+#
+# Default:
+#   200 measured rounds
+#   5 warm-up rounds
+#
+# Expected raw CSV lines with RUNS=200:
+#   200 * 8 + 1 = 1601
+# ============================================================
+
+campaign-cg: CAMPAIGN_MODEL=cg
+campaign-cg: BENCHMARK_CASES=$(CG_BENCHMARK_CASES)
+campaign-cg: campaign-run
+
+# ============================================================
+# Common campaign implementation
+#
+# Do not normally call this target directly.
+# Use:
+#
+#   make campaign-fg
+#   make campaign-cg
+# ============================================================
+
+campaign-run: check-clean release python-deps
 	@echo
 	@echo "========================================"
-	@echo "Heat2D Fine-Grained Campaign"
+	@echo "Heat2D Benchmark Campaign"
 	@echo "========================================"
+	@echo "Model      : $(CAMPAIGN_MODEL)"
+	@echo "Cases      : $(BENCHMARK_CASES)"
 	@echo "Result tag : $(RESULT_TAG)"
 	@echo "Runs       : $(RUNS)"
 	@echo "Warm-ups   : $(WARMUPS)"
@@ -558,7 +651,9 @@ campaign-fg: check-clean release python-deps
 		metadata \
 		RESULT_TAG="$(RESULT_TAG)" \
 		RUNS="$(RUNS)" \
-		WARMUPS="$(WARMUPS)"
+		WARMUPS="$(WARMUPS)" \
+		BENCHMARK_CASES="$(BENCHMARK_CASES)" \
+		CAMPAIGN_MODEL="$(CAMPAIGN_MODEL)"
 
 	@echo
 	@echo "Running benchmark..."
@@ -566,7 +661,8 @@ campaign-fg: check-clean release python-deps
 	$(BENCH_BIN) \
 		$(RUNS) \
 		$(WARMUPS) \
-		$(RAW_RESULTS) | tee $(BENCHMARK_LOG)
+		$(RAW_RESULTS) \
+		$(CAMPAIGN_MODEL) | tee $(BENCHMARK_LOG)
 
 	@echo
 	@echo "Validating raw sample count..."
@@ -599,6 +695,7 @@ campaign-fg: check-clean release python-deps
 	@echo "========================================"
 	@echo "Campaign completed successfully"
 	@echo "========================================"
+	@echo "Model    : $(CAMPAIGN_MODEL)"
 	@echo "Metadata : $(METADATA)"
 	@echo "Raw data : $(RAW_RESULTS)"
 	@echo "Summary  : $(SUMMARY)"
@@ -729,22 +826,23 @@ help:
 	@echo "  make stress-cg"
 	@echo "      Run Coarse-Grained stress test."
 	@echo
-	@echo "Benchmark:"
-	@echo "  make campaign-dev"
-	@echo "      3 measured rounds + 1 warm-up for current FG pipeline."
+	@echo "Development benchmark:"
+	@echo "  make campaign-dev-fg RESULT_TAG=utm_fg_smoke"
+	@echo "      3 measured rounds + 1 warm-up for Fine-Grained."
 	@echo
-	@echo "  make campaign-fg"
-	@echo "      200 measured rounds + 5 warm-ups."
+	@echo "  make campaign-dev-cg RESULT_TAG=utm_cg_smoke"
+	@echo "      3 measured rounds + 1 warm-up for Coarse-Grained."
 	@echo
-	@echo "  make campaign-fg RUNS=50 WARMUPS=3"
-	@echo "      Custom Fine-Grained campaign."
+	@echo "Formal / long benchmark:"
+	@echo "  make campaign-fg RUNS=200 WARMUPS=5 RESULT_TAG=utm_fg_200"
+	@echo "      Sequential + FG {1,2,4,8,16,32,64}."
 	@echo
-	@echo "  make campaign-fg RESULT_TAG=intel_fg_200"
-	@echo "      Custom result directory name."
+	@echo "  make campaign-cg RUNS=200 WARMUPS=5 RESULT_TAG=utm_cg_200"
+	@echo "      Sequential + CG {1,2,4,8,16,32,64}."
 	@echo
-	@echo "Coarse-Grained parameters:"
+	@echo "Coarse-Grained standalone parameters:"
 	@echo "  CG_THREADS=4"
-	@echo "      Number of worker threads."
+	@echo "      Number of worker threads used by stress/perf/profile targets."
 	@echo
 	@echo "  CG_BLOCK_US=100"
 	@echo "      Synthetic blocking duration in microseconds."

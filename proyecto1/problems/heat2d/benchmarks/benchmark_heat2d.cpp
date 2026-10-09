@@ -5,12 +5,16 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
 namespace {
 
+/**
+ * @brief Parses a strictly positive integer command-line argument.
+ */
 std::size_t parsePositiveInteger(
     const char* argument,
     const char* name
@@ -48,12 +52,139 @@ std::size_t parsePositiveInteger(
         );
     }
 
+    if (
+        parsed >
+        static_cast<unsigned long long>(
+            std::numeric_limits<std::size_t>::max()
+        )
+    ) {
+        throw std::out_of_range(
+            std::string(name) +
+            " exceeds std::size_t capacity."
+        );
+    }
+
     return static_cast<std::size_t>(
         parsed
     );
 }
 
 
+/**
+ * @brief Validates and returns the selected benchmark campaign.
+ *
+ * Supported values:
+ *   all -> Sequential + Fine-Grained + Coarse-Grained
+ *   fg  -> Sequential + Fine-Grained
+ *   cg  -> Sequential + Coarse-Grained
+ */
+std::string parseCampaignModel(
+    int argc,
+    char* argv[]
+) {
+    const std::string campaignModel =
+        argc >= 5
+            ? argv[4]
+            : "all";
+
+    if (
+        campaignModel != "all" &&
+        campaignModel != "fg" &&
+        campaignModel != "cg"
+    ) {
+        throw std::invalid_argument(
+            "Benchmark model must be one of: all, fg, cg."
+        );
+    }
+
+    return campaignModel;
+}
+
+
+/**
+ * @brief Builds the execution cases belonging to one campaign.
+ *
+ * Sequential is always included because it is the common reference
+ * used to calculate paired speedup.
+ */
+std::vector<
+    heat2d::benchmark::BenchmarkCase
+> createBenchmarkCases(
+    const std::string& campaignModel
+) {
+    using heat2d::benchmark::BenchmarkCase;
+    using heat2d::benchmark::ExecutionModel;
+
+    std::vector<BenchmarkCase> cases;
+
+    /*
+     * Sequential reference.
+     */
+    cases.push_back({
+        ExecutionModel::Sequential,
+        1
+    });
+
+    /*
+     * Common execution-context counts used by both models.
+     */
+    const std::vector<std::size_t> threadCounts{
+        1,
+        2,
+        4,
+        8,
+        16,
+        32,
+        64
+    };
+
+    /*
+     * Fine-Grained campaign.
+     *
+     * These values represent simulated logical contexts.
+     */
+    if (
+        campaignModel == "all" ||
+        campaignModel == "fg"
+    ) {
+        for (
+            const std::size_t threadCount :
+            threadCounts
+        ) {
+            cases.push_back({
+                ExecutionModel::FineGrained,
+                threadCount
+            });
+        }
+    }
+
+    /*
+     * Coarse-Grained campaign.
+     *
+     * These values represent real std::thread workers.
+     */
+    if (
+        campaignModel == "all" ||
+        campaignModel == "cg"
+    ) {
+        for (
+            const std::size_t threadCount :
+            threadCounts
+        ) {
+            cases.push_back({
+                ExecutionModel::CoarseGrained,
+                threadCount
+            });
+        }
+    }
+
+    return cases;
+}
+
+
+/**
+ * @brief Writes every measured benchmark observation to CSV.
+ */
 void writeCsv(
     const std::string& outputPath,
     const std::vector<
@@ -71,10 +202,19 @@ void writeCsv(
     }
 
     /*
-     * logical_threads is temporarily preserved for compatibility
-     * with the existing analysis scripts.
+     * logical_threads is preserved for compatibility with the
+     * statistical analysis scripts.
      *
-     * For Coarse-Grained it represents real worker threads.
+     * Meaning by model:
+     *
+     * Sequential:
+     *   always 1.
+     *
+     * Fine-Grained:
+     *   simulated logical contexts.
+     *
+     * Coarse-Grained:
+     *   real worker threads.
      */
     output
         << "run,"
@@ -134,17 +274,30 @@ int main(
     char* argv[]
 ) {
     try {
-        if (argc > 4) {
+        /*
+         * Command-line format:
+         *
+         * ./heat2d_benchmark
+         *      [measured_runs]
+         *      [warmup_runs]
+         *      [output.csv]
+         *      [all|fg|cg]
+         */
+        if (argc > 5) {
             throw std::invalid_argument(
                 "Usage: ./heat2d_benchmark "
                 "[measured_runs] "
                 "[warmup_runs] "
-                "[output.csv]"
+                "[output.csv] "
+                "[all|fg|cg]"
             );
         }
 
         heat2d::benchmark::BenchmarkConfig config;
 
+        /*
+         * Optional number of measured rounds.
+         */
         if (argc >= 2) {
             config.measuredRuns =
                 parsePositiveInteger(
@@ -153,6 +306,9 @@ int main(
                 );
         }
 
+        /*
+         * Optional number of discarded warm-up rounds.
+         */
         if (argc >= 3) {
             config.warmupRuns =
                 parsePositiveInteger(
@@ -161,90 +317,54 @@ int main(
                 );
         }
 
+        /*
+         * Optional raw CSV destination.
+         */
         const std::string outputPath =
             argc >= 4
                 ? argv[3]
                 : "heat2d_benchmark.csv";
 
         /*
-         * Common experimental matrix.
+         * Optional campaign selector.
          *
-         * Sequential:
-         *   1 reference configuration.
+         * Default:
+         *   all
+         */
+        const std::string campaignModel =
+            parseCampaignModel(
+                argc,
+                argv
+            );
+
+        /*
+         * Build only the cases belonging to the selected campaign.
          *
-         * Fine-Grained:
-         *   1, 2, 4, 8, 16, 32, 64 logical contexts.
+         * fg:
+         *   Sequential + FG {1,2,4,8,16,32,64}
+         *   = 8 cases.
          *
-         * Coarse-Grained:
-         *   1, 2, 4, 8, 16, 32, 64 real worker threads.
+         * cg:
+         *   Sequential + CG {1,2,4,8,16,32,64}
+         *   = 8 cases.
+         *
+         * all:
+         *   Sequential + 7 FG + 7 CG
+         *   = 15 cases.
          */
         const std::vector<
             heat2d::benchmark::BenchmarkCase
-        > cases{
-            {
-                heat2d::benchmark::ExecutionModel::Sequential,
-                1
-            },
+        > cases =
+            createBenchmarkCases(
+                campaignModel
+            );
 
-            {
-                heat2d::benchmark::ExecutionModel::FineGrained,
-                1
-            },
-            {
-                heat2d::benchmark::ExecutionModel::FineGrained,
-                2
-            },
-            {
-                heat2d::benchmark::ExecutionModel::FineGrained,
-                4
-            },
-            {
-                heat2d::benchmark::ExecutionModel::FineGrained,
-                8
-            },
-            {
-                heat2d::benchmark::ExecutionModel::FineGrained,
-                16
-            },
-            {
-                heat2d::benchmark::ExecutionModel::FineGrained,
-                32
-            },
-            {
-                heat2d::benchmark::ExecutionModel::FineGrained,
-                64
-            },
-
-            {
-                heat2d::benchmark::ExecutionModel::CoarseGrained,
-                1
-            },
-            {
-                heat2d::benchmark::ExecutionModel::CoarseGrained,
-                2
-            },
-            {
-                heat2d::benchmark::ExecutionModel::CoarseGrained,
-                4
-            },
-            {
-                heat2d::benchmark::ExecutionModel::CoarseGrained,
-                8
-            },
-            {
-                heat2d::benchmark::ExecutionModel::CoarseGrained,
-                16
-            },
-            {
-                heat2d::benchmark::ExecutionModel::CoarseGrained,
-                32
-            },
-            {
-                heat2d::benchmark::ExecutionModel::CoarseGrained,
-                64
-            }
-        };
-
+        /*
+         * Coarse-Grained policy metadata.
+         *
+         * These calculations are useful when CG participates in
+         * the selected campaign.
+         */
         const auto coarseBlockingMicroseconds =
             std::chrono::duration_cast<
                 std::chrono::microseconds
@@ -270,8 +390,16 @@ int main(
             eventsPerStep *
             config.steps;
 
+        /*
+         * Benchmark information.
+         */
         std::cout
             << "\n=== Heat2D Common Benchmark ===\n\n";
+
+        std::cout
+            << "Campaign model: "
+            << campaignModel
+            << '\n';
 
         std::cout
             << "Grid: "
@@ -312,29 +440,69 @@ int main(
             << config.measuredRuns
             << '\n';
 
-        std::cout
-            << "\n--- Coarse-Grained Policy ---\n";
+        /*
+         * Fine-Grained policy information.
+         */
+        if (
+            campaignModel == "fg" ||
+            campaignModel == "all"
+        ) {
+            std::cout
+                << "\n--- Fine-Grained Policy ---\n";
 
-        std::cout
-            << "Blocking duration: "
-            << coarseBlockingMicroseconds
-            << " us\n";
+            std::cout
+                << "Logical contexts: "
+                << "1, 2, 4, 8, 16, 32, 64\n";
 
-        std::cout
-            << "Rows per blocking event: "
-            << config.coarseRowsPerBlockingEvent
-            << '\n';
+            std::cout
+                << "Scheduler: Round-Robin\n";
 
-        std::cout
-            << "Blocking events per timestep: "
-            << eventsPerStep
-            << '\n';
+            std::cout
+                << "Quantum: 1 cell update\n";
 
-        std::cout
-            << "Blocking events per CG run: "
-            << coarseEventsPerRun
-            << '\n';
+            std::cout
+                << "Execution: simulated logical contexts\n";
+        }
 
+        /*
+         * Coarse-Grained policy information.
+         */
+        if (
+            campaignModel == "cg" ||
+            campaignModel == "all"
+        ) {
+            std::cout
+                << "\n--- Coarse-Grained Policy ---\n";
+
+            std::cout
+                << "Worker threads: "
+                << "1, 2, 4, 8, 16, 32, 64\n";
+
+            std::cout
+                << "Blocking duration: "
+                << coarseBlockingMicroseconds
+                << " us\n";
+
+            std::cout
+                << "Rows per blocking event: "
+                << config.coarseRowsPerBlockingEvent
+                << '\n';
+
+            std::cout
+                << "Blocking events per timestep: "
+                << eventsPerStep
+                << '\n';
+
+            std::cout
+                << "Blocking events per CG run: "
+                << coarseEventsPerRun
+                << '\n';
+        }
+
+        /*
+         * Validate every selected case against the sequential
+         * numerical reference before timing begins.
+         */
         std::cout
             << "\nValidating numerical equivalence...\n";
 
@@ -346,6 +514,9 @@ int main(
         std::cout
             << "Validation: PASSED\n";
 
+        /*
+         * Execute discarded warm-up rounds.
+         */
         std::cout
             << "\nRunning warm-ups...\n";
 
@@ -357,6 +528,9 @@ int main(
         std::cout
             << "Warm-ups completed.\n";
 
+        /*
+         * Execute measured rounds.
+         */
         std::cout
             << "\nRunning measured executions...\n";
 
@@ -366,6 +540,9 @@ int main(
                 cases
             );
 
+        /*
+         * Raw CSV writing is outside the timed regions.
+         */
         writeCsv(
             outputPath,
             samples
