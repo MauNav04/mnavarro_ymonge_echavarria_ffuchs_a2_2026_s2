@@ -3,10 +3,18 @@
 import argparse
 import csv
 
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+
+
+MODEL_ORDER = {
+    "sequential": 0,
+    "fine_grained": 1,
+    "coarse_grained": 2,
+}
 
 
 @dataclass(frozen=True)
@@ -23,19 +31,32 @@ class SummaryRow:
     throughput_ci95_low: float
     throughput_ci95_high: float
 
-    mean_speedup: float
-    speedup_ci95_low: float
-    speedup_ci95_high: float
+    mean_speedup_vs_sequential: float
+    speedup_vs_sequential_ci95_low: float
+    speedup_vs_sequential_ci95_high: float
 
-    mean_logical_efficiency: float
-    efficiency_ci95_low: float
-    efficiency_ci95_high: float
+    mean_model_scalability: float
+    model_scalability_ci95_low: float
+    model_scalability_ci95_high: float
+
+    mean_model_efficiency: float
+    model_efficiency_ci95_low: float
+    model_efficiency_ci95_high: float
+
+
+@dataclass(frozen=True)
+class RawSample:
+    run: int
+    model: str
+    logical_threads: int
+    elapsed_seconds: float
 
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
         description=(
-            "Generate plots from a Heat2D benchmark summary CSV."
+            "Generate plots from Heat2D benchmark summary "
+            "and raw CSV files."
         )
     )
 
@@ -46,10 +67,21 @@ def parse_arguments():
     )
 
     parser.add_argument(
+        "--raw",
+        type=Path,
+        default=None,
+        help=(
+            "Raw benchmark CSV. Required for the distribution "
+            "boxplot and convergence plot."
+        ),
+    )
+
+    parser.add_argument(
         "--output-dir",
         type=Path,
         default=Path(
-            "proyecto1/problems/heat2d/benchmark_results/plots"
+            "proyecto1/problems/heat2d/"
+            "benchmark_results/plots"
         ),
         help="Directory where plot images will be written.",
     )
@@ -78,12 +110,15 @@ def load_summary(path: Path):
             "mean_mupdates_per_second",
             "throughput_ci95_low_mupdates",
             "throughput_ci95_high_mupdates",
-            "mean_speedup",
-            "speedup_ci95_low",
-            "speedup_ci95_high",
-            "mean_logical_efficiency",
-            "efficiency_ci95_low",
-            "efficiency_ci95_high",
+            "mean_speedup_vs_sequential",
+            "speedup_vs_sequential_ci95_low",
+            "speedup_vs_sequential_ci95_high",
+            "mean_model_scalability",
+            "model_scalability_ci95_low",
+            "model_scalability_ci95_high",
+            "mean_model_efficiency",
+            "model_efficiency_ci95_low",
+            "model_efficiency_ci95_high",
         }
 
         if reader.fieldnames is None:
@@ -136,28 +171,49 @@ def load_summary(path: Path):
                             "throughput_ci95_high_mupdates"
                         ]
                     ),
-                    mean_speedup=float(
-                        row["mean_speedup"]
-                    ),
-                    speedup_ci95_low=float(
-                        row["speedup_ci95_low"]
-                    ),
-                    speedup_ci95_high=float(
-                        row["speedup_ci95_high"]
-                    ),
-                    mean_logical_efficiency=float(
+                    mean_speedup_vs_sequential=float(
                         row[
-                            "mean_logical_efficiency"
+                            "mean_speedup_vs_sequential"
                         ]
                     ),
-                    efficiency_ci95_low=float(
+                    speedup_vs_sequential_ci95_low=float(
                         row[
-                            "efficiency_ci95_low"
+                            "speedup_vs_sequential_ci95_low"
                         ]
                     ),
-                    efficiency_ci95_high=float(
+                    speedup_vs_sequential_ci95_high=float(
                         row[
-                            "efficiency_ci95_high"
+                            "speedup_vs_sequential_ci95_high"
+                        ]
+                    ),
+                    mean_model_scalability=float(
+                        row[
+                            "mean_model_scalability"
+                        ]
+                    ),
+                    model_scalability_ci95_low=float(
+                        row[
+                            "model_scalability_ci95_low"
+                        ]
+                    ),
+                    model_scalability_ci95_high=float(
+                        row[
+                            "model_scalability_ci95_high"
+                        ]
+                    ),
+                    mean_model_efficiency=float(
+                        row[
+                            "mean_model_efficiency"
+                        ]
+                    ),
+                    model_efficiency_ci95_low=float(
+                        row[
+                            "model_efficiency_ci95_low"
+                        ]
+                    ),
+                    model_efficiency_ci95_high=float(
+                        row[
+                            "model_efficiency_ci95_high"
                         ]
                     ),
                 )
@@ -168,23 +224,108 @@ def load_summary(path: Path):
             "Summary CSV does not contain data."
         )
 
-    return rows
+    return sorted(
+        rows,
+        key=lambda row: (
+            MODEL_ORDER.get(
+                row.model,
+                99,
+            ),
+            row.logical_threads,
+        ),
+    )
+
+
+def load_raw_samples(path: Path):
+    samples = []
+
+    with path.open(
+        "r",
+        newline="",
+        encoding="utf-8",
+    ) as file:
+
+        reader = csv.DictReader(file)
+
+        required_columns = {
+            "run",
+            "model",
+            "logical_threads",
+            "elapsed_seconds",
+        }
+
+        if reader.fieldnames is None:
+            raise ValueError(
+                "Raw CSV does not contain a header."
+            )
+
+        missing_columns = (
+            required_columns -
+            set(reader.fieldnames)
+        )
+
+        if missing_columns:
+            raise ValueError(
+                "Raw CSV is missing required columns: "
+                + ", ".join(
+                    sorted(missing_columns)
+                )
+            )
+
+        for row in reader:
+            samples.append(
+                RawSample(
+                    run=int(
+                        row["run"]
+                    ),
+                    model=row["model"],
+                    logical_threads=int(
+                        row["logical_threads"]
+                    ),
+                    elapsed_seconds=float(
+                        row["elapsed_seconds"]
+                    ),
+                )
+            )
+
+    if not samples:
+        raise ValueError(
+            "Raw CSV does not contain data."
+        )
+
+    return samples
+
+
+def case_label(
+    model,
+    logical_threads,
+):
+    if model == "sequential":
+        return "Sequential"
+
+    if model == "fine_grained":
+        return (
+            f"FG-{logical_threads}"
+        )
+
+    if model == "coarse_grained":
+        return (
+            f"CG-{logical_threads}"
+        )
+
+    return (
+        f"{model}-{logical_threads}"
+    )
 
 
 def create_labels(rows):
-    labels = []
-
-    for row in rows:
-        if row.model == "sequential":
-            labels.append(
-                "Sequential"
-            )
-        else:
-            labels.append(
-                f"FG-{row.logical_threads}"
-            )
-
-    return labels
+    return [
+        case_label(
+            row.model,
+            row.logical_threads,
+        )
+        for row in rows
+    ]
 
 
 def create_asymmetric_errors(
@@ -193,7 +334,10 @@ def create_asymmetric_errors(
     upper_bounds,
 ):
     lower_errors = [
-        mean - lower
+        max(
+            0.0,
+            mean - lower,
+        )
         for mean, lower
         in zip(
             means,
@@ -202,7 +346,10 @@ def create_asymmetric_errors(
     ]
 
     upper_errors = [
-        upper - mean
+        max(
+            0.0,
+            upper - mean,
+        )
         for mean, upper
         in zip(
             means,
@@ -214,6 +361,18 @@ def create_asymmetric_errors(
         lower_errors,
         upper_errors,
     ]
+
+
+def finish_bar_plot(
+    figure,
+    axis,
+):
+    axis.tick_params(
+        axis="x",
+        labelrotation=45,
+    )
+
+    figure.tight_layout()
 
 
 def save_execution_time_plot(
@@ -246,14 +405,14 @@ def save_execution_time_plot(
     )
 
     figure, axis = plt.subplots(
-        figsize=(10, 6)
+        figsize=(12, 7)
     )
 
     axis.bar(
         labels,
         means,
         yerr=errors,
-        capsize=5,
+        capsize=4,
     )
 
     axis.set_title(
@@ -261,7 +420,7 @@ def save_execution_time_plot(
     )
 
     axis.set_xlabel(
-        "Execution model"
+        "Execution configuration"
     )
 
     axis.set_ylabel(
@@ -273,7 +432,10 @@ def save_execution_time_plot(
         alpha=0.3,
     )
 
-    figure.tight_layout()
+    finish_bar_plot(
+        figure,
+        axis,
+    )
 
     figure.savefig(
         output_directory /
@@ -316,14 +478,14 @@ def save_throughput_plot(
     )
 
     figure, axis = plt.subplots(
-        figsize=(10, 6)
+        figsize=(12, 7)
     )
 
     axis.bar(
         labels,
         means,
         yerr=errors,
-        capsize=5,
+        capsize=4,
     )
 
     axis.set_title(
@@ -331,7 +493,7 @@ def save_throughput_plot(
     )
 
     axis.set_xlabel(
-        "Execution model"
+        "Execution configuration"
     )
 
     axis.set_ylabel(
@@ -343,7 +505,10 @@ def save_throughput_plot(
         alpha=0.3,
     )
 
-    figure.tight_layout()
+    finish_bar_plot(
+        figure,
+        axis,
+    )
 
     figure.savefig(
         output_directory /
@@ -365,17 +530,17 @@ def save_speedup_plot(
     )
 
     means = [
-        row.mean_speedup
+        row.mean_speedup_vs_sequential
         for row in rows
     ]
 
     lower = [
-        row.speedup_ci95_low
+        row.speedup_vs_sequential_ci95_low
         for row in rows
     ]
 
     upper = [
-        row.speedup_ci95_high
+        row.speedup_vs_sequential_ci95_high
         for row in rows
     ]
 
@@ -386,14 +551,14 @@ def save_speedup_plot(
     )
 
     figure, axis = plt.subplots(
-        figsize=(10, 6)
+        figsize=(12, 7)
     )
 
     axis.bar(
         labels,
         means,
         yerr=errors,
-        capsize=5,
+        capsize=4,
     )
 
     axis.axhline(
@@ -407,11 +572,11 @@ def save_speedup_plot(
     )
 
     axis.set_xlabel(
-        "Execution model"
+        "Execution configuration"
     )
 
     axis.set_ylabel(
-        "Speedup"
+        "Paired speedup"
     )
 
     axis.grid(
@@ -419,11 +584,14 @@ def save_speedup_plot(
         alpha=0.3,
     )
 
-    figure.tight_layout()
+    finish_bar_plot(
+        figure,
+        axis,
+    )
 
     figure.savefig(
         output_directory /
-        "speedup.png",
+        "speedup_vs_sequential.png",
         dpi=200,
     )
 
@@ -432,27 +600,133 @@ def save_speedup_plot(
     )
 
 
-def save_logical_efficiency_plot(
+def save_model_scalability_plot(
     rows,
     output_directory,
 ):
-    labels = create_labels(
-        rows
+    figure, axis = plt.subplots(
+        figsize=(10, 6)
     )
 
-    means = [
-        row.mean_logical_efficiency
+    found_model = False
+
+    for model, display_name in (
+        (
+            "fine_grained",
+            "Fine-Grained",
+        ),
+        (
+            "coarse_grained",
+            "Coarse-Grained",
+        ),
+    ):
+        model_rows = [
+            row
+            for row in rows
+            if row.model == model
+        ]
+
+        if not model_rows:
+            continue
+
+        found_model = True
+
+        x_values = [
+            row.logical_threads
+            for row in model_rows
+        ]
+
+        y_values = [
+            row.mean_model_scalability
+            for row in model_rows
+        ]
+
+        axis.plot(
+            x_values,
+            y_values,
+            marker="o",
+            label=display_name,
+        )
+
+    if not found_model:
+        plt.close(
+            figure
+        )
+        return
+
+    axis.axhline(
+        y=1.0,
+        linestyle="--",
+        linewidth=1.0,
+    )
+
+    axis.set_xscale(
+        "log",
+        base=2,
+    )
+
+    axis.set_title(
+        "Heat2D model scalability"
+    )
+
+    axis.set_xlabel(
+        "Execution contexts / worker threads"
+    )
+
+    axis.set_ylabel(
+        "Model-1 time / model-p time"
+    )
+
+    axis.grid(
+        alpha=0.3,
+    )
+
+    axis.legend()
+
+    figure.tight_layout()
+
+    figure.savefig(
+        output_directory /
+        "model_scalability.png",
+        dpi=200,
+    )
+
+    plt.close(
+        figure
+    )
+
+
+def save_fine_grained_efficiency_plot(
+    rows,
+    output_directory,
+):
+    fine_rows = [
+        row
         for row in rows
+        if row.model == "fine_grained"
+    ]
+
+    if not fine_rows:
+        return
+
+    x_values = [
+        row.logical_threads
+        for row in fine_rows
+    ]
+
+    means = [
+        row.mean_model_efficiency
+        for row in fine_rows
     ]
 
     lower = [
-        row.efficiency_ci95_low
-        for row in rows
+        row.model_efficiency_ci95_low
+        for row in fine_rows
     ]
 
     upper = [
-        row.efficiency_ci95_high
-        for row in rows
+        row.model_efficiency_ci95_high
+        for row in fine_rows
     ]
 
     errors = create_asymmetric_errors(
@@ -465,27 +739,32 @@ def save_logical_efficiency_plot(
         figsize=(10, 6)
     )
 
-    axis.bar(
-        labels,
+    axis.errorbar(
+        x_values,
         means,
         yerr=errors,
-        capsize=5,
+        marker="o",
+        capsize=4,
+    )
+
+    axis.set_xscale(
+        "log",
+        base=2,
     )
 
     axis.set_title(
-        "Heat2D logical-context efficiency"
+        "Fine-Grained logical-context efficiency"
     )
 
     axis.set_xlabel(
-        "Execution model"
+        "Simulated logical contexts"
     )
 
     axis.set_ylabel(
-        "Speedup / logical contexts"
+        "FG scalability / logical contexts"
     )
 
     axis.grid(
-        axis="y",
         alpha=0.3,
     )
 
@@ -493,7 +772,297 @@ def save_logical_efficiency_plot(
 
     figure.savefig(
         output_directory /
-        "logical_efficiency.png",
+        "fine_grained_logical_efficiency.png",
+        dpi=200,
+    )
+
+    plt.close(
+        figure
+    )
+
+
+def save_coarse_grained_efficiency_plot(
+    rows,
+    output_directory,
+):
+    coarse_rows = [
+        row
+        for row in rows
+        if row.model == "coarse_grained"
+    ]
+
+    if not coarse_rows:
+        return
+
+    x_values = [
+        row.logical_threads
+        for row in coarse_rows
+    ]
+
+    means = [
+        row.mean_model_efficiency
+        for row in coarse_rows
+    ]
+
+    lower = [
+        row.model_efficiency_ci95_low
+        for row in coarse_rows
+    ]
+
+    upper = [
+        row.model_efficiency_ci95_high
+        for row in coarse_rows
+    ]
+
+    errors = create_asymmetric_errors(
+        means,
+        lower,
+        upper,
+    )
+
+    figure, axis = plt.subplots(
+        figsize=(10, 6)
+    )
+
+    axis.errorbar(
+        x_values,
+        means,
+        yerr=errors,
+        marker="o",
+        capsize=4,
+    )
+
+    axis.set_xscale(
+        "log",
+        base=2,
+    )
+
+    axis.set_title(
+        "Coarse-Grained parallel scaling efficiency"
+    )
+
+    axis.set_xlabel(
+        "Worker threads"
+    )
+
+    axis.set_ylabel(
+        "CG scalability / worker threads"
+    )
+
+    axis.grid(
+        alpha=0.3,
+    )
+
+    figure.tight_layout()
+
+    figure.savefig(
+        output_directory /
+        "coarse_grained_parallel_efficiency.png",
+        dpi=200,
+    )
+
+    plt.close(
+        figure
+    )
+
+
+def group_raw_samples(samples):
+    groups = defaultdict(list)
+
+    for sample in samples:
+        key = (
+            sample.model,
+            sample.logical_threads,
+        )
+
+        groups[key].append(
+            sample
+        )
+
+    for group in groups.values():
+        group.sort(
+            key=lambda sample:
+                sample.run
+        )
+
+    return groups
+
+
+def sorted_raw_keys(groups):
+    return sorted(
+        groups,
+        key=lambda key: (
+            MODEL_ORDER.get(
+                key[0],
+                99,
+            ),
+            key[1],
+        ),
+    )
+
+
+def save_distribution_boxplot(
+    raw_samples,
+    output_directory,
+):
+    groups = group_raw_samples(
+        raw_samples
+    )
+
+    keys = sorted_raw_keys(
+        groups
+    )
+
+    labels = [
+        case_label(
+            model,
+            logical_threads,
+        )
+        for model, logical_threads
+        in keys
+    ]
+
+    values = [
+        [
+            sample.elapsed_seconds
+            for sample in groups[key]
+        ]
+        for key in keys
+    ]
+
+    figure, axis = plt.subplots(
+        figsize=(13, 7)
+    )
+
+    axis.boxplot(
+        values,
+        tick_labels=labels,
+        showmeans=True,
+    )
+
+    axis.set_title(
+        "Heat2D execution-time distribution"
+    )
+
+    axis.set_xlabel(
+        "Execution configuration"
+    )
+
+    axis.set_ylabel(
+        "Execution time (s)"
+    )
+
+    axis.grid(
+        axis="y",
+        alpha=0.3,
+    )
+
+    axis.tick_params(
+        axis="x",
+        labelrotation=45,
+    )
+
+    figure.tight_layout()
+
+    figure.savefig(
+        output_directory /
+        "time_distribution_boxplot.png",
+        dpi=200,
+    )
+
+    plt.close(
+        figure
+    )
+
+
+def running_means(values):
+    means = []
+
+    total = 0.0
+
+    for index, value in enumerate(
+        values,
+        start=1,
+    ):
+        total += value
+
+        means.append(
+            total /
+            index
+        )
+
+    return means
+
+
+def save_convergence_plot(
+    raw_samples,
+    output_directory,
+):
+    groups = group_raw_samples(
+        raw_samples
+    )
+
+    keys = sorted_raw_keys(
+        groups
+    )
+
+    figure, axis = plt.subplots(
+        figsize=(13, 8)
+    )
+
+    for key in keys:
+        samples = groups[key]
+
+        runs = [
+            sample.run
+            for sample in samples
+        ]
+
+        times = [
+            sample.elapsed_seconds
+            for sample in samples
+        ]
+
+        axis.plot(
+            runs,
+            running_means(
+                times
+            ),
+            label=case_label(
+                key[0],
+                key[1],
+            ),
+        )
+
+    axis.set_title(
+        "Heat2D execution-time convergence"
+    )
+
+    axis.set_xlabel(
+        "Measured run"
+    )
+
+    axis.set_ylabel(
+        "Running mean execution time (s)"
+    )
+
+    axis.grid(
+        alpha=0.3,
+    )
+
+    axis.legend(
+        bbox_to_anchor=(
+            1.02,
+            1.0,
+        ),
+        loc="upper left",
+    )
+
+    figure.tight_layout()
+
+    figure.savefig(
+        output_directory /
+        "convergence.png",
         dpi=200,
     )
 
@@ -529,31 +1098,68 @@ def main():
         arguments.output_dir,
     )
 
-    save_logical_efficiency_plot(
+    save_model_scalability_plot(
         rows,
         arguments.output_dir,
     )
+
+    save_fine_grained_efficiency_plot(
+        rows,
+        arguments.output_dir,
+    )
+
+    save_coarse_grained_efficiency_plot(
+        rows,
+        arguments.output_dir,
+    )
+
+    generated_files = [
+        "execution_time.png",
+        "throughput.png",
+        "speedup_vs_sequential.png",
+        "model_scalability.png",
+        "fine_grained_logical_efficiency.png",
+        "coarse_grained_parallel_efficiency.png",
+    ]
+
+    if arguments.raw is not None:
+        raw_samples = load_raw_samples(
+            arguments.raw
+        )
+
+        save_distribution_boxplot(
+            raw_samples,
+            arguments.output_dir,
+        )
+
+        save_convergence_plot(
+            raw_samples,
+            arguments.output_dir,
+        )
+
+        generated_files.extend(
+            [
+                "time_distribution_boxplot.png",
+                "convergence.png",
+            ]
+        )
+
+    else:
+        print()
+        print(
+            "WARNING: --raw was not provided. "
+            "Distribution and convergence plots were skipped."
+        )
 
     print()
     print(
         "Heat2D benchmark plots generated:"
     )
 
-    print(
-        "  execution_time.png"
-    )
-
-    print(
-        "  throughput.png"
-    )
-
-    print(
-        "  speedup.png"
-    )
-
-    print(
-        "  logical_efficiency.png"
-    )
+    for file_name in generated_files:
+        print(
+            f"  {file_name}"
+        )
 
     print()
 

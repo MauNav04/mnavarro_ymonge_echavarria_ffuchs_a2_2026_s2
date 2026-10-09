@@ -16,11 +16,17 @@ namespace heat2d {
 
 namespace {
 
+/**
+ * @brief Intervalo semiabierto de filas interiores [first, last).
+ */
 struct RowRange {
     std::size_t first;
     std::size_t last;
 };
 
+/**
+ * @brief Multiplica dos contadores verificando overflow.
+ */
 std::uint64_t checkedMultiply(
     std::uint64_t left,
     std::uint64_t right
@@ -39,9 +45,10 @@ std::uint64_t checkedMultiply(
 }
 
 /**
- * @brief Divide las filas interiores de forma balanceada.
+ * @brief Divide las filas interiores entre los workers.
  *
- * El intervalo es semiabierto: [first, last).
+ * La partición es contigua y balanceada. Los primeros workers reciben
+ * una fila adicional cuando la división no es exacta.
  */
 std::vector<RowRange> createRowRanges(
     std::size_t rows,
@@ -57,7 +64,10 @@ std::vector<RowRange> createRowRanges(
         interiorRows % threadCount;
 
     std::vector<RowRange> ranges;
-    ranges.reserve(threadCount);
+
+    ranges.reserve(
+        threadCount
+    );
 
     std::size_t firstRow = 1;
 
@@ -68,7 +78,11 @@ std::vector<RowRange> createRowRanges(
     ) {
         const std::size_t assignedRows =
             baseRows +
-            (threadId < remainder ? 1 : 0);
+            (
+                threadId < remainder
+                    ? 1
+                    : 0
+            );
 
         const std::size_t lastRow =
             firstRow + assignedRows;
@@ -78,20 +92,21 @@ std::vector<RowRange> createRowRanges(
             lastRow
         });
 
-        firstRow = lastRow;
+        firstRow =
+            lastRow;
     }
 
     return ranges;
 }
 
 /**
- * @brief Simula una operación bloqueante de alta latencia.
+ * @brief Simula un evento bloqueante de alta latencia.
  *
- * sleep_for() coloca el thread en espera durante el intervalo solicitado,
- * permitiendo que el SO programe otro thread runnable.
+ * sleep_for() suspende temporalmente al worker y permite que el
+ * planificador del sistema operativo programe otro thread runnable.
  *
- * Esta función modela un stall de forma sintética; no representa
- * directamente la latencia física de un cache miss.
+ * Esto representa un stall sintético y no debe interpretarse como
+ * la latencia física exacta de un cache miss.
  */
 void simulateCostlyBlockingEvent(
     std::chrono::nanoseconds duration
@@ -100,7 +115,38 @@ void simulateCostlyBlockingEvent(
         return;
     }
 
-    std::this_thread::sleep_for(duration);
+    std::this_thread::sleep_for(
+        duration
+    );
+}
+
+/**
+ * @brief Determina si una fila finaliza un bloque Coarse-Grained.
+ *
+ * Los eventos se definen utilizando el índice global de la fila,
+ * independientemente del worker al que haya sido asignada.
+ *
+ * Esto mantiene constante el número total de eventos cuando cambia
+ * threadCount.
+ */
+bool shouldBlockAfterRow(
+    std::size_t row,
+    std::size_t lastInteriorRow,
+    std::size_t rowsPerBlockingEvent
+) {
+    const bool completedFullBlock =
+        (row % rowsPerBlockingEvent) == 0;
+
+    /*
+     * La última región puede contener menos filas que el tamaño
+     * completo del bloque. También debe producir un evento.
+     */
+    const bool completedFinalPartialBlock =
+        row == lastInteriorRow;
+
+    return
+        completedFullBlock ||
+        completedFinalPartialBlock;
 }
 
 } // namespace
@@ -116,6 +162,9 @@ CoarseGrainedStats runCoarseGrained(
     double boundaryTemperature,
     const CoarseGrainedConfig& coarseConfig
 ) {
+    /*
+     * Validación estructural.
+     */
     if (
         current.rows() != next.rows() ||
         current.cols() != next.cols()
@@ -140,12 +189,26 @@ CoarseGrainedStats runCoarseGrained(
         );
     }
 
-    if (coarseConfig.blockingDuration.count() < 0) {
+    if (
+        coarseConfig.blockingDuration.count() < 0
+    ) {
         throw std::invalid_argument(
             "Blocking duration cannot be negative."
         );
     }
 
+    if (
+        coarseConfig.rowsPerBlockingEvent == 0
+    ) {
+        throw std::invalid_argument(
+            "Rows per blocking event must be greater than zero."
+        );
+    }
+
+    /*
+     * Se calculan una única vez los coeficientes utilizados por
+     * todas las actualizaciones.
+     */
     const DiffusionCoefficients coefficients =
         makeDiffusionCoefficients(
             alpha,
@@ -172,6 +235,9 @@ CoarseGrainedStats runCoarseGrained(
             current.cols() - 2
         );
 
+    /*
+     * Número de actualizaciones realizadas en cada timestep.
+     */
     const std::uint64_t cellsPerStep =
         checkedMultiply(
             interiorRows,
@@ -181,47 +247,99 @@ CoarseGrainedStats runCoarseGrained(
     stats.executedCellUpdates =
         checkedMultiply(
             cellsPerStep,
-            static_cast<std::uint64_t>(steps)
+            static_cast<std::uint64_t>(
+                steps
+            )
         );
 
-    if (coarseConfig.blockingDuration.count() > 0) {
+    /*
+     * Número global de eventos bloqueantes por timestep:
+     *
+     * ceil(interiorRows / rowsPerBlockingEvent)
+     *
+     * La expresión mediante división y módulo evita overflow en
+     * interiorRows + rowsPerBlockingEvent - 1.
+     */
+    const std::uint64_t rowsPerEvent =
+        static_cast<std::uint64_t>(
+            coarseConfig.rowsPerBlockingEvent
+        );
+
+    const std::uint64_t eventsPerStep =
+        (
+            interiorRows /
+            rowsPerEvent
+        )
+        +
+        (
+            interiorRows %
+            rowsPerEvent != 0
+                ? 1ULL
+                : 0ULL
+        );
+
+    /*
+     * Cuando blockingDuration es cero, no se ejecuta ningún stall.
+     */
+    if (
+        coarseConfig.blockingDuration.count() > 0
+    ) {
         stats.blockingEvents =
             checkedMultiply(
-                interiorRows,
-                static_cast<std::uint64_t>(steps)
+                eventsPerStep,
+                static_cast<std::uint64_t>(
+                    steps
+                )
             );
     }
 
     /*
-     * Dos fases de barrera por timestep:
+     * Existen dos fases globales de barrera por timestep:
      *
-     * 1. Todos terminaron de calcular next.
-     * 2. Todos observan el swap antes del timestep siguiente.
+     * 1. Todos terminaron de escribir next.
+     * 2. Todos observan boundary + swap antes del próximo timestep.
      */
     stats.barrierPhases =
         checkedMultiply(
-            2,
-            static_cast<std::uint64_t>(steps)
+            2ULL,
+            static_cast<std::uint64_t>(
+                steps
+            )
         );
 
+    /*
+     * Una simulación sin pasos no necesita crear workers.
+     */
     if (steps == 0) {
         return stats;
     }
 
+    /*
+     * Partición estática y contigua del dominio.
+     */
     const std::vector<RowRange> ranges =
         createRowRanges(
             current.rows(),
             coarseConfig.threadCount
         );
 
+    /*
+     * Todos los workers participan en las dos fases de barrera,
+     * incluso cuando alguno recibió un rango vacío debido a
+     * over-partitioning.
+     */
     ReusableBarrier barrier(
         coarseConfig.threadCount
     );
 
     std::vector<std::thread> workers;
+
     workers.reserve(
         coarseConfig.threadCount
     );
+
+    const std::size_t lastInteriorRow =
+        current.rows() - 2;
 
     for (
         std::size_t threadId = 0;
@@ -240,8 +358,10 @@ CoarseGrainedStats runCoarseGrained(
                     ++step
                 ) {
                     /*
-                     * Todos los workers ejecutan concurrentemente
-                     * sobre regiones distintas de next.
+                     * Cada worker procesa únicamente sus filas.
+                     *
+                     * Todos leen current y escriben regiones
+                     * disjuntas de next.
                      */
                     for (
                         std::size_t row = range.first;
@@ -263,24 +383,38 @@ CoarseGrainedStats runCoarseGrained(
                         }
 
                         /*
-                         * Evento costoso sintético.
+                         * Un stall sintético ocurre únicamente después
+                         * de completar un bloque grueso de filas.
                          *
-                         * El thread se bloquea después de completar
-                         * un bloque relativamente grande: una fila.
+                         * La condición utiliza el índice GLOBAL de la
+                         * fila, por lo que el número total de eventos
+                         * no depende de threadCount.
                          */
-                        simulateCostlyBlockingEvent(
-                            coarseConfig.blockingDuration
-                        );
+                        if (
+                            coarseConfig.blockingDuration.count() > 0 &&
+                            shouldBlockAfterRow(
+                                row,
+                                lastInteriorRow,
+                                coarseConfig.rowsPerBlockingEvent
+                            )
+                        ) {
+                            simulateCostlyBlockingEvent(
+                                coarseConfig.blockingDuration
+                            );
+                        }
                     }
 
                     /*
-                     * Nadie puede modificar/intercambiar current y next
-                     * hasta que todos hayan terminado el timestep.
+                     * FASE 1:
+                     *
+                     * Todos deben haber terminado next antes de
+                     * modificar las fronteras o intercambiar mallas.
                      */
                     barrier.wait();
 
                     /*
-                     * Un único worker aplica la frontera y hace swap.
+                     * Un único worker realiza el trabajo serial
+                     * necesario para cerrar el timestep.
                      */
                     if (threadId == 0) {
                         applyFixedBoundary(
@@ -295,8 +429,10 @@ CoarseGrainedStats runCoarseGrained(
                     }
 
                     /*
-                     * Ningún worker comienza el timestep siguiente
-                     * mientras thread 0 realiza boundary + swap.
+                     * FASE 2:
+                     *
+                     * Ningún worker puede comenzar el siguiente
+                     * timestep hasta que boundary + swap terminen.
                      */
                     barrier.wait();
                 }
@@ -304,7 +440,13 @@ CoarseGrainedStats runCoarseGrained(
         );
     }
 
-    for (std::thread& worker : workers) {
+    /*
+     * Espera por la terminación de todos los workers.
+     */
+    for (
+        std::thread& worker :
+        workers
+    ) {
         worker.join();
     }
 

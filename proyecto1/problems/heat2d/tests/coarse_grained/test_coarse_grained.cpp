@@ -9,6 +9,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <exception>
 #include <iostream>
 #include <stdexcept>
@@ -16,6 +17,9 @@
 
 namespace {
 
+/**
+ * @brief Calcula la diferencia absoluta máxima entre dos mallas.
+ */
 double maximumGridDifference(
     const heat2d::Grid& first,
     const heat2d::Grid& second
@@ -41,19 +45,23 @@ double maximumGridDifference(
             column < first.cols();
             ++column
         ) {
-            maximumDifference = std::max(
-                maximumDifference,
-                std::abs(
-                    first(row, column) -
-                    second(row, column)
-                )
-            );
+            maximumDifference =
+                std::max(
+                    maximumDifference,
+                    std::abs(
+                        first(row, column) -
+                        second(row, column)
+                    )
+                );
         }
     }
 
     return maximumDifference;
 }
 
+/**
+ * @brief Construye la condición inicial común para las pruebas.
+ */
 heat2d::Grid createInitialGrid(
     const heat2d::SimulationConfig& config
 ) {
@@ -78,15 +86,17 @@ heat2d::Grid createInitialGrid(
     return grid;
 }
 
+/**
+ * @brief Compara Coarse-Grained contra la referencia secuencial.
+ *
+ * El bloqueo sintético se desactiva para aislar la corrección
+ * numérica del solver paralelo.
+ */
 void testAgainstSequential(
     std::size_t threadCount
 ) {
     heat2d::SimulationConfig config;
 
-    /*
-     * Una configuración moderada mantiene el test rápido,
-     * pero suficientemente grande para probar la partición.
-     */
     config.rows = 51;
     config.cols = 51;
     config.alpha = 0.05;
@@ -139,14 +149,15 @@ void testAgainstSequential(
     coarseConfig.threadCount =
         threadCount;
 
-    /*
-     * No inyectamos stalls en el test funcional.
-     *
-     * Primero comprobamos que el algoritmo concurrente es
-     * numéricamente correcto.
-     */
     coarseConfig.blockingDuration =
         std::chrono::nanoseconds{0};
+
+    /*
+     * Aunque el bloqueo está desactivado, usamos explícitamente
+     * la política propuesta para el modelo formal.
+     */
+    coarseConfig.rowsPerBlockingEvent =
+        8;
 
     const heat2d::CoarseGrainedStats stats =
         heat2d::runCoarseGrained(
@@ -214,15 +225,18 @@ void testAgainstSequential(
         );
     }
 
-    if (stats.blockingEvents != 0) {
+    if (
+        stats.blockingEvents != 0
+    ) {
         throw std::runtime_error(
             "Blocking events were reported while blocking was disabled."
         );
     }
 
     const std::uint64_t expectedBarrierPhases =
+        2ULL *
         static_cast<std::uint64_t>(
-            2 * steps
+            steps
         );
 
     if (
@@ -244,6 +258,9 @@ void testAgainstSequential(
         << '\n';
 }
 
+/**
+ * @brief Verifica que no se acepten cero workers.
+ */
 void testRejectsZeroThreads() {
     heat2d::SimulationConfig config;
 
@@ -289,6 +306,13 @@ void testRejectsZeroThreads() {
     }
 }
 
+/**
+ * @brief Verifica que el mecanismo de bloqueo sintético realmente
+ *        introduzca una espera observable.
+ *
+ * Este test utiliza una granularidad de una fila por evento para
+ * ejercer agresivamente la ruta de bloqueo.
+ */
 void testBlockingEvents() {
     heat2d::SimulationConfig config;
 
@@ -297,6 +321,223 @@ void testBlockingEvents() {
     config.alpha = 0.05;
     config.dt = 0.0001;
     config.totalTime = 0.0005;
+
+    const std::size_t steps =
+        config.steps();
+
+    const heat2d::Grid initial =
+        createInitialGrid(config);
+
+    /*
+     * Ejecución sin bloqueo.
+     */
+    heat2d::Grid unblockedCurrent =
+        initial;
+
+    heat2d::Grid unblockedNext(
+        config.rows,
+        config.cols,
+        config.boundaryTemperature
+    );
+
+    heat2d::CoarseGrainedConfig unblockedConfig;
+
+    unblockedConfig.threadCount =
+        4;
+
+    unblockedConfig.blockingDuration =
+        std::chrono::nanoseconds{0};
+
+    /*
+     * Para esta prueba específica usamos una fila por evento.
+     */
+    unblockedConfig.rowsPerBlockingEvent =
+        1;
+
+    const auto unblockedStart =
+        std::chrono::steady_clock::now();
+
+    const heat2d::CoarseGrainedStats unblockedStats =
+        heat2d::runCoarseGrained(
+            unblockedCurrent,
+            unblockedNext,
+            steps,
+            config.alpha,
+            config.dt,
+            config.dx(),
+            config.dy(),
+            config.boundaryTemperature,
+            unblockedConfig
+        );
+
+    const auto unblockedEnd =
+        std::chrono::steady_clock::now();
+
+    const double unblockedSeconds =
+        std::chrono::duration<double>(
+            unblockedEnd -
+            unblockedStart
+        ).count();
+
+    /*
+     * Ejecución con bloqueo.
+     */
+    heat2d::Grid blockedCurrent =
+        initial;
+
+    heat2d::Grid blockedNext(
+        config.rows,
+        config.cols,
+        config.boundaryTemperature
+    );
+
+    heat2d::CoarseGrainedConfig blockedConfig;
+
+    blockedConfig.threadCount =
+        4;
+
+    /*
+     * 1 ms hace que el efecto sea suficientemente grande para
+     * distinguirlo del overhead normal del scheduler.
+     */
+    blockedConfig.blockingDuration =
+        std::chrono::milliseconds{1};
+
+    blockedConfig.rowsPerBlockingEvent =
+        1;
+
+    const auto blockedStart =
+        std::chrono::steady_clock::now();
+
+    const heat2d::CoarseGrainedStats blockedStats =
+        heat2d::runCoarseGrained(
+            blockedCurrent,
+            blockedNext,
+            steps,
+            config.alpha,
+            config.dt,
+            config.dx(),
+            config.dy(),
+            config.boundaryTemperature,
+            blockedConfig
+        );
+
+    const auto blockedEnd =
+        std::chrono::steady_clock::now();
+
+    const double blockedSeconds =
+        std::chrono::duration<double>(
+            blockedEnd -
+            blockedStart
+        ).count();
+
+    /*
+     * El bloqueo no puede modificar el resultado numérico.
+     */
+    const double maxDifference =
+        maximumGridDifference(
+            unblockedCurrent,
+            blockedCurrent
+        );
+
+    constexpr double tolerance =
+        1e-12;
+
+    if (
+        maxDifference >
+        tolerance
+    ) {
+        throw std::runtime_error(
+            "Blocking events changed the numerical solution."
+        );
+    }
+
+    /*
+     * Malla 11x11:
+     *
+     * 9 filas interiores
+     * 5 timesteps
+     * 1 fila/evento
+     *
+     * 9 * 5 = 45 eventos.
+     */
+    const std::uint64_t expectedBlockingEvents =
+        static_cast<std::uint64_t>(
+            config.rows - 2
+        ) *
+        static_cast<std::uint64_t>(
+            steps
+        );
+
+    if (
+        blockedStats.blockingEvents !=
+        expectedBlockingEvents
+    ) {
+        throw std::runtime_error(
+            "Unexpected number of blocking events."
+        );
+    }
+
+    if (
+        unblockedStats.blockingEvents != 0
+    ) {
+        throw std::runtime_error(
+            "Blocking events reported while blocking was disabled."
+        );
+    }
+
+    /*
+     * No exigimos proporcionalidad exacta debido al scheduler,
+     * pero sí un incremento claramente observable.
+     */
+    constexpr double minimumObservableIncrease =
+        0.005;
+
+    if (
+        blockedSeconds <
+        unblockedSeconds +
+        minimumObservableIncrease
+    ) {
+        throw std::runtime_error(
+            "Synthetic blocking did not produce an observable delay."
+        );
+    }
+
+    std::cout
+        << "  [PASS] blocking simulation"
+        << ", events = "
+        << blockedStats.blockingEvents
+        << ", no-block = "
+        << unblockedSeconds
+        << " s"
+        << ", blocked = "
+        << blockedSeconds
+        << " s"
+        << ", max error = "
+        << maxDifference
+        << '\n';
+}
+
+/**
+ * @brief Verifica específicamente la nueva política de agrupación
+ *        de filas usada por el modelo formal.
+ *
+ * Para 17 filas interiores y bloques de 8:
+ *
+ * ceil(17 / 8) = 3 eventos/timestep.
+ *
+ * Con 3 timesteps:
+ *
+ * 3 * 3 = 9 eventos.
+ */
+void testBlockingEventGrouping() {
+    heat2d::SimulationConfig config;
+
+    config.rows = 19;
+    config.cols = 19;
+    config.alpha = 0.05;
+    config.dt = 0.0001;
+    config.totalTime = 0.0003;
 
     const std::size_t steps =
         config.steps();
@@ -328,7 +569,9 @@ void testBlockingEvents() {
     );
 
     /*
-     * Coarse-Grained con evento bloqueante sintético.
+     * Coarse-Grained con la política formal:
+     *
+     * 100 us cada 8 filas.
      */
     heat2d::Grid coarseCurrent =
         initial;
@@ -341,16 +584,14 @@ void testBlockingEvents() {
 
     heat2d::CoarseGrainedConfig coarseConfig;
 
-    coarseConfig.threadCount = 4;
+    coarseConfig.threadCount =
+        4;
 
-    /*
-     * Duración suficientemente pequeña para mantener rápido el test.
-     *
-     * No representa una latencia real de caché. Únicamente verifica
-     * el camino de ejecución que contiene bloqueos sintéticos.
-     */
     coarseConfig.blockingDuration =
         std::chrono::microseconds{100};
+
+    coarseConfig.rowsPerBlockingEvent =
+        8;
 
     const heat2d::CoarseGrainedStats stats =
         heat2d::runCoarseGrained(
@@ -365,24 +606,31 @@ void testBlockingEvents() {
             coarseConfig
         );
 
-    const double maxError =
-        maximumGridDifference(
-            sequentialCurrent,
-            coarseCurrent
-        );
-
-    constexpr double tolerance = 1e-12;
-
-    if (maxError > tolerance) {
-        throw std::runtime_error(
-            "Blocking Coarse-Grained execution differs from Sequential."
-        );
-    }
-
-    const std::uint64_t expectedBlockingEvents =
+    /*
+     * 19 filas totales -> 17 interiores.
+     *
+     * ceil(17 / 8) = 3.
+     */
+    const std::uint64_t interiorRows =
         static_cast<std::uint64_t>(
             config.rows - 2
-        ) *
+        );
+
+    const std::uint64_t rowsPerEvent =
+        static_cast<std::uint64_t>(
+            coarseConfig.rowsPerBlockingEvent
+        );
+
+    const std::uint64_t eventsPerStep =
+        interiorRows / rowsPerEvent +
+        (
+            interiorRows % rowsPerEvent != 0
+                ? 1ULL
+                : 0ULL
+        );
+
+    const std::uint64_t expectedBlockingEvents =
+        eventsPerStep *
         static_cast<std::uint64_t>(
             steps
         );
@@ -392,12 +640,32 @@ void testBlockingEvents() {
         expectedBlockingEvents
     ) {
         throw std::runtime_error(
-            "Unexpected number of Coarse-Grained blocking events."
+            "Incorrect blocking-event grouping."
+        );
+    }
+
+    const double maxError =
+        maximumGridDifference(
+            sequentialCurrent,
+            coarseCurrent
+        );
+
+    constexpr double tolerance =
+        1e-12;
+
+    if (
+        maxError >
+        tolerance
+    ) {
+        throw std::runtime_error(
+            "Grouped blocking changed the numerical solution."
         );
     }
 
     std::cout
-        << "  [PASS] blocking enabled"
+        << "  [PASS] blocking grouping"
+        << ", rows/event = "
+        << coarseConfig.rowsPerBlockingEvent
         << ", events = "
         << stats.blockingEvents
         << ", max error = "
@@ -405,6 +673,9 @@ void testBlockingEvents() {
         << '\n';
 }
 
+/**
+ * @brief Verifica que una duración bloqueante negativa sea rechazada.
+ */
 void testRejectsNegativeBlockingDuration() {
     heat2d::SimulationConfig config;
 
@@ -419,7 +690,8 @@ void testRejectsNegativeBlockingDuration() {
 
     heat2d::CoarseGrainedConfig coarseConfig;
 
-    coarseConfig.threadCount = 4;
+    coarseConfig.threadCount =
+        4;
 
     coarseConfig.blockingDuration =
         std::chrono::nanoseconds{-1};
@@ -453,6 +725,64 @@ void testRejectsNegativeBlockingDuration() {
     }
 }
 
+/**
+ * @brief Verifica que rowsPerBlockingEvent no pueda ser cero.
+ */
+void testRejectsZeroRowsPerBlockingEvent() {
+    heat2d::SimulationConfig config;
+
+    heat2d::Grid current =
+        createInitialGrid(config);
+
+    heat2d::Grid next(
+        config.rows,
+        config.cols,
+        config.boundaryTemperature
+    );
+
+    heat2d::CoarseGrainedConfig coarseConfig;
+
+    coarseConfig.threadCount =
+        4;
+
+    coarseConfig.blockingDuration =
+        std::chrono::microseconds{100};
+
+    coarseConfig.rowsPerBlockingEvent =
+        0;
+
+    bool rejected = false;
+
+    try {
+        const auto stats =
+            heat2d::runCoarseGrained(
+                current,
+                next,
+                config.steps(),
+                config.alpha,
+                config.dt,
+                config.dx(),
+                config.dy(),
+                config.boundaryTemperature,
+                coarseConfig
+            );
+
+        (void)stats;
+
+    } catch (const std::invalid_argument&) {
+        rejected = true;
+    }
+
+    if (!rejected) {
+        throw std::runtime_error(
+            "Coarse-Grained accepted zero rows per blocking event."
+        );
+    }
+}
+
+/**
+ * @brief Verifica que una ejecución sin timesteps no modifique el estado.
+ */
 void testZeroSteps() {
     heat2d::SimulationConfig config;
 
@@ -470,10 +800,14 @@ void testZeroSteps() {
 
     heat2d::CoarseGrainedConfig coarseConfig;
 
-    coarseConfig.threadCount = 4;
+    coarseConfig.threadCount =
+        4;
 
     coarseConfig.blockingDuration =
         std::chrono::microseconds{100};
+
+    coarseConfig.rowsPerBlockingEvent =
+        8;
 
     const heat2d::CoarseGrainedStats stats =
         heat2d::runCoarseGrained(
@@ -488,19 +822,25 @@ void testZeroSteps() {
             coarseConfig
         );
 
-    if (stats.executedCellUpdates != 0) {
+    if (
+        stats.executedCellUpdates != 0
+    ) {
         throw std::runtime_error(
             "Zero-step execution reported cell updates."
         );
     }
 
-    if (stats.blockingEvents != 0) {
+    if (
+        stats.blockingEvents != 0
+    ) {
         throw std::runtime_error(
             "Zero-step execution reported blocking events."
         );
     }
 
-    if (stats.barrierPhases != 0) {
+    if (
+        stats.barrierPhases != 0
+    ) {
         throw std::runtime_error(
             "Zero-step execution reported barrier phases."
         );
@@ -512,7 +852,9 @@ void testZeroSteps() {
             current
         );
 
-    if (maxError != 0.0) {
+    if (
+        maxError != 0.0
+    ) {
         throw std::runtime_error(
             "Zero-step execution modified the grid."
         );
@@ -523,8 +865,6 @@ void testZeroSteps() {
         << ", updates = 0"
         << ", blocking events = 0\n";
 }
-
-
 
 } // namespace
 
@@ -552,9 +892,11 @@ int main() {
         }
 
         testBlockingEvents();
+        testBlockingEventGrouping();
         testZeroSteps();
         testRejectsZeroThreads();
         testRejectsNegativeBlockingDuration();
+        testRejectsZeroRowsPerBlockingEvent();
 
         std::cout
             << "\nCoarse-Grained integration tests: PASSED\n";

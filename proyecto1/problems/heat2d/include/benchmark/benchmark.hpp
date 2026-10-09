@@ -2,6 +2,7 @@
 
 #include "grid.hpp"
 
+#include <chrono>
 #include <cstddef>
 #include <vector>
 
@@ -9,7 +10,8 @@ namespace heat2d::benchmark {
 
 enum class ExecutionModel {
     Sequential,
-    FineGrained
+    FineGrained,
+    CoarseGrained
 };
 
 
@@ -31,6 +33,17 @@ struct BenchmarkConfig {
     double maxTemperature = 100.0;
     double boundaryTemperature = 0.0;
 
+    /*
+     * Formal Coarse-Grained policy.
+     *
+     * A synthetic costly blocking event is requested after every
+     * eight interior rows.
+     */
+    std::chrono::nanoseconds coarseBlockingDuration =
+        std::chrono::microseconds{100};
+
+    std::size_t coarseRowsPerBlockingEvent = 8;
+
     std::size_t warmupRuns = 1;
     std::size_t measuredRuns = 5;
 };
@@ -38,6 +51,15 @@ struct BenchmarkConfig {
 
 /**
  * @brief One execution configuration participating in the experiment.
+ *
+ * logicalThreadCount is kept for CSV compatibility with the existing
+ * Fine-Grained analysis pipeline.
+ *
+ * Interpretation:
+ *
+ *   Sequential    -> always 1
+ *   Fine-Grained  -> simulated logical thread count
+ *   Coarse-Grained -> real worker thread count
  */
 struct BenchmarkCase {
     ExecutionModel model;

@@ -1,5 +1,6 @@
 #include "benchmark/benchmark.hpp"
 
+#include "coarse_grained/coarse_grained.hpp"
 #include "fine_grained/fine_grained.hpp"
 #include "heat2d.hpp"
 #include "initial_conditions.hpp"
@@ -9,6 +10,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <limits>
 #include <stdexcept>
 #include <utility>
@@ -18,7 +20,30 @@ namespace heat2d::benchmark {
 
 namespace {
 
-constexpr double validationTolerance = 1e-12;
+constexpr double validationTolerance =
+    1e-12;
+
+
+/**
+ * @brief Multiplies two uint64 values while checking overflow.
+ */
+std::uint64_t checkedMultiply64(
+    std::uint64_t left,
+    std::uint64_t right
+) {
+    if (
+        left != 0 &&
+        right >
+            std::numeric_limits<std::uint64_t>::max() /
+            left
+    ) {
+        throw std::overflow_error(
+            "Benchmark statistics overflow."
+        );
+    }
+
+    return left * right;
+}
 
 
 /**
@@ -73,6 +98,23 @@ void validateBenchmarkConfig(
         );
     }
 
+    if (
+        config.coarseBlockingDuration.count() < 0
+    ) {
+        throw std::invalid_argument(
+            "Coarse-Grained blocking duration cannot be negative."
+        );
+    }
+
+    if (
+        config.coarseRowsPerBlockingEvent == 0
+    ) {
+        throw std::invalid_argument(
+            "Coarse-Grained rows per blocking event "
+            "must be greater than zero."
+        );
+    }
+
     const double dx =
         config.lengthX /
         static_cast<double>(
@@ -108,6 +150,14 @@ void validateBenchmarkCase(
 ) {
     switch (benchmarkCase.model) {
         case ExecutionModel::Sequential:
+            if (
+                benchmarkCase.logicalThreadCount != 1
+            ) {
+                throw std::invalid_argument(
+                    "Sequential benchmark must use one execution context."
+                );
+            }
+
             return;
 
         case ExecutionModel::FineGrained:
@@ -117,6 +167,18 @@ void validateBenchmarkCase(
                 throw std::invalid_argument(
                     "Fine-Grained benchmark requires at least one "
                     "logical thread."
+                );
+            }
+
+            return;
+
+        case ExecutionModel::CoarseGrained:
+            if (
+                benchmarkCase.logicalThreadCount == 0
+            ) {
+                throw std::invalid_argument(
+                    "Coarse-Grained benchmark requires at least one "
+                    "worker thread."
                 );
             }
 
@@ -209,6 +271,72 @@ Grid createInitialGrid(
 
 
 /**
+ * @brief Builds the configuration used by one Coarse-Grained case.
+ */
+heat2d::CoarseGrainedConfig createCoarseGrainedConfig(
+    const BenchmarkConfig& config,
+    const BenchmarkCase& benchmarkCase
+) {
+    heat2d::CoarseGrainedConfig coarseConfig;
+
+    coarseConfig.threadCount =
+        benchmarkCase.logicalThreadCount;
+
+    coarseConfig.blockingDuration =
+        config.coarseBlockingDuration;
+
+    coarseConfig.rowsPerBlockingEvent =
+        config.coarseRowsPerBlockingEvent;
+
+    return coarseConfig;
+}
+
+
+/**
+ * @brief Calculates the expected number of synthetic blocking events.
+ */
+std::uint64_t calculateExpectedBlockingEvents(
+    const BenchmarkConfig& config
+) {
+    if (
+        config.coarseBlockingDuration.count() == 0
+    ) {
+        return 0;
+    }
+
+    const std::uint64_t interiorRows =
+        static_cast<std::uint64_t>(
+            config.rows - 2
+        );
+
+    const std::uint64_t rowsPerEvent =
+        static_cast<std::uint64_t>(
+            config.coarseRowsPerBlockingEvent
+        );
+
+    const std::uint64_t eventsPerStep =
+        (
+            interiorRows /
+            rowsPerEvent
+        )
+        +
+        (
+            interiorRows %
+            rowsPerEvent != 0
+                ? 1ULL
+                : 0ULL
+        );
+
+    return checkedMultiply64(
+        eventsPerStep,
+        static_cast<std::uint64_t>(
+            config.steps
+        )
+    );
+}
+
+
+/**
  * @brief Validates the metadata returned by the Fine-Grained solver.
  *
  * This check is intentionally performed outside timed regions.
@@ -251,6 +379,88 @@ void validateFineGrainedStats(
 
 
 /**
+ * @brief Validates the metadata returned by the Coarse-Grained solver.
+ *
+ * This check is intentionally performed outside timed regions.
+ */
+void validateCoarseGrainedStats(
+    const heat2d::CoarseGrainedStats& stats,
+    const BenchmarkConfig& config,
+    const BenchmarkCase& benchmarkCase
+) {
+    if (
+        stats.threadCount !=
+        benchmarkCase.logicalThreadCount
+    ) {
+        throw std::runtime_error(
+            "Coarse-Grained benchmark returned an incorrect "
+            "worker-thread count."
+        );
+    }
+
+    if (
+        stats.timeSteps !=
+        config.steps
+    ) {
+        throw std::runtime_error(
+            "Coarse-Grained benchmark returned an incorrect "
+            "timestep count."
+        );
+    }
+
+    const std::uint64_t expectedCellUpdates =
+        static_cast<std::uint64_t>(
+            calculateCellUpdates(
+                config
+            )
+        );
+
+    if (
+        stats.executedCellUpdates !=
+        expectedCellUpdates
+    ) {
+        throw std::runtime_error(
+            "Coarse-Grained benchmark returned an incorrect "
+            "cell-update count."
+        );
+    }
+
+    const std::uint64_t expectedBlockingEvents =
+        calculateExpectedBlockingEvents(
+            config
+        );
+
+    if (
+        stats.blockingEvents !=
+        expectedBlockingEvents
+    ) {
+        throw std::runtime_error(
+            "Coarse-Grained benchmark returned an incorrect "
+            "blocking-event count."
+        );
+    }
+
+    const std::uint64_t expectedBarrierPhases =
+        checkedMultiply64(
+            2ULL,
+            static_cast<std::uint64_t>(
+                config.steps
+            )
+        );
+
+    if (
+        stats.barrierPhases !=
+        expectedBarrierPhases
+    ) {
+        throw std::runtime_error(
+            "Coarse-Grained benchmark returned an incorrect "
+            "barrier-phase count."
+        );
+    }
+}
+
+
+/**
  * @brief Executes one model without measuring it.
  *
  * Used exclusively for correctness validation.
@@ -270,10 +480,14 @@ Grid executeUnmeasured(
     );
 
     const double dx =
-        calculateDx(config);
+        calculateDx(
+            config
+        );
 
     const double dy =
-        calculateDy(config);
+        calculateDy(
+            config
+        );
 
     switch (benchmarkCase.model) {
         case ExecutionModel::Sequential:
@@ -312,6 +526,35 @@ Grid executeUnmeasured(
 
             break;
         }
+
+        case ExecutionModel::CoarseGrained: {
+            const heat2d::CoarseGrainedConfig coarseConfig =
+                createCoarseGrainedConfig(
+                    config,
+                    benchmarkCase
+                );
+
+            const heat2d::CoarseGrainedStats stats =
+                heat2d::runCoarseGrained(
+                    current,
+                    next,
+                    config.steps,
+                    config.alpha,
+                    config.dt,
+                    dx,
+                    dy,
+                    config.boundaryTemperature,
+                    coarseConfig
+                );
+
+            validateCoarseGrainedStats(
+                stats,
+                config,
+                benchmarkCase
+            );
+
+            break;
+        }
     }
 
     return current;
@@ -334,7 +577,8 @@ double calculateMaximumDifference(
         );
     }
 
-    double maximumDifference = 0.0;
+    double maximumDifference =
+        0.0;
 
     for (
         std::size_t row = 0;
@@ -389,19 +633,45 @@ BenchmarkSample executeMeasured(
      * Spatial parameters are prepared before starting the timer.
      */
     const double dx =
-        calculateDx(config);
+        calculateDx(
+            config
+        );
 
     const double dy =
-        calculateDy(config);
+        calculateDy(
+            config
+        );
 
-    fine_grained::FineGrainedStats fineGrainedStats {
+    fine_grained::FineGrainedStats fineGrainedStats{
         0,
         0,
         0
     };
 
+    heat2d::CoarseGrainedStats coarseGrainedStats{};
+
     bool hasFineGrainedStats =
         false;
+
+    bool hasCoarseGrainedStats =
+        false;
+
+    /*
+     * The lightweight Coarse-Grained configuration object is also
+     * prepared outside the timed region.
+     */
+    heat2d::CoarseGrainedConfig coarseConfig;
+
+    if (
+        benchmarkCase.model ==
+        ExecutionModel::CoarseGrained
+    ) {
+        coarseConfig =
+            createCoarseGrainedConfig(
+                config,
+                benchmarkCase
+            );
+    }
 
     const auto start =
         std::chrono::steady_clock::now();
@@ -439,18 +709,44 @@ BenchmarkSample executeMeasured(
                 true;
 
             break;
+
+        case ExecutionModel::CoarseGrained:
+            coarseGrainedStats =
+                heat2d::runCoarseGrained(
+                    current,
+                    next,
+                    config.steps,
+                    config.alpha,
+                    config.dt,
+                    dx,
+                    dy,
+                    config.boundaryTemperature,
+                    coarseConfig
+                );
+
+            hasCoarseGrainedStats =
+                true;
+
+            break;
     }
 
     const auto end =
         std::chrono::steady_clock::now();
 
     /*
-     * Fine-Grained metadata validation happens only after the timer
-     * has stopped so it does not contaminate performance measurements.
+     * Metadata validation happens after the timer stops.
      */
     if (hasFineGrainedStats) {
         validateFineGrainedStats(
             fineGrainedStats,
+            config,
+            benchmarkCase
+        );
+    }
+
+    if (hasCoarseGrainedStats) {
+        validateCoarseGrainedStats(
+            coarseGrainedStats,
             config,
             benchmarkCase
         );
@@ -463,7 +759,9 @@ BenchmarkSample executeMeasured(
 
     if (
         elapsedSeconds <= 0.0 ||
-        !std::isfinite(elapsedSeconds)
+        !std::isfinite(
+            elapsedSeconds
+        )
     ) {
         throw std::runtime_error(
             "Benchmark produced an invalid execution time."
@@ -483,9 +781,6 @@ BenchmarkSample executeMeasured(
 
     /*
      * Cheap post-execution sanity check.
-     *
-     * Complete numerical equivalence is verified once before the
-     * measurement campaign begins.
      */
     const double centerTemperature =
         current(
@@ -537,10 +832,14 @@ void executeWarmup(
     );
 
     const double dx =
-        calculateDx(config);
+        calculateDx(
+            config
+        );
 
     const double dy =
-        calculateDy(config);
+        calculateDy(
+            config
+        );
 
     switch (benchmarkCase.model) {
         case ExecutionModel::Sequential:
@@ -572,6 +871,35 @@ void executeWarmup(
                 );
 
             validateFineGrainedStats(
+                stats,
+                config,
+                benchmarkCase
+            );
+
+            break;
+        }
+
+        case ExecutionModel::CoarseGrained: {
+            const heat2d::CoarseGrainedConfig coarseConfig =
+                createCoarseGrainedConfig(
+                    config,
+                    benchmarkCase
+                );
+
+            const heat2d::CoarseGrainedStats stats =
+                heat2d::runCoarseGrained(
+                    current,
+                    next,
+                    config.steps,
+                    config.alpha,
+                    config.dt,
+                    dx,
+                    dy,
+                    config.boundaryTemperature,
+                    coarseConfig
+                );
+
+            validateCoarseGrainedStats(
                 stats,
                 config,
                 benchmarkCase
@@ -647,6 +975,9 @@ const char* modelName(
 
         case ExecutionModel::FineGrained:
             return "fine_grained";
+
+        case ExecutionModel::CoarseGrained:
+            return "coarse_grained";
     }
 
     return "unknown";
@@ -673,7 +1004,7 @@ void validateBenchmarkCases(
     /*
      * The sequential model defines the numerical reference.
      */
-    const BenchmarkCase sequentialCase {
+    const BenchmarkCase sequentialCase{
         ExecutionModel::Sequential,
         1
     };
@@ -809,14 +1140,9 @@ std::vector<BenchmarkSample> runBenchmark(
         /*
          * Rotate the first configuration every round.
          *
-         * Example:
-         *
          * R1: A B C D
          * R2: B C D A
          * R3: C D A B
-         *
-         * This reduces systematic bias caused by thermal state,
-         * CPU frequency changes or background system activity.
          */
         for (
             std::size_t offset = 0;

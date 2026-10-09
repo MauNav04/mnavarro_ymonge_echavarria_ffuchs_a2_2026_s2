@@ -1,5 +1,6 @@
 #include "benchmark/benchmark.hpp"
 
+#include <chrono>
 #include <cstddef>
 #include <fstream>
 #include <iomanip>
@@ -14,9 +15,22 @@ std::size_t parsePositiveInteger(
     const char* argument,
     const char* name
 ) {
-    const std::string value(argument);
+    const std::string value(
+        argument
+    );
 
-    std::size_t processedCharacters = 0;
+    if (
+        value.empty() ||
+        value.front() == '-'
+    ) {
+        throw std::invalid_argument(
+            std::string(name) +
+            " must be a positive integer."
+        );
+    }
+
+    std::size_t processedCharacters =
+        0;
 
     const unsigned long long parsed =
         std::stoull(
@@ -56,6 +70,12 @@ void writeCsv(
         );
     }
 
+    /*
+     * logical_threads is temporarily preserved for compatibility
+     * with the existing analysis scripts.
+     *
+     * For Coarse-Grained it represents real worker threads.
+     */
     output
         << "run,"
         << "model,"
@@ -70,7 +90,9 @@ void writeCsv(
         << "cell_updates_per_second\n";
 
     output
-        << std::setprecision(17);
+        << std::setprecision(
+            17
+        );
 
     for (
         const auto& sample :
@@ -144,13 +166,26 @@ int main(
                 ? argv[3]
                 : "heat2d_benchmark.csv";
 
+        /*
+         * Common experimental matrix.
+         *
+         * Sequential:
+         *   1 reference configuration.
+         *
+         * Fine-Grained:
+         *   1, 2, 4, 8, 16, 32, 64 logical contexts.
+         *
+         * Coarse-Grained:
+         *   1, 2, 4, 8, 16, 32, 64 real worker threads.
+         */
         const std::vector<
             heat2d::benchmark::BenchmarkCase
-        > cases {
+        > cases{
             {
                 heat2d::benchmark::ExecutionModel::Sequential,
                 1
             },
+
             {
                 heat2d::benchmark::ExecutionModel::FineGrained,
                 1
@@ -178,8 +213,62 @@ int main(
             {
                 heat2d::benchmark::ExecutionModel::FineGrained,
                 64
+            },
+
+            {
+                heat2d::benchmark::ExecutionModel::CoarseGrained,
+                1
+            },
+            {
+                heat2d::benchmark::ExecutionModel::CoarseGrained,
+                2
+            },
+            {
+                heat2d::benchmark::ExecutionModel::CoarseGrained,
+                4
+            },
+            {
+                heat2d::benchmark::ExecutionModel::CoarseGrained,
+                8
+            },
+            {
+                heat2d::benchmark::ExecutionModel::CoarseGrained,
+                16
+            },
+            {
+                heat2d::benchmark::ExecutionModel::CoarseGrained,
+                32
+            },
+            {
+                heat2d::benchmark::ExecutionModel::CoarseGrained,
+                64
             }
         };
+
+        const auto coarseBlockingMicroseconds =
+            std::chrono::duration_cast<
+                std::chrono::microseconds
+            >(
+                config.coarseBlockingDuration
+            ).count();
+
+        const std::size_t interiorRows =
+            config.rows - 2;
+
+        const std::size_t eventsPerStep =
+            interiorRows /
+                config.coarseRowsPerBlockingEvent
+            +
+            (
+                interiorRows %
+                    config.coarseRowsPerBlockingEvent != 0
+                    ? 1
+                    : 0
+            );
+
+        const std::size_t coarseEventsPerRun =
+            eventsPerStep *
+            config.steps;
 
         std::cout
             << "\n=== Heat2D Common Benchmark ===\n\n";
@@ -221,6 +310,29 @@ int main(
         std::cout
             << "Measured rounds: "
             << config.measuredRuns
+            << '\n';
+
+        std::cout
+            << "\n--- Coarse-Grained Policy ---\n";
+
+        std::cout
+            << "Blocking duration: "
+            << coarseBlockingMicroseconds
+            << " us\n";
+
+        std::cout
+            << "Rows per blocking event: "
+            << config.coarseRowsPerBlockingEvent
+            << '\n';
+
+        std::cout
+            << "Blocking events per timestep: "
+            << eventsPerStep
+            << '\n';
+
+        std::cout
+            << "Blocking events per CG run: "
+            << coarseEventsPerRun
             << '\n';
 
         std::cout

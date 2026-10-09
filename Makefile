@@ -48,6 +48,9 @@ PROFILE_FLAGS := \
 	-g \
 	-fno-omit-frame-pointer
 
+# Required by std::thread / mutex / condition_variable.
+THREAD_FLAGS := -pthread
+
 # ------------------------------------------------------------
 # Python environment
 # ------------------------------------------------------------
@@ -73,19 +76,31 @@ FINE_GRAINED_SRCS := \
 	$(SRC)/models/fine_grained/round_robin_scheduler.cpp \
 	$(SRC)/models/fine_grained/fine_grained.cpp
 
+COARSE_GRAINED_SRCS := \
+	$(SRC)/models/coarse_grained/reusable_barrier.cpp \
+	$(SRC)/models/coarse_grained/coarse_grained.cpp
+
 # ------------------------------------------------------------
 # Executables
 # ------------------------------------------------------------
 
 SEQ_BIN := $(BIN_DIR)/heat2d_sequential
 FG_BIN := $(BIN_DIR)/heat2d_fine_grained
+CG_BIN := $(BIN_DIR)/heat2d_coarse_grained
 BENCH_BIN := $(BIN_DIR)/heat2d_benchmark
+
 FG_PROFILE_BIN := $(BIN_DIR)/heat2d_fine_grained_profile
+CG_PROFILE_BIN := $(BIN_DIR)/heat2d_coarse_grained_profile
 
 TEST_LOGICAL_BIN := $(BIN_DIR)/test_logical_thread
 TEST_SCHEDULER_BIN := $(BIN_DIR)/test_round_robin_scheduler
 TEST_FG_BIN := $(BIN_DIR)/test_fine_grained
+
+TEST_BARRIER_BIN := $(BIN_DIR)/test_reusable_barrier
+TEST_CG_BIN := $(BIN_DIR)/test_coarse_grained
+
 STRESS_FG_BIN := $(BIN_DIR)/stress_fine_grained
+STRESS_CG_BIN := $(BIN_DIR)/stress_coarse_grained
 
 # ------------------------------------------------------------
 # Benchmark configuration
@@ -94,7 +109,16 @@ STRESS_FG_BIN := $(BIN_DIR)/stress_fine_grained
 RUNS ?= 200
 WARMUPS ?= 5
 
-# Current benchmark:
+# Coarse-Grained development/profiling parameters.
+#
+# IMPORTANT:
+# These are NOT yet the formal experimental parameters.
+# They are configurable values used for development and perf tests.
+CG_THREADS ?= 4
+CG_BLOCK_US ?= 100
+CG_ROWS_PER_BLOCK ?= 8
+
+# Current formal benchmark:
 #   Sequential
 #   FG-1
 #   FG-2
@@ -103,7 +127,9 @@ WARMUPS ?= 5
 #   FG-16
 #   FG-32
 #   FG-64
-BENCHMARK_CASES := 8
+#
+# Coarse-Grained has NOT yet been integrated into benchmark_heat2d.cpp.
+BENCHMARK_CASES := 15
 
 RESULT_TAG ?= fine_grained_$(shell date +%Y%m%d_%H%M%S)_$(shell uname -m)
 RESULT_DIR := $(HEAT2D)/benchmark_results/$(RESULT_TAG)
@@ -124,7 +150,10 @@ ANALYSIS_LOG := $(RESULT_DIR)/analysis.log
 	release \
 	tests \
 	test \
+	test-fg \
+	test-cg \
 	stress-fg \
+	stress-cg \
 	python-env \
 	python-deps \
 	check-clean \
@@ -133,20 +162,29 @@ ANALYSIS_LOG := $(RESULT_DIR)/analysis.log
 	campaign-fg \
 	perf-soft-seq \
 	perf-soft-fg \
+	perf-soft-cg \
 	perf-hw-seq \
 	perf-hw-fg \
+	perf-hw-cg \
 	profile-fg \
+	profile-cg \
 	help \
 	clean
 
 all: release tests
 
-release: $(SEQ_BIN) $(FG_BIN) $(BENCH_BIN)
+release: \
+	$(SEQ_BIN) \
+	$(FG_BIN) \
+	$(CG_BIN) \
+	$(BENCH_BIN)
 
 tests: \
 	$(TEST_LOGICAL_BIN) \
 	$(TEST_SCHEDULER_BIN) \
-	$(TEST_FG_BIN)
+	$(TEST_FG_BIN) \
+	$(TEST_BARRIER_BIN) \
+	$(TEST_CG_BIN)
 
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
@@ -182,7 +220,26 @@ $(FG_BIN): \
 		-o $@
 
 # ============================================================
+# Coarse-Grained
+# ============================================================
+
+$(CG_BIN): \
+	$(SRC)/models/coarse_grained/main.cpp \
+	$(CORE_SRCS) \
+	$(COARSE_GRAINED_SRCS) | $(BIN_DIR)
+
+	$(CXX) $(RELEASE_FLAGS) $(THREAD_FLAGS) \
+		$(SRC)/models/coarse_grained/main.cpp \
+		$(CORE_SRCS) \
+		$(COARSE_GRAINED_SRCS) \
+		-o $@
+
+# ============================================================
 # Benchmark
+#
+# IMPORTANT:
+# This benchmark currently contains only Sequential + Fine-Grained.
+# Coarse-Grained will be integrated in a later step.
 # ============================================================
 
 $(BENCH_BIN): \
@@ -190,18 +247,20 @@ $(BENCH_BIN): \
 	$(SRC)/benchmark/benchmark.cpp \
 	$(CORE_SRCS) \
 	$(SEQUENTIAL_SRC) \
-	$(FINE_GRAINED_SRCS) | $(BIN_DIR)
+	$(FINE_GRAINED_SRCS) \
+	$(COARSE_GRAINED_SRCS) | $(BIN_DIR)
 
-	$(CXX) $(RELEASE_FLAGS) \
+	$(CXX) $(RELEASE_FLAGS) $(THREAD_FLAGS) \
 		$(BENCHMARKS)/benchmark_heat2d.cpp \
 		$(SRC)/benchmark/benchmark.cpp \
 		$(CORE_SRCS) \
 		$(SEQUENTIAL_SRC) \
 		$(FINE_GRAINED_SRCS) \
+		$(COARSE_GRAINED_SRCS) \
 		-o $@
 
 # ============================================================
-# Unit / Integration Tests
+# Fine-Grained Unit / Integration Tests
 # ============================================================
 
 $(TEST_LOGICAL_BIN): \
@@ -237,16 +296,83 @@ $(TEST_FG_BIN): \
 		$(FINE_GRAINED_SRCS) \
 		-o $@
 
-test: tests
+# ============================================================
+# Coarse-Grained Unit / Integration Tests
+# ============================================================
+
+$(TEST_BARRIER_BIN): \
+	$(TESTS)/coarse_grained/test_reusable_barrier.cpp \
+	$(SRC)/models/coarse_grained/reusable_barrier.cpp | $(BIN_DIR)
+
+	$(CXX) $(TEST_FLAGS) $(THREAD_FLAGS) \
+		$(TESTS)/coarse_grained/test_reusable_barrier.cpp \
+		$(SRC)/models/coarse_grained/reusable_barrier.cpp \
+		-o $@
+
+$(TEST_CG_BIN): \
+	$(TESTS)/coarse_grained/test_coarse_grained.cpp \
+	$(CORE_SRCS) \
+	$(SEQUENTIAL_SRC) \
+	$(COARSE_GRAINED_SRCS) | $(BIN_DIR)
+
+	$(CXX) $(TEST_FLAGS) $(THREAD_FLAGS) \
+		$(TESTS)/coarse_grained/test_coarse_grained.cpp \
+		$(CORE_SRCS) \
+		$(SEQUENTIAL_SRC) \
+		$(COARSE_GRAINED_SRCS) \
+		-o $@
+
+# ============================================================
+# Test runners
+# ============================================================
+
+test-fg: \
+	$(TEST_LOGICAL_BIN) \
+	$(TEST_SCHEDULER_BIN) \
+	$(TEST_FG_BIN)
+
 	@echo
 	@echo "========================================"
-	@echo "Running Heat2D tests"
+	@echo "Running Heat2D Fine-Grained tests"
 	@echo "========================================"
 	$(TEST_LOGICAL_BIN)
 	$(TEST_SCHEDULER_BIN)
 	$(TEST_FG_BIN)
 	@echo
-	@echo "All tests PASSED."
+	@echo "Fine-Grained tests PASSED."
+
+test-cg: \
+	$(TEST_BARRIER_BIN) \
+	$(TEST_CG_BIN)
+
+	@echo
+	@echo "========================================"
+	@echo "Running Heat2D Coarse-Grained tests"
+	@echo "========================================"
+	$(TEST_BARRIER_BIN)
+	$(TEST_CG_BIN)
+	@echo
+	@echo "Coarse-Grained tests PASSED."
+
+test: tests
+	@echo
+	@echo "========================================"
+	@echo "Running all Heat2D tests"
+	@echo "========================================"
+
+	@echo
+	@echo "--- Fine-Grained ---"
+	$(TEST_LOGICAL_BIN)
+	$(TEST_SCHEDULER_BIN)
+	$(TEST_FG_BIN)
+
+	@echo
+	@echo "--- Coarse-Grained ---"
+	$(TEST_BARRIER_BIN)
+	$(TEST_CG_BIN)
+
+	@echo
+	@echo "All Heat2D tests PASSED."
 
 # ============================================================
 # Fine-Grained Stress Test
@@ -267,6 +393,24 @@ $(STRESS_FG_BIN): \
 
 stress-fg: $(STRESS_FG_BIN)
 	$(STRESS_FG_BIN) 8 801 1000 3
+
+# ============================================================
+# Coarse-Grained Stress Test
+# ============================================================
+
+$(STRESS_CG_BIN): \
+	$(TESTS)/coarse_grained/stress_coarse_grained.cpp \
+	$(CORE_SRCS) \
+	$(COARSE_GRAINED_SRCS) | $(BIN_DIR)
+
+	$(CXX) $(TEST_FLAGS) $(THREAD_FLAGS) \
+		$(TESTS)/coarse_grained/stress_coarse_grained.cpp \
+		$(CORE_SRCS) \
+		$(COARSE_GRAINED_SRCS) \
+		-o $@
+
+stress-cg: $(STRESS_CG_BIN)
+	$(STRESS_CG_BIN) $(CG_THREADS) 801 1000 3
 
 # ============================================================
 # Python
@@ -299,6 +443,9 @@ check-clean:
 
 # ============================================================
 # Experimental metadata
+#
+# IMPORTANT:
+# This metadata still describes the current formal FG campaign.
 # ============================================================
 
 metadata: release
@@ -371,7 +518,7 @@ metadata: release
 # ============================================================
 # Development benchmark
 #
-# Short campaign used only to validate the complete pipeline.
+# Short campaign used only to validate the complete FG pipeline.
 # ============================================================
 
 campaign-dev: RUNS=3
@@ -406,6 +553,7 @@ campaign-fg: check-clean release python-deps
 	@echo
 
 	@mkdir -p $(RESULT_DIR)
+
 	@$(MAKE) --no-print-directory \
 		metadata \
 		RESULT_TAG="$(RESULT_TAG)" \
@@ -414,6 +562,7 @@ campaign-fg: check-clean release python-deps
 
 	@echo
 	@echo "Running benchmark..."
+
 	$(BENCH_BIN) \
 		$(RUNS) \
 		$(WARMUPS) \
@@ -421,6 +570,7 @@ campaign-fg: check-clean release python-deps
 
 	@echo
 	@echo "Validating raw sample count..."
+
 	@actual="$$(wc -l < $(RAW_RESULTS))"; \
 	expected="$$(( $(RUNS) * $(BENCHMARK_CASES) + 1 ))"; \
 	echo "Expected lines: $$expected"; \
@@ -432,14 +582,17 @@ campaign-fg: check-clean release python-deps
 
 	@echo
 	@echo "Running statistical analysis..."
+
 	$(PYTHON) $(SCRIPTS)/analyze_benchmark.py \
 		$(RAW_RESULTS) \
 		--output $(SUMMARY) | tee $(ANALYSIS_LOG)
 
 	@echo
 	@echo "Generating plots..."
+
 	$(PYTHON) $(SCRIPTS)/plot_benchmark.py \
 		$(SUMMARY) \
+		--raw $(RAW_RESULTS) \
 		--output-dir $(PLOTS_DIR)
 
 	@echo
@@ -468,6 +621,11 @@ perf-soft-fg: $(FG_BIN)
 		-e task-clock,context-switches,cpu-migrations,page-faults \
 		$(FG_BIN) 8
 
+perf-soft-cg: $(CG_BIN)
+	sudo perf stat \
+		-e task-clock,context-switches,cpu-migrations,page-faults \
+		$(CG_BIN) $(CG_THREADS) $(CG_BLOCK_US) $(CG_ROWS_PER_BLOCK)
+
 # ============================================================
 # perf - hardware PMU events
 #
@@ -484,6 +642,11 @@ perf-hw-fg: $(FG_BIN)
 	sudo perf stat \
 		-e cycles,instructions,branches,branch-misses,cache-references,cache-misses \
 		$(FG_BIN) 8
+
+perf-hw-cg: $(CG_BIN)
+	sudo perf stat \
+		-e cycles,instructions,branches,branch-misses,cache-references,cache-misses \
+		$(CG_BIN) $(CG_THREADS) $(CG_BLOCK_US) $(CG_ROWS_PER_BLOCK)
 
 # ============================================================
 # Fine-Grained profiling binary
@@ -512,6 +675,32 @@ profile-fg: $(FG_PROFILE_BIN)
 	@echo "  sudo perf report"
 
 # ============================================================
+# Coarse-Grained profiling binary
+# ============================================================
+
+$(CG_PROFILE_BIN): \
+	$(SRC)/models/coarse_grained/main.cpp \
+	$(CORE_SRCS) \
+	$(COARSE_GRAINED_SRCS) | $(BIN_DIR)
+
+	$(CXX) $(PROFILE_FLAGS) $(THREAD_FLAGS) \
+		$(SRC)/models/coarse_grained/main.cpp \
+		$(CORE_SRCS) \
+		$(COARSE_GRAINED_SRCS) \
+		-o $@
+
+profile-cg: $(CG_PROFILE_BIN)
+	sudo perf record \
+		-e cpu-clock \
+		-g \
+		-- $(CG_PROFILE_BIN) $(CG_THREADS) $(CG_BLOCK_US) $(CG_ROWS_PER_BLOCK)
+
+	@echo
+	@echo "Profiling data written to perf.data"
+	@echo "Open it with:"
+	@echo "  sudo perf report"
+
+# ============================================================
 # Help
 # ============================================================
 
@@ -521,34 +710,64 @@ help:
 	@echo
 	@echo "Build:"
 	@echo "  make release"
-	@echo "      Build Sequential, Fine-Grained and benchmark binaries."
+	@echo "      Build Sequential, Fine-Grained, Coarse-Grained and benchmark binaries."
 	@echo
 	@echo "Tests:"
 	@echo "  make test"
-	@echo "      Compile and run all Fine-Grained tests."
+	@echo "      Compile and run all Fine-Grained and Coarse-Grained tests."
 	@echo
+	@echo "  make test-fg"
+	@echo "      Compile and run only Fine-Grained tests."
+	@echo
+	@echo "  make test-cg"
+	@echo "      Compile and run only Coarse-Grained tests."
+	@echo
+	@echo "Stress:"
 	@echo "  make stress-fg"
 	@echo "      Run Fine-Grained stress test."
 	@echo
+	@echo "  make stress-cg"
+	@echo "      Run Coarse-Grained stress test."
+	@echo
 	@echo "Benchmark:"
 	@echo "  make campaign-dev"
-	@echo "      3 measured rounds + 1 warm-up."
+	@echo "      3 measured rounds + 1 warm-up for current FG pipeline."
 	@echo
 	@echo "  make campaign-fg"
 	@echo "      200 measured rounds + 5 warm-ups."
 	@echo
 	@echo "  make campaign-fg RUNS=50 WARMUPS=3"
-	@echo "      Custom campaign."
+	@echo "      Custom Fine-Grained campaign."
 	@echo
 	@echo "  make campaign-fg RESULT_TAG=intel_fg_200"
 	@echo "      Custom result directory name."
 	@echo
+	@echo "Coarse-Grained parameters:"
+	@echo "  CG_THREADS=4"
+	@echo "      Number of worker threads."
+	@echo
+	@echo "  CG_BLOCK_US=100"
+	@echo "      Synthetic blocking duration in microseconds."
+	@echo
+	@echo "  CG_ROWS_PER_BLOCK=8"
+	@echo "      Interior rows processed between synthetic blocking events."
+	@echo
 	@echo "Profiling:"
 	@echo "  make perf-soft-seq"
 	@echo "  make perf-soft-fg"
+	@echo "  make perf-soft-cg"
+	@echo
 	@echo "  make perf-hw-seq"
 	@echo "  make perf-hw-fg"
+	@echo "  make perf-hw-cg"
+	@echo
 	@echo "  make profile-fg"
+	@echo "  make profile-cg"
+	@echo
+	@echo "Examples:"
+	@echo "  make perf-soft-cg CG_THREADS=4 CG_BLOCK_US=0 CG_ROWS_PER_BLOCK=8"
+	@echo "  make perf-soft-cg CG_THREADS=4 CG_BLOCK_US=100 CG_ROWS_PER_BLOCK=8"
+	@echo "  make stress-cg CG_THREADS=8"
 	@echo
 	@echo "Clean:"
 	@echo "  make clean"

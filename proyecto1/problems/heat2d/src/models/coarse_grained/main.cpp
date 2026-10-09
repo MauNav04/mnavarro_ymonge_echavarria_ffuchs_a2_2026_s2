@@ -10,19 +10,33 @@
 #include <exception>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 
 namespace {
 
+constexpr std::size_t kDefaultRowsPerBlockingEvent =
+    8;
+
 /**
- * @brief Convierte un argumento de línea de comandos a std::size_t.
+ * @brief Convierte un argumento a entero positivo.
  */
 std::size_t parsePositiveSize(
     const char* text,
     const char* argumentName
 ) {
     const std::string value(text);
+
+    if (
+        value.empty() ||
+        value.front() == '-'
+    ) {
+        throw std::invalid_argument(
+            std::string(argumentName) +
+            " must be a positive integer."
+        );
+    }
 
     std::size_t consumed = 0;
 
@@ -42,22 +56,44 @@ std::size_t parsePositiveSize(
         );
     }
 
+    if (
+        parsed >
+        static_cast<unsigned long long>(
+            std::numeric_limits<std::size_t>::max()
+        )
+    ) {
+        throw std::out_of_range(
+            std::string(argumentName) +
+            " is too large."
+        );
+    }
+
     return static_cast<std::size_t>(
         parsed
     );
 }
 
 /**
- * @brief Convierte la duración bloqueante a microsegundos.
+ * @brief Convierte un argumento a entero no negativo.
  *
- * Se permite cero para ejecutar el modelo sin inyectar el stall
- * sintético durante pruebas funcionales.
+ * Se utiliza para la duración del bloqueo porque cero desactiva
+ * explícitamente los stalls sintéticos.
  */
 std::size_t parseNonNegativeSize(
     const char* text,
     const char* argumentName
 ) {
     const std::string value(text);
+
+    if (
+        value.empty() ||
+        value.front() == '-'
+    ) {
+        throw std::invalid_argument(
+            std::string(argumentName) +
+            " must be a non-negative integer."
+        );
+    }
 
     std::size_t consumed = 0;
 
@@ -67,10 +103,24 @@ std::size_t parseNonNegativeSize(
             &consumed
         );
 
-    if (consumed != value.size()) {
+    if (
+        consumed != value.size()
+    ) {
         throw std::invalid_argument(
             std::string(argumentName) +
             " must be a non-negative integer."
+        );
+    }
+
+    if (
+        parsed >
+        static_cast<unsigned long long>(
+            std::numeric_limits<std::size_t>::max()
+        )
+    ) {
+        throw std::out_of_range(
+            std::string(argumentName) +
+            " is too large."
         );
     }
 
@@ -79,6 +129,9 @@ std::size_t parseNonNegativeSize(
     );
 }
 
+/**
+ * @brief Muestra la interfaz de línea de comandos.
+ */
 void printUsage(
     const char* programName
 ) {
@@ -86,14 +139,26 @@ void printUsage(
         << "Usage:\n"
         << "  "
         << programName
-        << " <threads> [blocking_microseconds]\n\n"
+        << " <threads>"
+        << " [blocking_microseconds]"
+        << " [rows_per_blocking_event]\n\n"
+
+        << "Defaults:\n"
+        << "  blocking_microseconds     = 0\n"
+        << "  rows_per_blocking_event   = 8\n\n"
+
         << "Examples:\n"
         << "  "
         << programName
-        << " 4 0\n"
+        << " 4\n"
+
         << "  "
         << programName
-        << " 4 100\n";
+        << " 4 0\n"
+
+        << "  "
+        << programName
+        << " 4 100 8\n";
 }
 
 } // namespace
@@ -105,7 +170,7 @@ int main(
     try {
         if (
             argc < 2 ||
-            argc > 3
+            argc > 4
         ) {
             printUsage(
                 argv[0]
@@ -120,13 +185,25 @@ int main(
                 "Thread count"
             );
 
-        std::size_t blockingMicroseconds = 0;
+        std::size_t blockingMicroseconds =
+            0;
 
-        if (argc == 3) {
+        std::size_t rowsPerBlockingEvent =
+            kDefaultRowsPerBlockingEvent;
+
+        if (argc >= 3) {
             blockingMicroseconds =
                 parseNonNegativeSize(
                     argv[2],
                     "Blocking duration"
+                );
+        }
+
+        if (argc >= 4) {
+            rowsPerBlockingEvent =
+                parsePositiveSize(
+                    argv[3],
+                    "Rows per blocking event"
                 );
         }
 
@@ -182,6 +259,9 @@ int main(
                 centerColumn
             );
 
+        /*
+         * Configuración específica Coarse-Grained.
+         */
         heat2d::CoarseGrainedConfig coarseConfig;
 
         coarseConfig.threadCount =
@@ -191,6 +271,9 @@ int main(
             std::chrono::microseconds{
                 blockingMicroseconds
             };
+
+        coarseConfig.rowsPerBlockingEvent =
+            rowsPerBlockingEvent;
 
         std::cout
             << "\n=== Heat Diffusion 2D - Coarse-Grained ===\n";
@@ -240,16 +323,27 @@ int main(
 
         std::cout
             << "Worker threads: "
-            << threadCount
+            << coarseConfig.threadCount
             << '\n';
 
         std::cout
-            << "Blocking event: after each completed row\n";
+            << "Rows per blocking event: "
+            << coarseConfig.rowsPerBlockingEvent
+            << '\n';
 
         std::cout
             << "Blocking duration: "
             << blockingMicroseconds
             << " us\n";
+
+        std::cout
+            << "Synthetic blocking: "
+            << (
+                blockingMicroseconds > 0
+                    ? "ENABLED"
+                    : "DISABLED"
+            )
+            << '\n';
 
         std::cout
             << "Synchronization: reusable timestep barrier\n";
