@@ -75,3 +75,5 @@ proyecto1/problems/heat2d/benchmark_results/
 
 # perf profiling output
 perf.data
+stress_coarse_grained
+test_coarse_grained
