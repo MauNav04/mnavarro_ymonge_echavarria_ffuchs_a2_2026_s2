@@ -10,6 +10,8 @@
 #include <string>
 #include <vector>
 
+#include "smt/cpu_topology.hpp"
+
 namespace {
 
 /**
@@ -75,10 +77,11 @@ std::size_t parsePositiveInteger(
  *
  * Supported values:
  *
- *   all -> Sequential + Fine-Grained + Coarse-Grained + CMP
+ *   all -> Sequential + Fine-Grained + Coarse-Grained + CMP + SMT
  *   fg  -> Sequential + Fine-Grained
  *   cg  -> Sequential + Coarse-Grained
  *   cmp -> Sequential + CMP
+ *   smt -> Sequential + topology-aware SMT
  */
 std::string parseCampaignModel(
     int argc,
@@ -93,11 +96,11 @@ std::string parseCampaignModel(
         campaignModel != "all" &&
         campaignModel != "fg" &&
         campaignModel != "cg" &&
-        campaignModel != "cmp"
+        campaignModel != "cmp" &&
+        campaignModel != "smt"
     ) {
         throw std::invalid_argument(
-            "Benchmark model must be one of: "
-            "all, fg, cg, cmp."
+            "Benchmark model must be one of: all, fg, cg, cmp, smt."
         );
     }
 
@@ -207,6 +210,49 @@ std::vector<
         }
     }
 
+    /*
+     * SMT campaign.
+     *
+     * SMT does not intentionally oversubscribe the machine.
+     * Only standard worker counts that fit inside the logical CPUs
+     * available to the current process are selected.
+     */
+    if (
+        campaignModel == "all" ||
+        campaignModel == "smt"
+    ) {
+        const heat2d::smt::CpuTopology topology =
+            heat2d::smt::detectCpuTopology();
+
+        const std::size_t availableLogicalCpus =
+            heat2d::smt::logicalCpuCount(
+                topology
+            );
+
+        const std::vector<std::size_t> smtThreadCounts{
+            1,
+            2,
+            4,
+            8,
+            16
+        };
+
+        for (
+            const std::size_t threadCount :
+            smtThreadCounts
+        ) {
+            if (
+                threadCount <=
+                availableLogicalCpus
+            ) {
+                cases.push_back({
+                    ExecutionModel::Smt,
+                    threadCount
+                });
+            }
+        }
+    }
+
     return cases;
 }
 
@@ -313,7 +359,7 @@ int main(
          *      [measured_runs]
          *      [warmup_runs]
          *      [output.csv]
-         *      [all|fg|cg|cmp]
+         *      [all|fg|cg|cmp|smt]
          */
         if (argc > 5) {
             throw std::invalid_argument(
@@ -321,7 +367,7 @@ int main(
                 "[measured_runs] "
                 "[warmup_runs] "
                 "[output.csv] "
-                "[all|fg|cg|cmp]"
+                "[all|fg|cg|cmp|smt]"
             );
         }
 
@@ -558,6 +604,51 @@ int main(
             std::cout
                 << "Synchronization: "
                 << "2 barrier phases per timestep\n";
+        }
+
+        if (
+            campaignModel == "smt" ||
+            campaignModel == "all"
+        ) {
+            const heat2d::smt::CpuTopology topology =
+                heat2d::smt::detectCpuTopology();
+
+            std::cout
+                << "\n--- SMT Policy ---\n";
+
+            std::cout
+                << "Physical cores available: "
+                << heat2d::smt::physicalCoreCount(
+                    topology
+                )
+                << '\n';
+
+            std::cout
+                << "Logical CPUs available: "
+                << heat2d::smt::logicalCpuCount(
+                    topology
+                )
+                << '\n';
+
+            std::cout
+                << "SMT hardware visible: "
+                << (
+                    heat2d::smt::smtAvailable(
+                        topology
+                    )
+                        ? "YES"
+                        : "NO"
+                )
+                << '\n';
+
+            std::cout
+                << "Placement: topology-aware pthread affinity\n";
+
+            std::cout
+                << "Oversubscription: disabled\n";
+
+            std::cout
+                << "Synchronization: 2 barrier phases per timestep\n";
         }
 
         /*

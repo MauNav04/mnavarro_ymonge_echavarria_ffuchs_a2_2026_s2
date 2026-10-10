@@ -16,6 +16,7 @@ MODEL_ORDER = {
     "fine_grained": 1,
     "coarse_grained": 2,
     "cmp": 3,
+    "smt": 4,
 }
 
 SUPPORTED_MODELS = set(MODEL_ORDER)
@@ -321,6 +322,7 @@ def validate_groups(groups):
         "fine_grained",
         "coarse_grained",
         "cmp",
+        "smt",
     ):
         has_model = any(
             key[0] == model
@@ -803,6 +805,7 @@ def efficiency_name(
     if model in {
         "coarse_grained",
         "cmp",
+        "smt",
     }:
         return "parallel"
 
@@ -871,6 +874,10 @@ def print_summary(
     )
 
     print(
+        "SMT efficiency: model scalability / hardware worker threads"
+    )
+
+    print(
         "FG efficiency: model scalability / simulated logical contexts "
         "(not hardware parallel efficiency)"
     )
@@ -928,6 +935,7 @@ def print_summary(
         "fine_grained",
         "coarse_grained",
         "cmp",
+        "smt",
     ):
         if any(
             result.model == model

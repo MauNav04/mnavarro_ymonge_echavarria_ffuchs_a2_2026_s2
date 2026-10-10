@@ -14,6 +14,7 @@ MODEL_ORDER = {
     "fine_grained": 1,
     "coarse_grained": 2,
     "cmp": 3,
+    "smt": 4,
 }
 
 
@@ -328,6 +329,11 @@ def case_label(
             f"CMP-{logical_threads}"
         )
 
+    if model == "smt":
+        return (
+            f"SMT-{logical_threads}"
+        )
+
     return (
         f"{model}-{logical_threads}"
     )
@@ -640,6 +646,10 @@ def save_model_scalability_plot(
             "cmp",
             "CMP",
         ),
+        (
+            "smt",
+            "SMT",
+        ),
     ):
         model_rows = [
             row
@@ -850,6 +860,21 @@ def save_cmp_efficiency_plot(
         "Worker threads",
         "CMP scalability / worker threads",
         "cmp_parallel_efficiency.png",
+    )
+
+
+def save_smt_efficiency_plot(
+    rows,
+    output_directory,
+):
+    save_efficiency_plot(
+        rows,
+        output_directory,
+        "smt",
+        "SMT hardware-thread scaling efficiency",
+        "Hardware worker threads",
+        "SMT scalability / hardware threads",
+        "smt_parallel_efficiency.png",
     )
 
 
@@ -1115,6 +1140,11 @@ def main():
         arguments.output_dir,
     )
 
+    save_smt_efficiency_plot(
+        rows,
+        arguments.output_dir,
+    )
+
     generated_files = [
         "execution_time.png",
         "throughput.png",
@@ -1140,6 +1170,11 @@ def main():
     if "cmp" in models_present:
         generated_files.append(
             "cmp_parallel_efficiency.png"
+        )
+
+    if "smt" in models_present:
+        generated_files.append(
+            "smt_parallel_efficiency.png"
         )
 
     if arguments.raw is not None:
