@@ -74,9 +74,11 @@ std::size_t parsePositiveInteger(
  * @brief Validates and returns the selected benchmark campaign.
  *
  * Supported values:
- *   all -> Sequential + Fine-Grained + Coarse-Grained
+ *
+ *   all -> Sequential + Fine-Grained + Coarse-Grained + CMP
  *   fg  -> Sequential + Fine-Grained
  *   cg  -> Sequential + Coarse-Grained
+ *   cmp -> Sequential + CMP
  */
 std::string parseCampaignModel(
     int argc,
@@ -90,10 +92,12 @@ std::string parseCampaignModel(
     if (
         campaignModel != "all" &&
         campaignModel != "fg" &&
-        campaignModel != "cg"
+        campaignModel != "cg" &&
+        campaignModel != "cmp"
     ) {
         throw std::invalid_argument(
-            "Benchmark model must be one of: all, fg, cg."
+            "Benchmark model must be one of: "
+            "all, fg, cg, cmp."
         );
     }
 
@@ -126,7 +130,8 @@ std::vector<
     });
 
     /*
-     * Common execution-context counts used by both models.
+     * Common execution-context counts used by all multithreaded
+     * benchmark models.
      */
     const std::vector<std::size_t> threadCounts{
         1,
@@ -161,7 +166,8 @@ std::vector<
     /*
      * Coarse-Grained campaign.
      *
-     * These values represent real std::thread workers.
+     * These values represent real std::thread workers with
+     * synthetic costly blocking events.
      */
     if (
         campaignModel == "all" ||
@@ -173,6 +179,29 @@ std::vector<
         ) {
             cases.push_back({
                 ExecutionModel::CoarseGrained,
+                threadCount
+            });
+        }
+    }
+
+    /*
+     * CMP campaign.
+     *
+     * These values represent real std::thread workers that may run
+     * simultaneously on different CPU cores.
+     *
+     * No synthetic blocking is injected.
+     */
+    if (
+        campaignModel == "all" ||
+        campaignModel == "cmp"
+    ) {
+        for (
+            const std::size_t threadCount :
+            threadCounts
+        ) {
+            cases.push_back({
+                ExecutionModel::Cmp,
                 threadCount
             });
         }
@@ -215,6 +244,9 @@ void writeCsv(
      *
      * Coarse-Grained:
      *   real worker threads.
+     *
+     * CMP:
+     *   real operating-system worker threads.
      */
     output
         << "run,"
@@ -281,7 +313,7 @@ int main(
          *      [measured_runs]
          *      [warmup_runs]
          *      [output.csv]
-         *      [all|fg|cg]
+         *      [all|fg|cg|cmp]
          */
         if (argc > 5) {
             throw std::invalid_argument(
@@ -289,7 +321,7 @@ int main(
                 "[measured_runs] "
                 "[warmup_runs] "
                 "[output.csv] "
-                "[all|fg|cg]"
+                "[all|fg|cg|cmp]"
             );
         }
 
@@ -348,9 +380,13 @@ int main(
          *   Sequential + CG {1,2,4,8,16,32,64}
          *   = 8 cases.
          *
+         * cmp:
+         *   Sequential + CMP {1,2,4,8,16,32,64}
+         *   = 8 cases.
+         *
          * all:
-         *   Sequential + 7 FG + 7 CG
-         *   = 15 cases.
+         *   Sequential + 7 FG + 7 CG + 7 CMP
+         *   = 22 cases.
          */
         const std::vector<
             heat2d::benchmark::BenchmarkCase
@@ -497,6 +533,31 @@ int main(
                 << "Blocking events per CG run: "
                 << coarseEventsPerRun
                 << '\n';
+        }
+
+        /*
+         * CMP policy information.
+         */
+        if (
+            campaignModel == "cmp" ||
+            campaignModel == "all"
+        ) {
+            std::cout
+                << "\n--- CMP Policy ---\n";
+
+            std::cout
+                << "Worker threads: "
+                << "1, 2, 4, 8, 16, 32, 64\n";
+
+            std::cout
+                << "Execution: real std::thread workers\n";
+
+            std::cout
+                << "Synthetic blocking: disabled\n";
+
+            std::cout
+                << "Synchronization: "
+                << "2 barrier phases per timestep\n";
         }
 
         /*

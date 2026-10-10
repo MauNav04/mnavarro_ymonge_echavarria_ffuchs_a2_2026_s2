@@ -4,7 +4,6 @@ import argparse
 import csv
 import math
 import statistics
-
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,6 +15,7 @@ MODEL_ORDER = {
     "sequential": 0,
     "fine_grained": 1,
     "coarse_grained": 2,
+    "cmp": 3,
 }
 
 SUPPORTED_MODELS = set(MODEL_ORDER)
@@ -26,16 +26,12 @@ class Sample:
     run: int
     model: str
     logical_threads: int
-
     rows: int
     cols: int
     steps: int
-
     alpha: float
     dt: float
-
     cell_updates: int
-
     elapsed_seconds: float
     cell_updates_per_second: float
 
@@ -51,38 +47,30 @@ class GroupStatistics:
     model: str
     logical_threads: int
     sample_count: int
-
     mean_seconds: float
     median_seconds: float
     std_seconds: float
     cv_percent: float
-
     minimum_seconds: float
     maximum_seconds: float
-
     time_ci95: ConfidenceInterval
     time_ci95_relative_half_width_percent: float
-
     mean_updates_per_second: float
     throughput_ci95: ConfidenceInterval
-
     mean_speedup_vs_sequential: float
     speedup_vs_sequential_ci95: ConfidenceInterval
-
     mean_model_scalability: float
     model_scalability_ci95: ConfidenceInterval
-
     mean_model_efficiency: float
     model_efficiency_ci95: ConfidenceInterval
-
     convergence_last_10_percent_change_percent: float
 
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
         description=(
-            "Analyze raw Heat2D benchmark measurements "
-            "and generate a statistical summary."
+            "Analyze raw Heat2D benchmark measurements and generate "
+            "a statistical summary."
         )
     )
 
@@ -96,16 +84,27 @@ def parse_arguments():
         "--output",
         type=Path,
         default=None,
-        help=(
-            "Summary CSV output path. "
-            "Default: <input>_summary.csv"
-        ),
+        help="Summary CSV output path. Default: <input>_summary.csv",
     )
 
     return parser.parse_args()
 
 
 def load_samples(path: Path):
+    required_columns = {
+        "run",
+        "model",
+        "logical_threads",
+        "rows",
+        "cols",
+        "steps",
+        "alpha",
+        "dt",
+        "cell_updates",
+        "elapsed_seconds",
+        "cell_updates_per_second",
+    }
+
     samples = []
 
     with path.open(
@@ -115,20 +114,6 @@ def load_samples(path: Path):
     ) as file:
 
         reader = csv.DictReader(file)
-
-        required_columns = {
-            "run",
-            "model",
-            "logical_threads",
-            "rows",
-            "cols",
-            "steps",
-            "alpha",
-            "dt",
-            "cell_updates",
-            "elapsed_seconds",
-            "cell_updates_per_second",
-        }
 
         if reader.fieldnames is None:
             raise ValueError(
@@ -223,7 +208,10 @@ def validate_sample(sample: Sample):
             "Sequential samples must use one execution context."
         )
 
-    if sample.rows < 3 or sample.cols < 3:
+    if (
+        sample.rows < 3 or
+        sample.cols < 3
+    ):
         raise ValueError(
             "Grid dimensions must be at least 3x3."
         )
@@ -332,6 +320,7 @@ def validate_groups(groups):
     for model in (
         "fine_grained",
         "coarse_grained",
+        "cmp",
     ):
         has_model = any(
             key[0] == model
@@ -371,7 +360,7 @@ def confidence_interval_95(values):
     if not values:
         raise ValueError(
             "Cannot calculate a confidence "
-            "interval from an empty sample."
+            "interval from empty data."
         )
 
     count = len(values)
@@ -386,12 +375,8 @@ def confidence_interval_95(values):
             mean_value,
         )
 
-    standard_deviation = statistics.stdev(
-        values
-    )
-
     standard_error = (
-        standard_deviation /
+        statistics.stdev(values) /
         math.sqrt(count)
     )
 
@@ -411,48 +396,46 @@ def confidence_interval_95(values):
     )
 
 
-def calculate_coefficient_of_variation(
+def coefficient_of_variation_percent(
     values
 ):
     mean_value = statistics.fmean(
         values
     )
 
-    if mean_value == 0.0:
+    if (
+        mean_value == 0.0 or
+        len(values) <= 1
+    ):
         return 0.0
-
-    if len(values) <= 1:
-        return 0.0
-
-    standard_deviation = (
-        statistics.stdev(values)
-    )
 
     return (
-        standard_deviation /
-        mean_value
-    ) * 100.0
+        statistics.stdev(values) /
+        mean_value *
+        100.0
+    )
 
 
-def calculate_relative_ci_half_width_percent(
+def relative_ci_half_width_percent(
     mean_value,
-    confidence_interval,
+    interval,
 ):
     if mean_value == 0.0:
         return 0.0
 
     half_width = (
-        confidence_interval.upper -
-        confidence_interval.lower
+        interval.upper -
+        interval.lower
     ) / 2.0
 
     return (
         abs(half_width) /
-        abs(mean_value)
-    ) * 100.0
+        abs(mean_value) *
+        100.0
+    )
 
 
-def calculate_convergence_change_percent(
+def convergence_change_percent(
     values
 ):
     if len(values) <= 1:
@@ -486,68 +469,47 @@ def calculate_convergence_change_percent(
             final_mean -
             checkpoint_mean
         ) /
-        abs(final_mean)
-    ) * 100.0
+        abs(final_mean) *
+        100.0
+    )
 
 
-def create_run_lookup(samples):
-    return {
-        sample.run: sample
-        for sample in samples
-    }
-
-
-def calculate_paired_ratios(
+def paired_ratios(
     reference_samples,
     candidate_samples,
 ):
-    reference_by_run = (
-        create_run_lookup(
-            reference_samples
+    reference_by_run = {
+        sample.run: sample
+        for sample in reference_samples
+    }
+
+    candidate_by_run = {
+        sample.run: sample
+        for sample in candidate_samples
+    }
+
+    return [
+        reference_by_run[
+            run
+        ].elapsed_seconds
+        /
+        candidate_by_run[
+            run
+        ].elapsed_seconds
+        for run in sorted(
+            reference_by_run
         )
-    )
-
-    candidate_by_run = (
-        create_run_lookup(
-            candidate_samples
-        )
-    )
-
-    ratios = []
-
-    for run in sorted(
-        reference_by_run
-    ):
-        reference_time = (
-            reference_by_run[
-                run
-            ].elapsed_seconds
-        )
-
-        candidate_time = (
-            candidate_by_run[
-                run
-            ].elapsed_seconds
-        )
-
-        ratios.append(
-            reference_time /
-            candidate_time
-        )
-
-    return ratios
+    ]
 
 
 def calculate_statistics(
     groups
 ):
-    sequential_key = (
-        "sequential",
-        1,
-    )
-
     sequential_samples = groups[
-        sequential_key
+        (
+            "sequential",
+            1,
+        )
     ]
 
     results = []
@@ -567,16 +529,12 @@ def calculate_statistics(
             for sample in samples
         ]
 
-        mean_seconds = (
-            statistics.fmean(
-                times
-            )
+        mean_seconds = statistics.fmean(
+            times
         )
 
-        median_seconds = (
-            statistics.median(
-                times
-            )
+        median_seconds = statistics.median(
+            times
         )
 
         std_seconds = (
@@ -586,7 +544,7 @@ def calculate_statistics(
         )
 
         cv_percent = (
-            calculate_coefficient_of_variation(
+            coefficient_of_variation_percent(
                 times
             )
         )
@@ -598,22 +556,18 @@ def calculate_statistics(
         )
 
         time_ci95_relative_half_width_percent = (
-            calculate_relative_ci_half_width_percent(
+            relative_ci_half_width_percent(
                 mean_seconds,
                 time_ci95,
             )
         )
 
-        mean_throughput = (
-            statistics.fmean(
-                throughputs
-            )
+        mean_throughput = statistics.fmean(
+            throughputs
         )
 
-        throughput_ci95 = (
-            confidence_interval_95(
-                throughputs
-            )
+        throughput_ci95 = confidence_interval_95(
+            throughputs
         )
 
         if model == "sequential":
@@ -629,22 +583,20 @@ def calculate_statistics(
 
         else:
             speedups_vs_sequential = (
-                calculate_paired_ratios(
+                paired_ratios(
                     sequential_samples,
                     samples,
                 )
             )
 
-            model_baseline_samples = groups[
-                (
-                    model,
-                    1,
-                )
-            ]
-
             model_scalabilities = (
-                calculate_paired_ratios(
-                    model_baseline_samples,
+                paired_ratios(
+                    groups[
+                        (
+                            model,
+                            1,
+                        )
+                    ],
                     samples,
                 )
             )
@@ -655,48 +607,6 @@ def calculate_statistics(
             for scalability
             in model_scalabilities
         ]
-
-        mean_speedup_vs_sequential = (
-            statistics.fmean(
-                speedups_vs_sequential
-            )
-        )
-
-        speedup_vs_sequential_ci95 = (
-            confidence_interval_95(
-                speedups_vs_sequential
-            )
-        )
-
-        mean_model_scalability = (
-            statistics.fmean(
-                model_scalabilities
-            )
-        )
-
-        model_scalability_ci95 = (
-            confidence_interval_95(
-                model_scalabilities
-            )
-        )
-
-        mean_model_efficiency = (
-            statistics.fmean(
-                model_efficiencies
-            )
-        )
-
-        model_efficiency_ci95 = (
-            confidence_interval_95(
-                model_efficiencies
-            )
-        )
-
-        convergence_change = (
-            calculate_convergence_change_percent(
-                times
-            )
-        )
 
         results.append(
             GroupStatistics(
@@ -738,25 +648,39 @@ def calculate_statistics(
                     throughput_ci95
                 ),
                 mean_speedup_vs_sequential=(
-                    mean_speedup_vs_sequential
+                    statistics.fmean(
+                        speedups_vs_sequential
+                    )
                 ),
                 speedup_vs_sequential_ci95=(
-                    speedup_vs_sequential_ci95
+                    confidence_interval_95(
+                        speedups_vs_sequential
+                    )
                 ),
                 mean_model_scalability=(
-                    mean_model_scalability
+                    statistics.fmean(
+                        model_scalabilities
+                    )
                 ),
                 model_scalability_ci95=(
-                    model_scalability_ci95
+                    confidence_interval_95(
+                        model_scalabilities
+                    )
                 ),
                 mean_model_efficiency=(
-                    mean_model_efficiency
+                    statistics.fmean(
+                        model_efficiencies
+                    )
                 ),
                 model_efficiency_ci95=(
-                    model_efficiency_ci95
+                    confidence_interval_95(
+                        model_efficiencies
+                    )
                 ),
                 convergence_last_10_percent_change_percent=(
-                    convergence_change
+                    convergence_change_percent(
+                        times
+                    )
                 ),
             )
         )
@@ -776,8 +700,8 @@ def default_summary_path(
     input_path: Path
 ):
     return input_path.with_name(
-        input_path.stem
-        + "_summary.csv"
+        input_path.stem +
+        "_summary.csv"
     )
 
 
@@ -790,6 +714,34 @@ def write_summary_csv(
         exist_ok=True,
     )
 
+    header = [
+        "model",
+        "logical_threads",
+        "n",
+        "mean_seconds",
+        "median_seconds",
+        "std_seconds",
+        "cv_percent",
+        "minimum_seconds",
+        "maximum_seconds",
+        "time_ci95_low",
+        "time_ci95_high",
+        "time_ci95_relative_half_width_percent",
+        "mean_mupdates_per_second",
+        "throughput_ci95_low_mupdates",
+        "throughput_ci95_high_mupdates",
+        "mean_speedup_vs_sequential",
+        "speedup_vs_sequential_ci95_low",
+        "speedup_vs_sequential_ci95_high",
+        "mean_model_scalability",
+        "model_scalability_ci95_low",
+        "model_scalability_ci95_high",
+        "mean_model_efficiency",
+        "model_efficiency_ci95_low",
+        "model_efficiency_ci95_high",
+        "convergence_last_10_percent_change_percent",
+    ]
+
     with path.open(
         "w",
         newline="",
@@ -801,33 +753,7 @@ def write_summary_csv(
         )
 
         writer.writerow(
-            [
-                "model",
-                "logical_threads",
-                "n",
-                "mean_seconds",
-                "median_seconds",
-                "std_seconds",
-                "cv_percent",
-                "minimum_seconds",
-                "maximum_seconds",
-                "time_ci95_low",
-                "time_ci95_high",
-                "time_ci95_relative_half_width_percent",
-                "mean_mupdates_per_second",
-                "throughput_ci95_low_mupdates",
-                "throughput_ci95_high_mupdates",
-                "mean_speedup_vs_sequential",
-                "speedup_vs_sequential_ci95_low",
-                "speedup_vs_sequential_ci95_high",
-                "mean_model_scalability",
-                "model_scalability_ci95_low",
-                "model_scalability_ci95_high",
-                "mean_model_efficiency",
-                "model_efficiency_ci95_low",
-                "model_efficiency_ci95_high",
-                "convergence_last_10_percent_change_percent",
-            ]
+            header
         )
 
         for result in results:
@@ -846,16 +772,16 @@ def write_summary_csv(
                     result.time_ci95.upper,
                     result.time_ci95_relative_half_width_percent,
                     (
-                        result.mean_updates_per_second
-                        / 1_000_000.0
+                        result.mean_updates_per_second /
+                        1_000_000.0
                     ),
                     (
-                        result.throughput_ci95.lower
-                        / 1_000_000.0
+                        result.throughput_ci95.lower /
+                        1_000_000.0
                     ),
                     (
-                        result.throughput_ci95.upper
-                        / 1_000_000.0
+                        result.throughput_ci95.upper /
+                        1_000_000.0
                     ),
                     result.mean_speedup_vs_sequential,
                     result.speedup_vs_sequential_ci95.lower,
@@ -871,8 +797,13 @@ def write_summary_csv(
             )
 
 
-def efficiency_name(model):
-    if model == "coarse_grained":
+def efficiency_name(
+    model
+):
+    if model in {
+        "coarse_grained",
+        "cmp",
+    }:
         return "parallel"
 
     if model == "fine_grained":
@@ -892,7 +823,6 @@ def print_summary(
     print(
         "=== Heat2D Benchmark Analysis ==="
     )
-
     print()
 
     print(
@@ -934,6 +864,10 @@ def print_summary(
 
     print(
         "CG efficiency: model scalability / real worker threads"
+    )
+
+    print(
+        "CMP efficiency: model scalability / real worker threads"
     )
 
     print(
@@ -986,7 +920,6 @@ def print_summary(
         )
 
     print()
-
     print(
         "Efficiency interpretation:"
     )
@@ -994,6 +927,7 @@ def print_summary(
     for model in (
         "fine_grained",
         "coarse_grained",
+        "cmp",
     ):
         if any(
             result.model == model
@@ -1031,8 +965,7 @@ def main():
 
     output_path = (
         arguments.output
-        if arguments.output
-        is not None
+        if arguments.output is not None
         else default_summary_path(
             arguments.input_csv
         )

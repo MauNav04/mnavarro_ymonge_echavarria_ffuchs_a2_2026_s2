@@ -2,7 +2,6 @@
 
 import argparse
 import csv
-
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,6 +13,7 @@ MODEL_ORDER = {
     "sequential": 0,
     "fine_grained": 1,
     "coarse_grained": 2,
+    "cmp": 3,
 }
 
 
@@ -89,7 +89,30 @@ def parse_arguments():
     return parser.parse_args()
 
 
-def load_summary(path: Path):
+def load_summary(
+    path: Path
+):
+    required_columns = {
+        "model",
+        "logical_threads",
+        "n",
+        "mean_seconds",
+        "time_ci95_low",
+        "time_ci95_high",
+        "mean_mupdates_per_second",
+        "throughput_ci95_low_mupdates",
+        "throughput_ci95_high_mupdates",
+        "mean_speedup_vs_sequential",
+        "speedup_vs_sequential_ci95_low",
+        "speedup_vs_sequential_ci95_high",
+        "mean_model_scalability",
+        "model_scalability_ci95_low",
+        "model_scalability_ci95_high",
+        "mean_model_efficiency",
+        "model_efficiency_ci95_low",
+        "model_efficiency_ci95_high",
+    }
+
     rows = []
 
     with path.open(
@@ -98,28 +121,9 @@ def load_summary(path: Path):
         encoding="utf-8",
     ) as file:
 
-        reader = csv.DictReader(file)
-
-        required_columns = {
-            "model",
-            "logical_threads",
-            "n",
-            "mean_seconds",
-            "time_ci95_low",
-            "time_ci95_high",
-            "mean_mupdates_per_second",
-            "throughput_ci95_low_mupdates",
-            "throughput_ci95_high_mupdates",
-            "mean_speedup_vs_sequential",
-            "speedup_vs_sequential_ci95_low",
-            "speedup_vs_sequential_ci95_high",
-            "mean_model_scalability",
-            "model_scalability_ci95_low",
-            "model_scalability_ci95_high",
-            "mean_model_efficiency",
-            "model_efficiency_ci95_low",
-            "model_efficiency_ci95_high",
-        }
+        reader = csv.DictReader(
+            file
+        )
 
         if reader.fieldnames is None:
             raise ValueError(
@@ -159,7 +163,9 @@ def load_summary(path: Path):
                         row["time_ci95_high"]
                     ),
                     mean_mupdates_per_second=float(
-                        row["mean_mupdates_per_second"]
+                        row[
+                            "mean_mupdates_per_second"
+                        ]
                     ),
                     throughput_ci95_low=float(
                         row[
@@ -236,7 +242,16 @@ def load_summary(path: Path):
     )
 
 
-def load_raw_samples(path: Path):
+def load_raw_samples(
+    path: Path
+):
+    required_columns = {
+        "run",
+        "model",
+        "logical_threads",
+        "elapsed_seconds",
+    }
+
     samples = []
 
     with path.open(
@@ -245,14 +260,9 @@ def load_raw_samples(path: Path):
         encoding="utf-8",
     ) as file:
 
-        reader = csv.DictReader(file)
-
-        required_columns = {
-            "run",
-            "model",
-            "logical_threads",
-            "elapsed_seconds",
-        }
+        reader = csv.DictReader(
+            file
+        )
 
         if reader.fieldnames is None:
             raise ValueError(
@@ -313,12 +323,19 @@ def case_label(
             f"CG-{logical_threads}"
         )
 
+    if model == "cmp":
+        return (
+            f"CMP-{logical_threads}"
+        )
+
     return (
         f"{model}-{logical_threads}"
     )
 
 
-def create_labels(rows):
+def create_labels(
+    rows
+):
     return [
         case_label(
             row.model,
@@ -619,6 +636,10 @@ def save_model_scalability_plot(
             "coarse_grained",
             "Coarse-Grained",
         ),
+        (
+            "cmp",
+            "CMP",
+        ),
     ):
         model_rows = [
             row
@@ -652,6 +673,7 @@ def save_model_scalability_plot(
         plt.close(
             figure
         )
+
         return
 
     axis.axhline(
@@ -696,37 +718,42 @@ def save_model_scalability_plot(
     )
 
 
-def save_fine_grained_efficiency_plot(
+def save_efficiency_plot(
     rows,
     output_directory,
+    model,
+    title,
+    x_label,
+    y_label,
+    file_name,
 ):
-    fine_rows = [
+    model_rows = [
         row
         for row in rows
-        if row.model == "fine_grained"
+        if row.model == model
     ]
 
-    if not fine_rows:
+    if not model_rows:
         return
 
     x_values = [
         row.logical_threads
-        for row in fine_rows
+        for row in model_rows
     ]
 
     means = [
         row.mean_model_efficiency
-        for row in fine_rows
+        for row in model_rows
     ]
 
     lower = [
         row.model_efficiency_ci95_low
-        for row in fine_rows
+        for row in model_rows
     ]
 
     upper = [
         row.model_efficiency_ci95_high
-        for row in fine_rows
+        for row in model_rows
     ]
 
     errors = create_asymmetric_errors(
@@ -753,15 +780,15 @@ def save_fine_grained_efficiency_plot(
     )
 
     axis.set_title(
-        "Fine-Grained logical-context efficiency"
+        title
     )
 
     axis.set_xlabel(
-        "Simulated logical contexts"
+        x_label
     )
 
     axis.set_ylabel(
-        "FG scalability / logical contexts"
+        y_label
     )
 
     axis.grid(
@@ -772,12 +799,27 @@ def save_fine_grained_efficiency_plot(
 
     figure.savefig(
         output_directory /
-        "fine_grained_logical_efficiency.png",
+        file_name,
         dpi=200,
     )
 
     plt.close(
         figure
+    )
+
+
+def save_fine_grained_efficiency_plot(
+    rows,
+    output_directory,
+):
+    save_efficiency_plot(
+        rows,
+        output_directory,
+        "fine_grained",
+        "Fine-Grained logical-context efficiency",
+        "Simulated logical contexts",
+        "FG scalability / logical contexts",
+        "fine_grained_logical_efficiency.png",
     )
 
 
@@ -785,88 +827,35 @@ def save_coarse_grained_efficiency_plot(
     rows,
     output_directory,
 ):
-    coarse_rows = [
-        row
-        for row in rows
-        if row.model == "coarse_grained"
-    ]
-
-    if not coarse_rows:
-        return
-
-    x_values = [
-        row.logical_threads
-        for row in coarse_rows
-    ]
-
-    means = [
-        row.mean_model_efficiency
-        for row in coarse_rows
-    ]
-
-    lower = [
-        row.model_efficiency_ci95_low
-        for row in coarse_rows
-    ]
-
-    upper = [
-        row.model_efficiency_ci95_high
-        for row in coarse_rows
-    ]
-
-    errors = create_asymmetric_errors(
-        means,
-        lower,
-        upper,
-    )
-
-    figure, axis = plt.subplots(
-        figsize=(10, 6)
-    )
-
-    axis.errorbar(
-        x_values,
-        means,
-        yerr=errors,
-        marker="o",
-        capsize=4,
-    )
-
-    axis.set_xscale(
-        "log",
-        base=2,
-    )
-
-    axis.set_title(
-        "Coarse-Grained parallel scaling efficiency"
-    )
-
-    axis.set_xlabel(
-        "Worker threads"
-    )
-
-    axis.set_ylabel(
-        "CG scalability / worker threads"
-    )
-
-    axis.grid(
-        alpha=0.3,
-    )
-
-    figure.tight_layout()
-
-    figure.savefig(
-        output_directory /
+    save_efficiency_plot(
+        rows,
+        output_directory,
+        "coarse_grained",
+        "Coarse-Grained parallel scaling efficiency",
+        "Worker threads",
+        "CG scalability / worker threads",
         "coarse_grained_parallel_efficiency.png",
-        dpi=200,
-    )
-
-    plt.close(
-        figure
     )
 
 
-def group_raw_samples(samples):
+def save_cmp_efficiency_plot(
+    rows,
+    output_directory,
+):
+    save_efficiency_plot(
+        rows,
+        output_directory,
+        "cmp",
+        "CMP parallel scaling efficiency",
+        "Worker threads",
+        "CMP scalability / worker threads",
+        "cmp_parallel_efficiency.png",
+    )
+
+
+def group_raw_samples(
+    samples
+):
     groups = defaultdict(list)
 
     for sample in samples:
@@ -888,7 +877,9 @@ def group_raw_samples(samples):
     return groups
 
 
-def sorted_raw_keys(groups):
+def sorted_raw_keys(
+    groups
+):
     return sorted(
         groups,
         key=lambda key: (
@@ -975,7 +966,9 @@ def save_distribution_boxplot(
     )
 
 
-def running_means(values):
+def running_means(
+    values
+):
     means = []
 
     total = 0.0
@@ -1011,7 +1004,9 @@ def save_convergence_plot(
     )
 
     for key in keys:
-        samples = groups[key]
+        samples = groups[
+            key
+        ]
 
         runs = [
             sample.run
@@ -1072,7 +1067,9 @@ def save_convergence_plot(
 
 
 def main():
-    arguments = parse_arguments()
+    arguments = (
+        parse_arguments()
+    )
 
     rows = load_summary(
         arguments.summary_csv
@@ -1113,14 +1110,37 @@ def main():
         arguments.output_dir,
     )
 
+    save_cmp_efficiency_plot(
+        rows,
+        arguments.output_dir,
+    )
+
     generated_files = [
         "execution_time.png",
         "throughput.png",
         "speedup_vs_sequential.png",
         "model_scalability.png",
-        "fine_grained_logical_efficiency.png",
-        "coarse_grained_parallel_efficiency.png",
     ]
+
+    models_present = {
+        row.model
+        for row in rows
+    }
+
+    if "fine_grained" in models_present:
+        generated_files.append(
+            "fine_grained_logical_efficiency.png"
+        )
+
+    if "coarse_grained" in models_present:
+        generated_files.append(
+            "coarse_grained_parallel_efficiency.png"
+        )
+
+    if "cmp" in models_present:
+        generated_files.append(
+            "cmp_parallel_efficiency.png"
+        )
 
     if arguments.raw is not None:
         raw_samples = load_raw_samples(

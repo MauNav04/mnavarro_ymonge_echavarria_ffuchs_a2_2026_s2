@@ -11,7 +11,8 @@ namespace heat2d::benchmark {
 enum class ExecutionModel {
     Sequential,
     FineGrained,
-    CoarseGrained
+    CoarseGrained,
+    Cmp
 };
 
 
@@ -53,13 +54,14 @@ struct BenchmarkConfig {
  * @brief One execution configuration participating in the experiment.
  *
  * logicalThreadCount is kept for CSV compatibility with the existing
- * Fine-Grained analysis pipeline.
+ * analysis pipeline.
  *
  * Interpretation:
  *
- *   Sequential    -> always 1
- *   Fine-Grained  -> simulated logical thread count
+ *   Sequential     -> always 1
+ *   Fine-Grained   -> simulated logical thread count
  *   Coarse-Grained -> real worker thread count
+ *   CMP            -> real OS worker thread count
  */
 struct BenchmarkCase {
     ExecutionModel model;

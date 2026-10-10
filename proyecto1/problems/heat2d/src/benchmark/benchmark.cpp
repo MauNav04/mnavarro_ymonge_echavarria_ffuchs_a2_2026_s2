@@ -1,5 +1,6 @@
 #include "benchmark/benchmark.hpp"
 
+#include "cmp/cmp.hpp"
 #include "coarse_grained/coarse_grained.hpp"
 #include "fine_grained/fine_grained.hpp"
 #include "heat2d.hpp"
@@ -183,6 +184,18 @@ void validateBenchmarkCase(
             }
 
             return;
+
+        case ExecutionModel::Cmp:
+            if (
+                benchmarkCase.logicalThreadCount == 0
+            ) {
+                throw std::invalid_argument(
+                    "CMP benchmark requires at least one "
+                    "worker thread."
+                );
+            }
+
+            return;
     }
 
     throw std::invalid_argument(
@@ -289,6 +302,21 @@ heat2d::CoarseGrainedConfig createCoarseGrainedConfig(
         config.coarseRowsPerBlockingEvent;
 
     return coarseConfig;
+}
+
+
+/**
+ * @brief Builds the configuration used by one CMP case.
+ */
+heat2d::CmpConfig createCmpConfig(
+    const BenchmarkCase& benchmarkCase
+) {
+    heat2d::CmpConfig cmpConfig;
+
+    cmpConfig.threadCount =
+        benchmarkCase.logicalThreadCount;
+
+    return cmpConfig;
 }
 
 
@@ -461,6 +489,73 @@ void validateCoarseGrainedStats(
 
 
 /**
+ * @brief Validates the metadata returned by the CMP solver.
+ *
+ * This check is intentionally performed outside timed regions.
+ */
+void validateCmpStats(
+    const heat2d::CmpStats& stats,
+    const BenchmarkConfig& config,
+    const BenchmarkCase& benchmarkCase
+) {
+    if (
+        stats.threadCount !=
+        benchmarkCase.logicalThreadCount
+    ) {
+        throw std::runtime_error(
+            "CMP benchmark returned an incorrect "
+            "worker-thread count."
+        );
+    }
+
+    if (
+        stats.timeSteps !=
+        config.steps
+    ) {
+        throw std::runtime_error(
+            "CMP benchmark returned an incorrect "
+            "timestep count."
+        );
+    }
+
+    const std::uint64_t expectedCellUpdates =
+        static_cast<std::uint64_t>(
+            calculateCellUpdates(
+                config
+            )
+        );
+
+    if (
+        stats.executedCellUpdates !=
+        expectedCellUpdates
+    ) {
+        throw std::runtime_error(
+            "CMP benchmark returned an incorrect "
+            "cell-update count."
+        );
+    }
+
+    const std::uint64_t expectedBarrierPhases =
+        checkedMultiply64(
+            2ULL,
+            static_cast<std::uint64_t>(
+                config.steps
+            )
+        );
+
+    if (
+        stats.barrierPhases !=
+        expectedBarrierPhases
+    ) {
+        throw std::runtime_error(
+            "CMP benchmark returned an incorrect "
+            "barrier-phase count."
+        );
+    }
+}
+
+
+/**
  * @brief Executes one model without measuring it.
  *
  * Used exclusively for correctness validation.
@@ -548,6 +643,34 @@ Grid executeUnmeasured(
                 );
 
             validateCoarseGrainedStats(
+                stats,
+                config,
+                benchmarkCase
+            );
+
+            break;
+        }
+
+        case ExecutionModel::Cmp: {
+            const heat2d::CmpConfig cmpConfig =
+                createCmpConfig(
+                    benchmarkCase
+                );
+
+            const heat2d::CmpStats stats =
+                heat2d::runCmp(
+                    current,
+                    next,
+                    config.steps,
+                    config.alpha,
+                    config.dt,
+                    dx,
+                    dy,
+                    config.boundaryTemperature,
+                    cmpConfig
+                );
+
+            validateCmpStats(
                 stats,
                 config,
                 benchmarkCase
@@ -650,10 +773,15 @@ BenchmarkSample executeMeasured(
 
     heat2d::CoarseGrainedStats coarseGrainedStats{};
 
+    heat2d::CmpStats cmpStats{};
+
     bool hasFineGrainedStats =
         false;
 
     bool hasCoarseGrainedStats =
+        false;
+
+    bool hasCmpStats =
         false;
 
     /*
@@ -669,6 +797,22 @@ BenchmarkSample executeMeasured(
         coarseConfig =
             createCoarseGrainedConfig(
                 config,
+                benchmarkCase
+            );
+    }
+
+    /*
+     * The lightweight CMP configuration object is also prepared
+     * outside the timed region.
+     */
+    heat2d::CmpConfig cmpConfig;
+
+    if (
+        benchmarkCase.model ==
+        ExecutionModel::Cmp
+    ) {
+        cmpConfig =
+            createCmpConfig(
                 benchmarkCase
             );
     }
@@ -728,6 +872,25 @@ BenchmarkSample executeMeasured(
                 true;
 
             break;
+
+        case ExecutionModel::Cmp:
+            cmpStats =
+                heat2d::runCmp(
+                    current,
+                    next,
+                    config.steps,
+                    config.alpha,
+                    config.dt,
+                    dx,
+                    dy,
+                    config.boundaryTemperature,
+                    cmpConfig
+                );
+
+            hasCmpStats =
+                true;
+
+            break;
     }
 
     const auto end =
@@ -747,6 +910,14 @@ BenchmarkSample executeMeasured(
     if (hasCoarseGrainedStats) {
         validateCoarseGrainedStats(
             coarseGrainedStats,
+            config,
+            benchmarkCase
+        );
+    }
+
+    if (hasCmpStats) {
+        validateCmpStats(
+            cmpStats,
             config,
             benchmarkCase
         );
@@ -907,6 +1078,34 @@ void executeWarmup(
 
             break;
         }
+
+        case ExecutionModel::Cmp: {
+            const heat2d::CmpConfig cmpConfig =
+                createCmpConfig(
+                    benchmarkCase
+                );
+
+            const heat2d::CmpStats stats =
+                heat2d::runCmp(
+                    current,
+                    next,
+                    config.steps,
+                    config.alpha,
+                    config.dt,
+                    dx,
+                    dy,
+                    config.boundaryTemperature,
+                    cmpConfig
+                );
+
+            validateCmpStats(
+                stats,
+                config,
+                benchmarkCase
+            );
+
+            break;
+        }
     }
 }
 
@@ -978,6 +1177,9 @@ const char* modelName(
 
         case ExecutionModel::CoarseGrained:
             return "coarse_grained";
+
+        case ExecutionModel::Cmp:
+            return "cmp";
     }
 
     return "unknown";

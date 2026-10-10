@@ -76,9 +76,17 @@ FINE_GRAINED_SRCS := \
 	$(SRC)/models/fine_grained/round_robin_scheduler.cpp \
 	$(SRC)/models/fine_grained/fine_grained.cpp
 
+# Reusable synchronization primitive currently stored inside the
+# Coarse-Grained module. CMP temporarily reuses this implementation.
+REUSABLE_BARRIER_SRC := \
+	$(SRC)/models/coarse_grained/reusable_barrier.cpp
+
 COARSE_GRAINED_SRCS := \
-	$(SRC)/models/coarse_grained/reusable_barrier.cpp \
+	$(REUSABLE_BARRIER_SRC) \
 	$(SRC)/models/coarse_grained/coarse_grained.cpp
+
+CMP_SRCS := \
+	$(SRC)/models/cmp/cmp.cpp
 
 # ------------------------------------------------------------
 # Executables
@@ -87,10 +95,13 @@ COARSE_GRAINED_SRCS := \
 SEQ_BIN := $(BIN_DIR)/heat2d_sequential
 FG_BIN := $(BIN_DIR)/heat2d_fine_grained
 CG_BIN := $(BIN_DIR)/heat2d_coarse_grained
+CMP_BIN := $(BIN_DIR)/heat2d_cmp
+
 BENCH_BIN := $(BIN_DIR)/heat2d_benchmark
 
 FG_PROFILE_BIN := $(BIN_DIR)/heat2d_fine_grained_profile
 CG_PROFILE_BIN := $(BIN_DIR)/heat2d_coarse_grained_profile
+CMP_PROFILE_BIN := $(BIN_DIR)/heat2d_cmp_profile
 
 TEST_LOGICAL_BIN := $(BIN_DIR)/test_logical_thread
 TEST_SCHEDULER_BIN := $(BIN_DIR)/test_round_robin_scheduler
@@ -99,8 +110,11 @@ TEST_FG_BIN := $(BIN_DIR)/test_fine_grained
 TEST_BARRIER_BIN := $(BIN_DIR)/test_reusable_barrier
 TEST_CG_BIN := $(BIN_DIR)/test_coarse_grained
 
+TEST_CMP_BIN := $(BIN_DIR)/test_cmp
+
 STRESS_FG_BIN := $(BIN_DIR)/stress_fine_grained
 STRESS_CG_BIN := $(BIN_DIR)/stress_coarse_grained
+STRESS_CMP_BIN := $(BIN_DIR)/stress_cmp
 
 # ------------------------------------------------------------
 # Benchmark configuration
@@ -109,19 +123,33 @@ STRESS_CG_BIN := $(BIN_DIR)/stress_coarse_grained
 RUNS ?= 200
 WARMUPS ?= 5
 
-# Coarse-Grained development / profiling parameters.
-#
-# The formal benchmark implementation currently uses:
-#   blocking duration = 100 us
-#   rows per blocking event = 8
-#
-# These Makefile variables are used by standalone CG profiling targets.
+# ------------------------------------------------------------
+# Coarse-Grained standalone parameters
+# ------------------------------------------------------------
+
 CG_THREADS ?= 4
 CG_BLOCK_US ?= 100
 CG_ROWS_PER_BLOCK ?= 8
 
-# Separate benchmark campaigns:
+# ------------------------------------------------------------
+# CMP standalone parameters
+# ------------------------------------------------------------
+
+# Used by:
+#   perf-soft-cmp
+#   perf-hw-cmp
+#   profile-cmp
 #
+# CMP itself does not inject artificial blocking.
+CMP_THREADS ?= 4
+
+# ------------------------------------------------------------
+# Current benchmark campaigns
+#
+# CMP is intentionally NOT integrated into the common benchmark yet.
+# First we validate the standalone CMP implementation.
+# ------------------------------------------------------------
+
 # Fine-Grained:
 #   Sequential
 #   FG-1
@@ -141,13 +169,11 @@ CG_ROWS_PER_BLOCK ?= 8
 #   CG-16
 #   CG-32
 #   CG-64
-#
-# Full benchmark:
-#   Sequential + all FG + all CG
 
 FG_BENCHMARK_CASES := 8
 CG_BENCHMARK_CASES := 8
-ALL_BENCHMARK_CASES := 15
+CMP_BENCHMARK_CASES := 8
+ALL_BENCHMARK_CASES := 22
 
 BENCHMARK_CASES ?= $(ALL_BENCHMARK_CASES)
 CAMPAIGN_MODEL ?= all
@@ -173,8 +199,10 @@ ANALYSIS_LOG := $(RESULT_DIR)/analysis.log
 	test \
 	test-fg \
 	test-cg \
+	test-cmp \
 	stress-fg \
 	stress-cg \
+	stress-cmp \
 	python-env \
 	python-deps \
 	check-clean \
@@ -184,14 +212,19 @@ ANALYSIS_LOG := $(RESULT_DIR)/analysis.log
 	campaign-fg \
 	campaign-cg \
 	campaign-run \
+	campaign-dev-cmp \
+	campaign-cmp \
 	perf-soft-seq \
 	perf-soft-fg \
 	perf-soft-cg \
+	perf-soft-cmp \
 	perf-hw-seq \
 	perf-hw-fg \
 	perf-hw-cg \
+	perf-hw-cmp \
 	profile-fg \
 	profile-cg \
+	profile-cmp \
 	help \
 	clean
 
@@ -201,6 +234,7 @@ release: \
 	$(SEQ_BIN) \
 	$(FG_BIN) \
 	$(CG_BIN) \
+	$(CMP_BIN) \
 	$(BENCH_BIN)
 
 tests: \
@@ -208,7 +242,8 @@ tests: \
 	$(TEST_SCHEDULER_BIN) \
 	$(TEST_FG_BIN) \
 	$(TEST_BARRIER_BIN) \
-	$(TEST_CG_BIN)
+	$(TEST_CG_BIN) \
+	$(TEST_CMP_BIN)
 
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
@@ -259,14 +294,35 @@ $(CG_BIN): \
 		-o $@
 
 # ============================================================
+# CMP - Chip Multiprocessing
+#
+# Real operating-system threads execute the numerical kernel
+# concurrently. No synthetic blocking is injected.
+# ============================================================
+
+$(CMP_BIN): \
+	$(SRC)/models/cmp/main.cpp \
+	$(CORE_SRCS) \
+	$(CMP_SRCS) \
+	$(REUSABLE_BARRIER_SRC) | $(BIN_DIR)
+
+	$(CXX) $(RELEASE_FLAGS) $(THREAD_FLAGS) \
+		$(SRC)/models/cmp/main.cpp \
+		$(CORE_SRCS) \
+		$(CMP_SRCS) \
+		$(REUSABLE_BARRIER_SRC) \
+		-o $@
+
+# ============================================================
 # Common benchmark
 #
-# benchmark_heat2d accepts:
+# Current supported selectors:
 #
 #   ./heat2d_benchmark RUNS WARMUPS output.csv fg
 #   ./heat2d_benchmark RUNS WARMUPS output.csv cg
 #   ./heat2d_benchmark RUNS WARMUPS output.csv all
 #
+# CMP will be integrated after standalone validation.
 # ============================================================
 
 $(BENCH_BIN): \
@@ -275,7 +331,8 @@ $(BENCH_BIN): \
 	$(CORE_SRCS) \
 	$(SEQUENTIAL_SRC) \
 	$(FINE_GRAINED_SRCS) \
-	$(COARSE_GRAINED_SRCS) | $(BIN_DIR)
+	$(COARSE_GRAINED_SRCS) \
+	$(CMP_SRCS) | $(BIN_DIR)
 
 	$(CXX) $(RELEASE_FLAGS) $(THREAD_FLAGS) \
 		$(BENCHMARKS)/benchmark_heat2d.cpp \
@@ -284,8 +341,8 @@ $(BENCH_BIN): \
 		$(SEQUENTIAL_SRC) \
 		$(FINE_GRAINED_SRCS) \
 		$(COARSE_GRAINED_SRCS) \
+		$(CMP_SRCS) \
 		-o $@
-
 # ============================================================
 # Fine-Grained Unit / Integration Tests
 # ============================================================
@@ -329,11 +386,11 @@ $(TEST_FG_BIN): \
 
 $(TEST_BARRIER_BIN): \
 	$(TESTS)/coarse_grained/test_reusable_barrier.cpp \
-	$(SRC)/models/coarse_grained/reusable_barrier.cpp | $(BIN_DIR)
+	$(REUSABLE_BARRIER_SRC) | $(BIN_DIR)
 
 	$(CXX) $(TEST_FLAGS) $(THREAD_FLAGS) \
 		$(TESTS)/coarse_grained/test_reusable_barrier.cpp \
-		$(SRC)/models/coarse_grained/reusable_barrier.cpp \
+		$(REUSABLE_BARRIER_SRC) \
 		-o $@
 
 $(TEST_CG_BIN): \
@@ -347,6 +404,25 @@ $(TEST_CG_BIN): \
 		$(CORE_SRCS) \
 		$(SEQUENTIAL_SRC) \
 		$(COARSE_GRAINED_SRCS) \
+		-o $@
+
+# ============================================================
+# CMP Unit / Integration Tests
+# ============================================================
+
+$(TEST_CMP_BIN): \
+	$(TESTS)/cmp/test_cmp.cpp \
+	$(CORE_SRCS) \
+	$(SEQUENTIAL_SRC) \
+	$(CMP_SRCS) \
+	$(REUSABLE_BARRIER_SRC) | $(BIN_DIR)
+
+	$(CXX) $(TEST_FLAGS) $(THREAD_FLAGS) \
+		$(TESTS)/cmp/test_cmp.cpp \
+		$(CORE_SRCS) \
+		$(SEQUENTIAL_SRC) \
+		$(CMP_SRCS) \
+		$(REUSABLE_BARRIER_SRC) \
 		-o $@
 
 # ============================================================
@@ -381,6 +457,16 @@ test-cg: \
 	@echo
 	@echo "Coarse-Grained tests PASSED."
 
+test-cmp: $(TEST_CMP_BIN)
+
+	@echo
+	@echo "========================================"
+	@echo "Running Heat2D CMP tests"
+	@echo "========================================"
+	$(TEST_CMP_BIN)
+	@echo
+	@echo "CMP tests PASSED."
+
 test: tests
 	@echo
 	@echo "========================================"
@@ -397,6 +483,10 @@ test: tests
 	@echo "--- Coarse-Grained ---"
 	$(TEST_BARRIER_BIN)
 	$(TEST_CG_BIN)
+
+	@echo
+	@echo "--- CMP ---"
+	$(TEST_CMP_BIN)
 
 	@echo
 	@echo "All Heat2D tests PASSED."
@@ -440,6 +530,36 @@ stress-cg: $(STRESS_CG_BIN)
 	$(STRESS_CG_BIN) $(CG_THREADS) 801 1000 3
 
 # ============================================================
+# CMP Stress Test
+#
+# stress_cmp.cpp currently executes:
+#   CMP-1
+#   CMP-2
+#   CMP-4
+#   CMP-8
+#
+# with 3 repetitions per configuration on the 801x801 workload.
+# ============================================================
+
+$(STRESS_CMP_BIN): \
+	$(TESTS)/cmp/stress_cmp.cpp \
+	$(CORE_SRCS) \
+	$(SEQUENTIAL_SRC) \
+	$(CMP_SRCS) \
+	$(REUSABLE_BARRIER_SRC) | $(BIN_DIR)
+
+	$(CXX) $(TEST_FLAGS) $(THREAD_FLAGS) \
+		$(TESTS)/cmp/stress_cmp.cpp \
+		$(CORE_SRCS) \
+		$(SEQUENTIAL_SRC) \
+		$(CMP_SRCS) \
+		$(REUSABLE_BARRIER_SRC) \
+		-o $@
+
+stress-cmp: $(STRESS_CMP_BIN)
+	$(STRESS_CMP_BIN)
+
+# ============================================================
 # Python
 # ============================================================
 
@@ -470,6 +590,12 @@ check-clean:
 
 # ============================================================
 # Experimental metadata
+#
+# Current statistical campaigns:
+#   Fine-Grained
+#   Coarse-Grained
+#
+# CMP metadata will be added when campaign-cmp is integrated.
 # ============================================================
 
 metadata: release
@@ -548,8 +674,14 @@ metadata: release
 			echo "Coarse-Grained rows per blocking event: 8"; \
 			echo "Coarse-Grained blocking events per timestep: 100"; \
 			echo "Coarse-Grained blocking events per run: 100000"; \
+		elif [ "$(CAMPAIGN_MODEL)" = "cmp" ]; then \
+			echo "Cases: Sequential + CMP {1,2,4,8,16,32,64}"; \
+			echo "CMP implementation: real std::thread workers"; \
+			echo "CMP synchronization: reusable timestep barrier"; \
+			echo "CMP synthetic blocking: disabled"; \
+			echo "CMP barrier phases per timestep: 2"; \
 		else \
-			echo "Cases: Sequential + Fine-Grained {1,2,4,8,16,32,64} + Coarse-Grained {1,2,4,8,16,32,64}"; \
+			echo "Cases: Sequential + Fine-Grained {1,2,4,8,16,32,64} + Coarse-Grained {1,2,4,8,16,32,64} + CMP {1,2,4,8,16,32,64}"; \
 		fi; \
 	} > $(METADATA)
 
@@ -559,9 +691,7 @@ metadata: release
 # ============================================================
 # Development benchmark campaigns
 #
-# Short smoke tests:
-#   3 measured rounds
-#   1 warm-up round
+# CMP is not integrated here yet.
 # ============================================================
 
 campaign-dev-fg: RUNS=3
@@ -571,6 +701,10 @@ campaign-dev-fg: campaign-fg
 campaign-dev-cg: RUNS=3
 campaign-dev-cg: WARMUPS=1
 campaign-dev-cg: campaign-cg
+
+campaign-dev-cmp: RUNS=3
+campaign-dev-cmp: WARMUPS=1
+campaign-dev-cmp: campaign-cmp
 
 # ============================================================
 # Fine-Grained benchmark campaign
@@ -623,16 +757,49 @@ campaign-cg: BENCHMARK_CASES=$(CG_BENCHMARK_CASES)
 campaign-cg: campaign-run
 
 # ============================================================
+# CMP benchmark campaign
+#
+# Cases:
+#   Sequential
+#   CMP-1
+#   CMP-2
+#   CMP-4
+#   CMP-8
+#   CMP-16
+#   CMP-32
+#   CMP-64
+#
+# Default:
+#   200 measured rounds
+#   5 warm-up rounds
+#
+# Expected raw CSV lines with RUNS=200:
+#   200 * 8 + 1 = 1601
+# ============================================================
+
+campaign-cmp: CAMPAIGN_MODEL=cmp
+campaign-cmp: BENCHMARK_CASES=$(CMP_BENCHMARK_CASES)
+campaign-cmp: campaign-run
+
+# ============================================================
 # Common campaign implementation
 #
-# Do not normally call this target directly.
-# Use:
+# Current valid models:
 #
-#   make campaign-fg
-#   make campaign-cg
+#   fg
+#   cg
+#
+# CMP will be added after benchmark integration.
 # ============================================================
 
 campaign-run: check-clean release python-deps
+	@if [ "$(CAMPAIGN_MODEL)" != "fg" ] && \
+	    [ "$(CAMPAIGN_MODEL)" != "cg" ] && \
+	    [ "$(CAMPAIGN_MODEL)" != "cmp" ]; then \
+		echo "ERROR: campaign-run requires CAMPAIGN_MODEL=fg, cg or cmp."; \
+		exit 1; \
+	fi
+
 	@echo
 	@echo "========================================"
 	@echo "Heat2D Benchmark Campaign"
@@ -723,11 +890,18 @@ perf-soft-cg: $(CG_BIN)
 		-e task-clock,context-switches,cpu-migrations,page-faults \
 		$(CG_BIN) $(CG_THREADS) $(CG_BLOCK_US) $(CG_ROWS_PER_BLOCK)
 
+perf-soft-cmp: $(CMP_BIN)
+	sudo perf stat \
+		-e task-clock,context-switches,cpu-migrations,page-faults \
+		$(CMP_BIN) $(CMP_THREADS)
+
 # ============================================================
 # perf - hardware PMU events
 #
 # Intended for native hardware.
-# UTM may report these events as unsupported.
+#
+# UTM may report these events as unsupported because hardware PMU
+# counters are generally not exposed by the virtual machine.
 # ============================================================
 
 perf-hw-seq: $(SEQ_BIN)
@@ -744,6 +918,11 @@ perf-hw-cg: $(CG_BIN)
 	sudo perf stat \
 		-e cycles,instructions,branches,branch-misses,cache-references,cache-misses \
 		$(CG_BIN) $(CG_THREADS) $(CG_BLOCK_US) $(CG_ROWS_PER_BLOCK)
+
+perf-hw-cmp: $(CMP_BIN)
+	sudo perf stat \
+		-e cycles,instructions,branches,branch-misses,cache-references,cache-misses \
+		$(CMP_BIN) $(CMP_THREADS)
 
 # ============================================================
 # Fine-Grained profiling binary
@@ -798,6 +977,34 @@ profile-cg: $(CG_PROFILE_BIN)
 	@echo "  sudo perf report"
 
 # ============================================================
+# CMP profiling binary
+# ============================================================
+
+$(CMP_PROFILE_BIN): \
+	$(SRC)/models/cmp/main.cpp \
+	$(CORE_SRCS) \
+	$(CMP_SRCS) \
+	$(REUSABLE_BARRIER_SRC) | $(BIN_DIR)
+
+	$(CXX) $(PROFILE_FLAGS) $(THREAD_FLAGS) \
+		$(SRC)/models/cmp/main.cpp \
+		$(CORE_SRCS) \
+		$(CMP_SRCS) \
+		$(REUSABLE_BARRIER_SRC) \
+		-o $@
+
+profile-cmp: $(CMP_PROFILE_BIN)
+	sudo perf record \
+		-e cpu-clock \
+		-g \
+		-- $(CMP_PROFILE_BIN) $(CMP_THREADS)
+
+	@echo
+	@echo "CMP profiling data written to perf.data"
+	@echo "Open it with:"
+	@echo "  sudo perf report"
+
+# ============================================================
 # Help
 # ============================================================
 
@@ -805,20 +1012,26 @@ help:
 	@echo
 	@echo "Heat2D Makefile"
 	@echo
+
 	@echo "Build:"
 	@echo "  make release"
-	@echo "      Build Sequential, Fine-Grained, Coarse-Grained and benchmark binaries."
+	@echo "      Build Sequential, Fine-Grained, Coarse-Grained, CMP and benchmark binaries."
 	@echo
+
 	@echo "Tests:"
 	@echo "  make test"
-	@echo "      Compile and run all Fine-Grained and Coarse-Grained tests."
+	@echo "      Compile and run Fine-Grained, Coarse-Grained and CMP tests."
 	@echo
 	@echo "  make test-fg"
-	@echo "      Compile and run only Fine-Grained tests."
+	@echo "      Run only Fine-Grained tests."
 	@echo
 	@echo "  make test-cg"
-	@echo "      Compile and run only Coarse-Grained tests."
+	@echo "      Run only Coarse-Grained tests."
 	@echo
+	@echo "  make test-cmp"
+	@echo "      Run only CMP integration tests."
+	@echo
+
 	@echo "Stress:"
 	@echo "  make stress-fg"
 	@echo "      Run Fine-Grained stress test."
@@ -826,47 +1039,70 @@ help:
 	@echo "  make stress-cg"
 	@echo "      Run Coarse-Grained stress test."
 	@echo
-	@echo "Development benchmark:"
+	@echo "  make stress-cmp"
+	@echo "      Run CMP 801x801 stress test for 1,2,4,8 workers."
+	@echo
+
+	@echo "Current benchmark campaigns:"
 	@echo "  make campaign-dev-fg RESULT_TAG=utm_fg_smoke"
 	@echo "      3 measured rounds + 1 warm-up for Fine-Grained."
 	@echo
 	@echo "  make campaign-dev-cg RESULT_TAG=utm_cg_smoke"
 	@echo "      3 measured rounds + 1 warm-up for Coarse-Grained."
 	@echo
-	@echo "Formal / long benchmark:"
 	@echo "  make campaign-fg RUNS=200 WARMUPS=5 RESULT_TAG=utm_fg_200"
 	@echo "      Sequential + FG {1,2,4,8,16,32,64}."
 	@echo
 	@echo "  make campaign-cg RUNS=200 WARMUPS=5 RESULT_TAG=utm_cg_200"
 	@echo "      Sequential + CG {1,2,4,8,16,32,64}."
 	@echo
-	@echo "Coarse-Grained standalone parameters:"
+	@echo "  CMP campaign is not integrated into the common benchmark yet."
+	@echo
+
+	@echo "Standalone parameters:"
 	@echo "  CG_THREADS=4"
-	@echo "      Number of worker threads used by stress/perf/profile targets."
+	@echo "      Coarse-Grained worker count."
 	@echo
 	@echo "  CG_BLOCK_US=100"
-	@echo "      Synthetic blocking duration in microseconds."
+	@echo "      Coarse-Grained synthetic blocking duration."
 	@echo
 	@echo "  CG_ROWS_PER_BLOCK=8"
-	@echo "      Interior rows processed between synthetic blocking events."
+	@echo "      Coarse-Grained rows per synthetic blocking event."
 	@echo
-	@echo "Profiling:"
+	@echo "  CMP_THREADS=4"
+	@echo "      CMP real worker-thread count for perf/profile targets."
+	@echo
+
+	@echo "Software perf:"
 	@echo "  make perf-soft-seq"
 	@echo "  make perf-soft-fg"
 	@echo "  make perf-soft-cg"
+	@echo "  make perf-soft-cmp CMP_THREADS=4"
 	@echo
+
+	@echo "Hardware perf:"
 	@echo "  make perf-hw-seq"
 	@echo "  make perf-hw-fg"
 	@echo "  make perf-hw-cg"
+	@echo "  make perf-hw-cmp CMP_THREADS=4"
 	@echo
+
+	@echo "Profiling:"
 	@echo "  make profile-fg"
 	@echo "  make profile-cg"
+	@echo "  make profile-cmp CMP_THREADS=4"
 	@echo
-	@echo "Examples:"
-	@echo "  make perf-soft-cg CG_THREADS=4 CG_BLOCK_US=0 CG_ROWS_PER_BLOCK=8"
-	@echo "  make perf-soft-cg CG_THREADS=4 CG_BLOCK_US=100 CG_ROWS_PER_BLOCK=8"
-	@echo "  make stress-cg CG_THREADS=8"
+
+	@echo "CMP examples:"
+	@echo "  build/bin/heat2d_cmp 1"
+	@echo "  build/bin/heat2d_cmp 2"
+	@echo "  build/bin/heat2d_cmp 4"
+	@echo "  build/bin/heat2d_cmp 8"
+	@echo "  make test-cmp"
+	@echo "  make stress-cmp"
+	@echo "  make perf-soft-cmp CMP_THREADS=4"
 	@echo
+
 	@echo "Clean:"
 	@echo "  make clean"
 	@echo "      Deletes build products only."
