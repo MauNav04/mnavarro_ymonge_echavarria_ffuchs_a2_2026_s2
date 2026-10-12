@@ -6,6 +6,7 @@
 #include "heat2d.hpp"
 #include "initial_conditions.hpp"
 #include "sequential.hpp"
+#include "smt/smt.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -13,6 +14,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <set>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -196,6 +198,18 @@ void validateBenchmarkCase(
             }
 
             return;
+
+        case ExecutionModel::Smt:
+            if (
+                benchmarkCase.logicalThreadCount == 0
+            ) {
+                throw std::invalid_argument(
+                    "SMT benchmark requires at least one "
+                    "hardware worker thread."
+                );
+            }
+
+            return;
     }
 
     throw std::invalid_argument(
@@ -317,6 +331,21 @@ heat2d::CmpConfig createCmpConfig(
         benchmarkCase.logicalThreadCount;
 
     return cmpConfig;
+}
+
+
+/**
+ * @brief Builds the configuration used by one SMT case.
+ */
+heat2d::smt::SmtConfig createSmtConfig(
+    const BenchmarkCase& benchmarkCase
+) {
+    heat2d::smt::SmtConfig smtConfig;
+
+    smtConfig.threadCount =
+        benchmarkCase.logicalThreadCount;
+
+    return smtConfig;
 }
 
 
@@ -556,6 +585,110 @@ void validateCmpStats(
 
 
 /**
+ * @brief Validates metadata returned by the SMT solver.
+ *
+ * This validation is intentionally performed outside timed regions.
+ */
+void validateSmtStats(
+    const heat2d::smt::SmtStats& stats,
+    const BenchmarkConfig& config,
+    const BenchmarkCase& benchmarkCase
+) {
+    if (
+        stats.threadCount !=
+        benchmarkCase.logicalThreadCount
+    ) {
+        throw std::runtime_error(
+            "SMT benchmark returned an incorrect worker-thread count."
+        );
+    }
+
+    if (
+        stats.timeSteps !=
+        config.steps
+    ) {
+        throw std::runtime_error(
+            "SMT benchmark returned an incorrect timestep count."
+        );
+    }
+
+    const std::uint64_t expectedCellUpdates =
+        static_cast<std::uint64_t>(
+            calculateCellUpdates(
+                config
+            )
+        );
+
+    if (
+        stats.executedCellUpdates !=
+        expectedCellUpdates
+    ) {
+        throw std::runtime_error(
+            "SMT benchmark returned an incorrect cell-update count."
+        );
+    }
+
+    const std::uint64_t expectedBarrierPhases =
+        checkedMultiply64(
+            2ULL,
+            static_cast<std::uint64_t>(
+                config.steps
+            )
+        );
+
+    if (
+        stats.barrierPhases !=
+        expectedBarrierPhases
+    ) {
+        throw std::runtime_error(
+            "SMT benchmark returned an incorrect barrier-phase count."
+        );
+    }
+
+    if (
+        stats.pinnedWorkerCount !=
+        benchmarkCase.logicalThreadCount
+    ) {
+        throw std::runtime_error(
+            "SMT benchmark did not pin every worker thread."
+        );
+    }
+
+    if (
+        stats.availableLogicalCpus <
+        benchmarkCase.logicalThreadCount
+    ) {
+        throw std::runtime_error(
+            "SMT benchmark used more workers than available logical CPUs."
+        );
+    }
+
+    if (
+        stats.logicalCpuIds.size() !=
+        benchmarkCase.logicalThreadCount
+    ) {
+        throw std::runtime_error(
+            "SMT benchmark returned an incorrect CPU-assignment count."
+        );
+    }
+
+    const std::set<int> uniqueCpuIds(
+        stats.logicalCpuIds.begin(),
+        stats.logicalCpuIds.end()
+    );
+
+    if (
+        uniqueCpuIds.size() !=
+        stats.logicalCpuIds.size()
+    ) {
+        throw std::runtime_error(
+            "SMT benchmark assigned multiple workers to the same logical CPU."
+        );
+    }
+}
+
+
+/**
  * @brief Executes one model without measuring it.
  *
  * Used exclusively for correctness validation.
@@ -678,6 +811,34 @@ Grid executeUnmeasured(
 
             break;
         }
+
+        case ExecutionModel::Smt: {
+            const heat2d::smt::SmtConfig smtConfig =
+                createSmtConfig(
+                    benchmarkCase
+                );
+
+            const heat2d::smt::SmtStats stats =
+                heat2d::smt::runSmt(
+                    current,
+                    next,
+                    config.steps,
+                    config.alpha,
+                    config.dt,
+                    dx,
+                    dy,
+                    config.boundaryTemperature,
+                    smtConfig
+                );
+
+            validateSmtStats(
+                stats,
+                config,
+                benchmarkCase
+            );
+
+            break;
+        }
     }
 
     return current;
@@ -775,6 +936,8 @@ BenchmarkSample executeMeasured(
 
     heat2d::CmpStats cmpStats{};
 
+    heat2d::smt::SmtStats smtStats{};
+
     bool hasFineGrainedStats =
         false;
 
@@ -782,6 +945,9 @@ BenchmarkSample executeMeasured(
         false;
 
     bool hasCmpStats =
+        false;
+
+    bool hasSmtStats =
         false;
 
     /*
@@ -813,6 +979,18 @@ BenchmarkSample executeMeasured(
     ) {
         cmpConfig =
             createCmpConfig(
+                benchmarkCase
+            );
+    }
+
+    heat2d::smt::SmtConfig smtConfig;
+
+    if (
+        benchmarkCase.model ==
+        ExecutionModel::Smt
+    ) {
+        smtConfig =
+            createSmtConfig(
                 benchmarkCase
             );
     }
@@ -891,6 +1069,25 @@ BenchmarkSample executeMeasured(
                 true;
 
             break;
+
+        case ExecutionModel::Smt:
+            smtStats =
+                heat2d::smt::runSmt(
+                    current,
+                    next,
+                    config.steps,
+                    config.alpha,
+                    config.dt,
+                    dx,
+                    dy,
+                    config.boundaryTemperature,
+                    smtConfig
+                );
+
+            hasSmtStats =
+                true;
+
+            break;
     }
 
     const auto end =
@@ -918,6 +1115,14 @@ BenchmarkSample executeMeasured(
     if (hasCmpStats) {
         validateCmpStats(
             cmpStats,
+            config,
+            benchmarkCase
+        );
+    }
+
+    if (hasSmtStats) {
+        validateSmtStats(
+            smtStats,
             config,
             benchmarkCase
         );
@@ -1106,6 +1311,34 @@ void executeWarmup(
 
             break;
         }
+
+        case ExecutionModel::Smt: {
+            const heat2d::smt::SmtConfig smtConfig =
+                createSmtConfig(
+                    benchmarkCase
+                );
+
+            const heat2d::smt::SmtStats stats =
+                heat2d::smt::runSmt(
+                    current,
+                    next,
+                    config.steps,
+                    config.alpha,
+                    config.dt,
+                    dx,
+                    dy,
+                    config.boundaryTemperature,
+                    smtConfig
+                );
+
+            validateSmtStats(
+                stats,
+                config,
+                benchmarkCase
+            );
+
+            break;
+        }
     }
 }
 
@@ -1180,6 +1413,9 @@ const char* modelName(
 
         case ExecutionModel::Cmp:
             return "cmp";
+
+        case ExecutionModel::Smt:
+            return "smt";
     }
 
     return "unknown";

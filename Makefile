@@ -10,7 +10,12 @@
 #   - Separate timing measurements from profiling
 # ============================================================
 
-CXX := clang++
+# Detect available C++ compiler (prefer clang++ if installed, otherwise fallback to g++)
+ifeq ($(shell which clang++ 2>/dev/null),)
+CXX ?= g++
+else
+CXX ?= clang++
+endif
 
 HEAT2D := proyecto1/problems/heat2d
 INCLUDE := $(HEAT2D)/include
@@ -77,7 +82,7 @@ FINE_GRAINED_SRCS := \
 	$(SRC)/models/fine_grained/fine_grained.cpp
 
 # Reusable synchronization primitive currently stored inside the
-# Coarse-Grained module. CMP temporarily reuses this implementation.
+# Coarse-Grained module. CMP and SMT reuse this implementation.
 REUSABLE_BARRIER_SRC := \
 	$(SRC)/models/coarse_grained/reusable_barrier.cpp
 
@@ -88,6 +93,11 @@ COARSE_GRAINED_SRCS := \
 CMP_SRCS := \
 	$(SRC)/models/cmp/cmp.cpp
 
+SMT_SRCS := \
+	$(SRC)/models/smt/cpu_topology.cpp \
+	$(SRC)/models/smt/thread_affinity.cpp \
+	$(SRC)/models/smt/smt.cpp
+
 # ------------------------------------------------------------
 # Executables
 # ------------------------------------------------------------
@@ -96,12 +106,14 @@ SEQ_BIN := $(BIN_DIR)/heat2d_sequential
 FG_BIN := $(BIN_DIR)/heat2d_fine_grained
 CG_BIN := $(BIN_DIR)/heat2d_coarse_grained
 CMP_BIN := $(BIN_DIR)/heat2d_cmp
+SMT_BIN := $(BIN_DIR)/heat2d_smt
 
 BENCH_BIN := $(BIN_DIR)/heat2d_benchmark
 
 FG_PROFILE_BIN := $(BIN_DIR)/heat2d_fine_grained_profile
 CG_PROFILE_BIN := $(BIN_DIR)/heat2d_coarse_grained_profile
 CMP_PROFILE_BIN := $(BIN_DIR)/heat2d_cmp_profile
+SMT_PROFILE_BIN := $(BIN_DIR)/heat2d_smt_profile
 
 TEST_LOGICAL_BIN := $(BIN_DIR)/test_logical_thread
 TEST_SCHEDULER_BIN := $(BIN_DIR)/test_round_robin_scheduler
@@ -112,9 +124,14 @@ TEST_CG_BIN := $(BIN_DIR)/test_coarse_grained
 
 TEST_CMP_BIN := $(BIN_DIR)/test_cmp
 
+TEST_SMT_TOPOLOGY_BIN := $(BIN_DIR)/test_cpu_topology
+TEST_SMT_AFFINITY_BIN := $(BIN_DIR)/test_thread_affinity
+TEST_SMT_BIN := $(BIN_DIR)/test_smt
+
 STRESS_FG_BIN := $(BIN_DIR)/stress_fine_grained
 STRESS_CG_BIN := $(BIN_DIR)/stress_coarse_grained
 STRESS_CMP_BIN := $(BIN_DIR)/stress_cmp
+STRESS_SMT_BIN := $(BIN_DIR)/stress_smt
 
 # ------------------------------------------------------------
 # Benchmark configuration
@@ -122,6 +139,11 @@ STRESS_CMP_BIN := $(BIN_DIR)/stress_cmp
 
 RUNS ?= 200
 WARMUPS ?= 5
+
+# Formal campaigns require a clean Git working tree.
+#
+# Development campaigns may explicitly disable this check.
+REQUIRE_CLEAN ?= 1
 
 # ------------------------------------------------------------
 # Coarse-Grained standalone parameters
@@ -144,10 +166,20 @@ CG_ROWS_PER_BLOCK ?= 8
 CMP_THREADS ?= 4
 
 # ------------------------------------------------------------
+# SMT standalone / profiling parameters
+# ------------------------------------------------------------
+
+# By default use every logical CPU available to the process.
+# Override explicitly when comparing SMT-8 vs SMT-16 on native hardware.
+SMT_THREADS ?= $(shell nproc 2>/dev/null || getconf _NPROCESSORS_ONLN)
+
+# ------------------------------------------------------------
 # Current benchmark campaigns
 #
-# CMP is intentionally NOT integrated into the common benchmark yet.
-# First we validate the standalone CMP implementation.
+# Fine-Grained, Coarse-Grained and CMP use the fixed execution-context
+# set {1,2,4,8,16,32,64}. SMT intentionally disables oversubscription
+# and only includes {1,2,4,8,16} values that fit inside the logical CPUs
+# currently available to the process.
 # ------------------------------------------------------------
 
 # Fine-Grained:
@@ -169,11 +201,39 @@ CMP_THREADS ?= 4
 #   CG-16
 #   CG-32
 #   CG-64
+#
+# CMP:
+#   Sequential
+#   CMP-1
+#   CMP-2
+#   CMP-4
+#   CMP-8
+#   CMP-16
+#   CMP-32
+#   CMP-64
+#
+# SMT:
+#   Sequential + supported values from SMT-{1,2,4,8,16}
 
 FG_BENCHMARK_CASES := 8
 CG_BENCHMARK_CASES := 8
 CMP_BENCHMARK_CASES := 8
-ALL_BENCHMARK_CASES := 22
+
+# SMT cases are topology-dependent:
+#   Sequential + SMT-{1,2,4,8,16}, capped by available logical CPUs.
+SMT_THREAD_LIST := $(strip $(shell \
+	n=$$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN); \
+	for t in 1 2 4 8 16; do \
+		if [ $$t -le $$n ]; then printf "%s " $$t; fi; \
+	done))
+
+SMT_MODEL_CASES := $(words $(SMT_THREAD_LIST))
+SMT_BENCHMARK_CASES := $(shell echo $$((1 + $(SMT_MODEL_CASES))))
+
+# Previous combined benchmark:
+#   Sequential + 7 FG + 7 CG + 7 CMP = 22 cases.
+# SMT contributes only its model cases because Sequential is shared.
+ALL_BENCHMARK_CASES := $(shell echo $$((22 + $(SMT_MODEL_CASES))))
 
 BENCHMARK_CASES ?= $(ALL_BENCHMARK_CASES)
 CAMPAIGN_MODEL ?= all
@@ -200,31 +260,38 @@ ANALYSIS_LOG := $(RESULT_DIR)/analysis.log
 	test-fg \
 	test-cg \
 	test-cmp \
+	test-smt \
 	stress-fg \
 	stress-cg \
 	stress-cmp \
+	stress-smt \
 	python-env \
 	python-deps \
 	check-clean \
 	metadata \
 	campaign-dev-fg \
 	campaign-dev-cg \
+	campaign-dev-cmp \
+	campaign-dev-smt \
 	campaign-fg \
 	campaign-cg \
-	campaign-run \
-	campaign-dev-cmp \
 	campaign-cmp \
+	campaign-smt \
+	campaign-run \
 	perf-soft-seq \
 	perf-soft-fg \
 	perf-soft-cg \
 	perf-soft-cmp \
+	perf-soft-smt \
 	perf-hw-seq \
 	perf-hw-fg \
 	perf-hw-cg \
 	perf-hw-cmp \
+	perf-hw-smt \
 	profile-fg \
 	profile-cg \
 	profile-cmp \
+	profile-smt \
 	help \
 	clean
 
@@ -235,6 +302,7 @@ release: \
 	$(FG_BIN) \
 	$(CG_BIN) \
 	$(CMP_BIN) \
+	$(SMT_BIN) \
 	$(BENCH_BIN)
 
 tests: \
@@ -243,7 +311,10 @@ tests: \
 	$(TEST_FG_BIN) \
 	$(TEST_BARRIER_BIN) \
 	$(TEST_CG_BIN) \
-	$(TEST_CMP_BIN)
+	$(TEST_CMP_BIN) \
+	$(TEST_SMT_TOPOLOGY_BIN) \
+	$(TEST_SMT_AFFINITY_BIN) \
+	$(TEST_SMT_BIN)
 
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
@@ -295,9 +366,6 @@ $(CG_BIN): \
 
 # ============================================================
 # CMP - Chip Multiprocessing
-#
-# Real operating-system threads execute the numerical kernel
-# concurrently. No synthetic blocking is injected.
 # ============================================================
 
 $(CMP_BIN): \
@@ -314,15 +382,24 @@ $(CMP_BIN): \
 		-o $@
 
 # ============================================================
+# SMT - Simultaneous Multithreading
+# ============================================================
+
+$(SMT_BIN): \
+	$(SRC)/models/smt/main.cpp \
+	$(CORE_SRCS) \
+	$(SMT_SRCS) \
+	$(REUSABLE_BARRIER_SRC) | $(BIN_DIR)
+
+	$(CXX) $(RELEASE_FLAGS) $(THREAD_FLAGS) \
+		$(SRC)/models/smt/main.cpp \
+		$(CORE_SRCS) \
+		$(SMT_SRCS) \
+		$(REUSABLE_BARRIER_SRC) \
+		-o $@
+
+# ============================================================
 # Common benchmark
-#
-# Current supported selectors:
-#
-#   ./heat2d_benchmark RUNS WARMUPS output.csv fg
-#   ./heat2d_benchmark RUNS WARMUPS output.csv cg
-#   ./heat2d_benchmark RUNS WARMUPS output.csv all
-#
-# CMP will be integrated after standalone validation.
 # ============================================================
 
 $(BENCH_BIN): \
@@ -332,7 +409,8 @@ $(BENCH_BIN): \
 	$(SEQUENTIAL_SRC) \
 	$(FINE_GRAINED_SRCS) \
 	$(COARSE_GRAINED_SRCS) \
-	$(CMP_SRCS) | $(BIN_DIR)
+	$(CMP_SRCS) \
+	$(SMT_SRCS) | $(BIN_DIR)
 
 	$(CXX) $(RELEASE_FLAGS) $(THREAD_FLAGS) \
 		$(BENCHMARKS)/benchmark_heat2d.cpp \
@@ -342,7 +420,9 @@ $(BENCH_BIN): \
 		$(FINE_GRAINED_SRCS) \
 		$(COARSE_GRAINED_SRCS) \
 		$(CMP_SRCS) \
+		$(SMT_SRCS) \
 		-o $@
+
 # ============================================================
 # Fine-Grained Unit / Integration Tests
 # ============================================================
@@ -426,6 +506,45 @@ $(TEST_CMP_BIN): \
 		-o $@
 
 # ============================================================
+# SMT Unit / Integration Tests
+# ============================================================
+
+$(TEST_SMT_TOPOLOGY_BIN): \
+	$(TESTS)/smt/test_cpu_topology.cpp \
+	$(SRC)/models/smt/cpu_topology.cpp | $(BIN_DIR)
+
+	$(CXX) $(TEST_FLAGS) $(THREAD_FLAGS) \
+		$(TESTS)/smt/test_cpu_topology.cpp \
+		$(SRC)/models/smt/cpu_topology.cpp \
+		-o $@
+
+$(TEST_SMT_AFFINITY_BIN): \
+	$(TESTS)/smt/test_thread_affinity.cpp \
+	$(SRC)/models/smt/cpu_topology.cpp \
+	$(SRC)/models/smt/thread_affinity.cpp | $(BIN_DIR)
+
+	$(CXX) $(TEST_FLAGS) $(THREAD_FLAGS) \
+		$(TESTS)/smt/test_thread_affinity.cpp \
+		$(SRC)/models/smt/cpu_topology.cpp \
+		$(SRC)/models/smt/thread_affinity.cpp \
+		-o $@
+
+$(TEST_SMT_BIN): \
+	$(TESTS)/smt/test_smt.cpp \
+	$(CORE_SRCS) \
+	$(SEQUENTIAL_SRC) \
+	$(SMT_SRCS) \
+	$(REUSABLE_BARRIER_SRC) | $(BIN_DIR)
+
+	$(CXX) $(TEST_FLAGS) $(THREAD_FLAGS) \
+		$(TESTS)/smt/test_smt.cpp \
+		$(CORE_SRCS) \
+		$(SEQUENTIAL_SRC) \
+		$(SMT_SRCS) \
+		$(REUSABLE_BARRIER_SRC) \
+		-o $@
+
+# ============================================================
 # Test runners
 # ============================================================
 
@@ -467,6 +586,21 @@ test-cmp: $(TEST_CMP_BIN)
 	@echo
 	@echo "CMP tests PASSED."
 
+test-smt: \
+	$(TEST_SMT_TOPOLOGY_BIN) \
+	$(TEST_SMT_AFFINITY_BIN) \
+	$(TEST_SMT_BIN)
+
+	@echo
+	@echo "========================================"
+	@echo "Running Heat2D SMT tests"
+	@echo "========================================"
+	$(TEST_SMT_TOPOLOGY_BIN)
+	$(TEST_SMT_AFFINITY_BIN)
+	$(TEST_SMT_BIN)
+	@echo
+	@echo "SMT tests PASSED."
+
 test: tests
 	@echo
 	@echo "========================================"
@@ -487,6 +621,12 @@ test: tests
 	@echo
 	@echo "--- CMP ---"
 	$(TEST_CMP_BIN)
+
+	@echo
+	@echo "--- SMT ---"
+	$(TEST_SMT_TOPOLOGY_BIN)
+	$(TEST_SMT_AFFINITY_BIN)
+	$(TEST_SMT_BIN)
 
 	@echo
 	@echo "All Heat2D tests PASSED."
@@ -531,14 +671,6 @@ stress-cg: $(STRESS_CG_BIN)
 
 # ============================================================
 # CMP Stress Test
-#
-# stress_cmp.cpp currently executes:
-#   CMP-1
-#   CMP-2
-#   CMP-4
-#   CMP-8
-#
-# with 3 repetitions per configuration on the 801x801 workload.
 # ============================================================
 
 $(STRESS_CMP_BIN): \
@@ -558,6 +690,28 @@ $(STRESS_CMP_BIN): \
 
 stress-cmp: $(STRESS_CMP_BIN)
 	$(STRESS_CMP_BIN)
+
+# ============================================================
+# SMT Stress Test
+# ============================================================
+
+$(STRESS_SMT_BIN): \
+	$(TESTS)/smt/stress_smt.cpp \
+	$(CORE_SRCS) \
+	$(SEQUENTIAL_SRC) \
+	$(SMT_SRCS) \
+	$(REUSABLE_BARRIER_SRC) | $(BIN_DIR)
+
+	$(CXX) $(TEST_FLAGS) $(THREAD_FLAGS) \
+		$(TESTS)/smt/stress_smt.cpp \
+		$(CORE_SRCS) \
+		$(SEQUENTIAL_SRC) \
+		$(SMT_SRCS) \
+		$(REUSABLE_BARRIER_SRC) \
+		-o $@
+
+stress-smt: $(STRESS_SMT_BIN)
+	$(STRESS_SMT_BIN)
 
 # ============================================================
 # Python
@@ -590,12 +744,6 @@ check-clean:
 
 # ============================================================
 # Experimental metadata
-#
-# Current statistical campaigns:
-#   Fine-Grained
-#   Coarse-Grained
-#
-# CMP metadata will be added when campaign-cmp is integrated.
 # ============================================================
 
 metadata: release
@@ -642,6 +790,15 @@ metadata: release
 		echo "CPU topology:"; \
 		lscpu 2>/dev/null || true; \
 		echo; \
+		echo "CPU/core mapping:"; \
+		lscpu -e=CPU,CORE,SOCKET,NODE,ONLINE 2>/dev/null || true; \
+		echo; \
+		echo "Linux SMT control:"; \
+		cat /sys/devices/system/cpu/smt/control 2>/dev/null || echo "unavailable"; \
+		echo; \
+		echo "Process-visible logical CPUs (nproc):"; \
+		nproc 2>/dev/null || true; \
+		echo; \
 		echo "Memory:"; \
 		free -h 2>/dev/null || true; \
 		echo; \
@@ -680,8 +837,17 @@ metadata: release
 			echo "CMP synchronization: reusable timestep barrier"; \
 			echo "CMP synthetic blocking: disabled"; \
 			echo "CMP barrier phases per timestep: 2"; \
+		elif [ "$(CAMPAIGN_MODEL)" = "smt" ]; then \
+			echo "Cases: Sequential + SMT {$(SMT_THREAD_LIST)}"; \
+			echo "SMT implementation: persistent std::thread workers"; \
+			echo "SMT topology discovery: sched_getaffinity + Linux sysfs"; \
+			echo "SMT affinity: pthread_setaffinity_np"; \
+			echo "SMT placement: one logical CPU per physical core before sibling threads"; \
+			echo "SMT oversubscription: disabled"; \
+			echo "SMT synchronization: reusable timestep barrier"; \
+			echo "SMT barrier phases per timestep: 2"; \
 		else \
-			echo "Cases: Sequential + Fine-Grained {1,2,4,8,16,32,64} + Coarse-Grained {1,2,4,8,16,32,64} + CMP {1,2,4,8,16,32,64}"; \
+			echo "Cases: Sequential + Fine-Grained {1,2,4,8,16,32,64} + Coarse-Grained {1,2,4,8,16,32,64} + CMP {1,2,4,8,16,32,64} + SMT {$(SMT_THREAD_LIST)}"; \
 		fi; \
 	} > $(METADATA)
 
@@ -691,7 +857,14 @@ metadata: release
 # ============================================================
 # Development benchmark campaigns
 #
-# CMP is not integrated here yet.
+# FG / CG / CMP preserve their existing behavior.
+#
+# SMT development additionally:
+#   1. runs the complete SMT test suite,
+#   2. executes a short benchmark,
+#   3. generates statistics,
+#   4. generates plots,
+#   5. does not require a clean Git working tree.
 # ============================================================
 
 campaign-dev-fg: RUNS=3
@@ -706,25 +879,29 @@ campaign-dev-cmp: RUNS=3
 campaign-dev-cmp: WARMUPS=1
 campaign-dev-cmp: campaign-cmp
 
+campaign-dev-smt:
+	@echo
+	@echo "========================================"
+	@echo "Heat2D SMT Development Campaign"
+	@echo "========================================"
+	@echo
+	@echo "Step 1/2 - Running SMT tests..."
+	@echo
+
+	@$(MAKE) --no-print-directory test-smt
+
+	@echo
+	@echo "Step 2/2 - Running SMT benchmark pipeline..."
+	@echo
+
+	@$(MAKE) --no-print-directory campaign-smt \
+		RUNS=3 \
+		WARMUPS=1 \
+		REQUIRE_CLEAN=0 \
+		RESULT_TAG="$(RESULT_TAG)"
+
 # ============================================================
 # Fine-Grained benchmark campaign
-#
-# Cases:
-#   Sequential
-#   FG-1
-#   FG-2
-#   FG-4
-#   FG-8
-#   FG-16
-#   FG-32
-#   FG-64
-#
-# Default:
-#   200 measured rounds
-#   5 warm-up rounds
-#
-# Expected raw CSV lines with RUNS=200:
-#   200 * 8 + 1 = 1601
 # ============================================================
 
 campaign-fg: CAMPAIGN_MODEL=fg
@@ -733,23 +910,6 @@ campaign-fg: campaign-run
 
 # ============================================================
 # Coarse-Grained benchmark campaign
-#
-# Cases:
-#   Sequential
-#   CG-1
-#   CG-2
-#   CG-4
-#   CG-8
-#   CG-16
-#   CG-32
-#   CG-64
-#
-# Default:
-#   200 measured rounds
-#   5 warm-up rounds
-#
-# Expected raw CSV lines with RUNS=200:
-#   200 * 8 + 1 = 1601
 # ============================================================
 
 campaign-cg: CAMPAIGN_MODEL=cg
@@ -758,23 +918,6 @@ campaign-cg: campaign-run
 
 # ============================================================
 # CMP benchmark campaign
-#
-# Cases:
-#   Sequential
-#   CMP-1
-#   CMP-2
-#   CMP-4
-#   CMP-8
-#   CMP-16
-#   CMP-32
-#   CMP-64
-#
-# Default:
-#   200 measured rounds
-#   5 warm-up rounds
-#
-# Expected raw CSV lines with RUNS=200:
-#   200 * 8 + 1 = 1601
 # ============================================================
 
 campaign-cmp: CAMPAIGN_MODEL=cmp
@@ -782,21 +925,46 @@ campaign-cmp: BENCHMARK_CASES=$(CMP_BENCHMARK_CASES)
 campaign-cmp: campaign-run
 
 # ============================================================
-# Common campaign implementation
+# SMT benchmark campaign
 #
-# Current valid models:
+# On target Ryzen 8C / 16T:
 #
-#   fg
-#   cg
+#   Sequential
+#   SMT-1
+#   SMT-2
+#   SMT-4
+#   SMT-8
+#   SMT-16
 #
-# CMP will be added after benchmark integration.
+# RUNS=200:
+#
+#   200 * 6 + 1 header = 1201 CSV lines
 # ============================================================
 
-campaign-run: check-clean release python-deps
+campaign-smt: CAMPAIGN_MODEL=smt
+campaign-smt: BENCHMARK_CASES=$(SMT_BENCHMARK_CASES)
+campaign-smt: campaign-run
+
+# ============================================================
+# Common campaign implementation
+#
+# REQUIRE_CLEAN=1:
+#   intended for formal campaigns.
+#
+# REQUIRE_CLEAN=0:
+#   intended only for development/smoke campaigns.
+# ============================================================
+
+campaign-run: release python-deps
+	@if [ "$(REQUIRE_CLEAN)" = "1" ]; then \
+		$(MAKE) --no-print-directory check-clean; \
+	fi
+
 	@if [ "$(CAMPAIGN_MODEL)" != "fg" ] && \
 	    [ "$(CAMPAIGN_MODEL)" != "cg" ] && \
-	    [ "$(CAMPAIGN_MODEL)" != "cmp" ]; then \
-		echo "ERROR: campaign-run requires CAMPAIGN_MODEL=fg, cg or cmp."; \
+	    [ "$(CAMPAIGN_MODEL)" != "cmp" ] && \
+	    [ "$(CAMPAIGN_MODEL)" != "smt" ]; then \
+		echo "ERROR: campaign-run requires CAMPAIGN_MODEL=fg, cg, cmp or smt."; \
 		exit 1; \
 	fi
 
@@ -809,6 +977,7 @@ campaign-run: check-clean release python-deps
 	@echo "Result tag : $(RESULT_TAG)"
 	@echo "Runs       : $(RUNS)"
 	@echo "Warm-ups   : $(WARMUPS)"
+	@echo "Git clean  : $(REQUIRE_CLEAN)"
 	@echo "Output     : $(RESULT_DIR)"
 	@echo
 
@@ -871,8 +1040,6 @@ campaign-run: check-clean release python-deps
 
 # ============================================================
 # perf - software events
-#
-# Useful inside UTM and native Linux.
 # ============================================================
 
 perf-soft-seq: $(SEQ_BIN)
@@ -895,13 +1062,13 @@ perf-soft-cmp: $(CMP_BIN)
 		-e task-clock,context-switches,cpu-migrations,page-faults \
 		$(CMP_BIN) $(CMP_THREADS)
 
+perf-soft-smt: $(SMT_BIN)
+	sudo perf stat \
+		-e task-clock,context-switches,cpu-migrations,page-faults \
+		$(SMT_BIN) $(SMT_THREADS)
+
 # ============================================================
 # perf - hardware PMU events
-#
-# Intended for native hardware.
-#
-# UTM may report these events as unsupported because hardware PMU
-# counters are generally not exposed by the virtual machine.
 # ============================================================
 
 perf-hw-seq: $(SEQ_BIN)
@@ -923,6 +1090,11 @@ perf-hw-cmp: $(CMP_BIN)
 	sudo perf stat \
 		-e cycles,instructions,branches,branch-misses,cache-references,cache-misses \
 		$(CMP_BIN) $(CMP_THREADS)
+
+perf-hw-smt: $(SMT_BIN)
+	sudo perf stat \
+		-e cycles,instructions,branches,branch-misses,cache-references,cache-misses \
+		$(SMT_BIN) $(SMT_THREADS)
 
 # ============================================================
 # Fine-Grained profiling binary
@@ -1005,6 +1177,34 @@ profile-cmp: $(CMP_PROFILE_BIN)
 	@echo "  sudo perf report"
 
 # ============================================================
+# SMT profiling binary
+# ============================================================
+
+$(SMT_PROFILE_BIN): \
+	$(SRC)/models/smt/main.cpp \
+	$(CORE_SRCS) \
+	$(SMT_SRCS) \
+	$(REUSABLE_BARRIER_SRC) | $(BIN_DIR)
+
+	$(CXX) $(PROFILE_FLAGS) $(THREAD_FLAGS) \
+		$(SRC)/models/smt/main.cpp \
+		$(CORE_SRCS) \
+		$(SMT_SRCS) \
+		$(REUSABLE_BARRIER_SRC) \
+		-o $@
+
+profile-smt: $(SMT_PROFILE_BIN)
+	sudo perf record \
+		-e cpu-clock \
+		-g \
+		-- $(SMT_PROFILE_BIN) $(SMT_THREADS)
+
+	@echo
+	@echo "SMT profiling data written to perf.data"
+	@echo "Open it with:"
+	@echo "  sudo perf report"
+
+# ============================================================
 # Help
 # ============================================================
 
@@ -1015,92 +1215,45 @@ help:
 
 	@echo "Build:"
 	@echo "  make release"
-	@echo "      Build Sequential, Fine-Grained, Coarse-Grained, CMP and benchmark binaries."
+	@echo "      Build Sequential, Fine-Grained, Coarse-Grained, CMP, SMT and benchmark binaries."
 	@echo
 
 	@echo "Tests:"
 	@echo "  make test"
-	@echo "      Compile and run Fine-Grained, Coarse-Grained and CMP tests."
+	@echo "      Compile and run all Heat2D tests."
 	@echo
-	@echo "  make test-fg"
-	@echo "      Run only Fine-Grained tests."
-	@echo
-	@echo "  make test-cg"
-	@echo "      Run only Coarse-Grained tests."
-	@echo
-	@echo "  make test-cmp"
-	@echo "      Run only CMP integration tests."
+	@echo "  make test-smt"
+	@echo "      Run SMT topology, affinity and integration tests."
 	@echo
 
 	@echo "Stress:"
-	@echo "  make stress-fg"
-	@echo "      Run Fine-Grained stress test."
-	@echo
-	@echo "  make stress-cg"
-	@echo "      Run Coarse-Grained stress test."
-	@echo
-	@echo "  make stress-cmp"
-	@echo "      Run CMP 801x801 stress test for 1,2,4,8 workers."
+	@echo "  make stress-smt"
+	@echo "      Run SMT 801x801 stress test."
 	@echo
 
-	@echo "Current benchmark campaigns:"
-	@echo "  make campaign-dev-fg RESULT_TAG=utm_fg_smoke"
-	@echo "      3 measured rounds + 1 warm-up for Fine-Grained."
-	@echo
-	@echo "  make campaign-dev-cg RESULT_TAG=utm_cg_smoke"
-	@echo "      3 measured rounds + 1 warm-up for Coarse-Grained."
-	@echo
-	@echo "  make campaign-fg RUNS=200 WARMUPS=5 RESULT_TAG=utm_fg_200"
-	@echo "      Sequential + FG {1,2,4,8,16,32,64}."
-	@echo
-	@echo "  make campaign-cg RUNS=200 WARMUPS=5 RESULT_TAG=utm_cg_200"
-	@echo "      Sequential + CG {1,2,4,8,16,32,64}."
-	@echo
-	@echo "  CMP campaign is not integrated into the common benchmark yet."
+	@echo "SMT development campaign:"
+	@echo "  make campaign-dev-smt RESULT_TAG=utm_smt_smoke"
+	@echo "      Automatically runs SMT tests, benchmark, statistical analysis and plots."
+	@echo "      Uses 3 measured rounds + 1 warm-up."
+	@echo "      Does not require a clean Git working tree."
 	@echo
 
-	@echo "Standalone parameters:"
-	@echo "  CG_THREADS=4"
-	@echo "      Coarse-Grained worker count."
-	@echo
-	@echo "  CG_BLOCK_US=100"
-	@echo "      Coarse-Grained synthetic blocking duration."
-	@echo
-	@echo "  CG_ROWS_PER_BLOCK=8"
-	@echo "      Coarse-Grained rows per synthetic blocking event."
-	@echo
-	@echo "  CMP_THREADS=4"
-	@echo "      CMP real worker-thread count for perf/profile targets."
+	@echo "SMT formal campaign:"
+	@echo "  make campaign-smt RUNS=200 WARMUPS=5 RESULT_TAG=ryzen_smt_200"
+	@echo "      Requires a clean Git working tree."
+	@echo "      On 8C/16T target: Sequential + SMT {1,2,4,8,16}."
 	@echo
 
 	@echo "Software perf:"
-	@echo "  make perf-soft-seq"
-	@echo "  make perf-soft-fg"
-	@echo "  make perf-soft-cg"
-	@echo "  make perf-soft-cmp CMP_THREADS=4"
+	@echo "  make perf-soft-smt SMT_THREADS=16"
 	@echo
 
 	@echo "Hardware perf:"
-	@echo "  make perf-hw-seq"
-	@echo "  make perf-hw-fg"
-	@echo "  make perf-hw-cg"
-	@echo "  make perf-hw-cmp CMP_THREADS=4"
+	@echo "  make perf-hw-smt SMT_THREADS=16"
 	@echo
 
 	@echo "Profiling:"
-	@echo "  make profile-fg"
-	@echo "  make profile-cg"
-	@echo "  make profile-cmp CMP_THREADS=4"
-	@echo
-
-	@echo "CMP examples:"
-	@echo "  build/bin/heat2d_cmp 1"
-	@echo "  build/bin/heat2d_cmp 2"
-	@echo "  build/bin/heat2d_cmp 4"
-	@echo "  build/bin/heat2d_cmp 8"
-	@echo "  make test-cmp"
-	@echo "  make stress-cmp"
-	@echo "  make perf-soft-cmp CMP_THREADS=4"
+	@echo "  make profile-smt SMT_THREADS=16"
 	@echo
 
 	@echo "Clean:"

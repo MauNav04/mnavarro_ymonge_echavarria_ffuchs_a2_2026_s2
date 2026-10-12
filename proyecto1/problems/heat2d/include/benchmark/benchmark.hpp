@@ -12,7 +12,8 @@ enum class ExecutionModel {
     Sequential,
     FineGrained,
     CoarseGrained,
-    Cmp
+    Cmp,
+    Smt
 };
 
 
