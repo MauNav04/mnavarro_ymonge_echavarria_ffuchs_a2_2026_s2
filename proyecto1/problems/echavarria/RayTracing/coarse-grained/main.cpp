@@ -1,22 +1,18 @@
 /**
  * ============================================================================
- * Modelo de Ejecución: Coarse-Grained Multithreading (Multihilo de Grano Grueso)
- * Problema: Trazado de Rayos 3D (Ray Tracing)
+ * Modelo de Ejecución: Coarse-Grained Multithreading (Grano Grueso)
  * ============================================================================
  *
  * Características Arquitectónicas:
- * 1. Ejecución por Ráfagas Continuas (Burst Execution): Cada hilo tradicional
+ * 1. Burst Execution: Cada hilo tradicional
  *    procesa un bloque continuo extenso de filas de forma ininterrumpida,
  *    maximizando el aprovechamiento del pipeline y la localidad en memoria caché L1/L2.
  * 2. Conmutación ante Eventos de Bloqueo Costosos / Stalls de Hardware:
  *    En el trazado de rayos, los píxeles tienen costos altamente dispares según la
- *    naturaleza estocástica de los materiales. Mientras que los rayos que impactan el
- *    fondo terminan en 1 evaluación, los rayos en materiales dieléctricos y reflectivos
- *    rebotan recursivamente hasta 50 veces. Se modela e instrumenta como "stall"
+ *    naturaleza de los materiales. Los rayos en materiales dieléctricos y reflectivos
+ *    rebotan hasta 50 veces. Se modela e instrumenta como "stall"
  *    cuando la profundidad de rebote de un rayo alcanza latencia profunda (>= 15 rebotes).
- * 3. Hilos Persistentes Tradicionales: Implementado mediante hilos POSIX de larga duración.
- * 4. Métricas Clave: Contabilización explícita de píxeles por ráfaga (burst_pixels)
- *    y eventos de bloqueo/estancamiento acumulados (stall_events).
+ * 3. Hilos Tradicionales: Implementado mediante hilos POSIX de larga duración.
  * ============================================================================
  */
 
@@ -36,26 +32,26 @@
 #include <iomanip>
 
 // ============================================================================
-// Contexto para cada Hilo Trabajador Coarse-Grained
+// Contexto para cada Hilo Coarse-Grained
 // ============================================================================
 struct ContextoHiloCoarse {
     int id;                        // Identificador lógico del hilo [0, num_threads - 1]
-    int start_y;                   // Fila inicial de la franja continua (inclusiva)
-    int end_y;                     // Fila final de la franja (exclusiva)
-    uint64_t burst_pixels;         // Píxeles computados en la ráfaga continua
-    int stall_events;              // Contador de eventos de bloqueo / rebotes profundos
-    const camera* cam;             // Puntero a la cámara calibrada (read-only)
-    const hittable_list* world;    // Puntero a la escena 3D (read-only)
+    int start_y;                   // Fila inicial de la franja 
+    int end_y;                     // Fila final de la franja 
+    uint64_t burst_pixels;         // Píxeles en la ráfaga continua
+    int stall_events;              // Contador de eventos de rebotes profundos
+    const camera* cam;             // Puntero a la cámara calibrada
+    const hittable_list* world;    // Puntero a la escena 3D
     Framebuffer* fb;               // Puntero al Framebuffer compartido en RAM
 };
 
 // ============================================================================
-// Rutina de Ejecución del Hilo Trabajador (Coarse-Grained)
+// Rutina de Ejecución del Hilo (Coarse-Grained)
 // ============================================================================
 void* worker_thread_coarse(void* arg) {
     ContextoHiloCoarse* ctx = static_cast<ContextoHiloCoarse*>(arg);
 
-    // Cómputo continuo en ráfaga con detección de eventos de bloqueo (stalls)
+    // Calculo con detección de eventos de bloqueo (stalls)
     ctx->cam->render_slice_counted(*(ctx->world), *(ctx->fb), ctx->start_y, ctx->end_y, ctx->stall_events);
 
     return nullptr;
@@ -65,7 +61,7 @@ int main(int argc, char* argv[]) {
     int width = 400;
     int samples = 10;
     int max_depth = 50;
-    int num_threads = 8;        // 8 hilos tradicionales por defecto
+    int num_threads = 8;        // 8 hilos fisicos por defecto
     bool verify = false;
     std::string output_ppm = "";
 
@@ -134,7 +130,7 @@ int main(int argc, char* argv[]) {
     }
 
     // =========================================================================
-    // MEDICIÓN DE TIEMPO PURO DE CÓMPUTO COARSE-GRAINED
+    // MEDICIÓN DE TIEMPO PURO DE CÓMPUTO
     // =========================================================================
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -173,7 +169,7 @@ int main(int argc, char* argv[]) {
     std::cout << "Tiempo Cómputo     : " << std::fixed << std::setprecision(3)
               << elapsed_coarse.count() << " ms (" << elapsed_coarse.count() / 1000.0 << " s)\n";
 
-    // Verificación numérica cruzada contra secuencial
+    // Verificación numérica contra secuencial
     if (verify) {
         std::cout << "--------------------------------------------------------\n";
         std::cout << " Ejecutando verificación numérica contra Secuencial...\n";

@@ -1,11 +1,10 @@
 /**
  * ============================================================================
  * Modelo de Ejecución: SMT (Simultaneous Multithreading - Hilos Lógicos)
- * Problema: Trazado de Rayos 3D (Ray Tracing)
  * ============================================================================
  *
  * Características Arquitectónicas:
- * 1. Descomposición de Dominio 1D: La altura total de la imagen se divide en
+ * 1. Descomposición 1D: La altura total de la imagen se divide en
  *    16 franjas horizontales continuas entre los 16 hilos lógicos de trabajo.
  * 2. Evaluación de Concurrencia SMT (Hardware vs. Software):
  *    - Con SMT ON (Hardware Real): 2 hilos lógicos coexisten en el mismo núcleo
@@ -14,7 +13,6 @@
  *      núcleos físicos online, obligando al planificador de Linux a realizar
  *      conmutaciones de contexto por software (time-slicing).
  * 3. Hilos Persistentes y Afinidad Mapeada: Afinidad adaptativa con pthread_setaffinity_np
- *    según el estado detectado en /sys/devices/system/cpu/smt/control.
  * 4. Escritura Directa Libre de Cerrojos (Lock-Free): Cada hilo escribe exclusivamente
  *    en sus índices correspondientes del Framebuffer en RAM contigua.
  * ============================================================================
@@ -115,15 +113,15 @@ std::vector<int> obtener_cpus_fisicos() {
 struct ContextoHiloSMT {
     int id;                        // Identificador lógico del hilo [0, num_threads - 1]
     int cpu_afinidad;              // CPU asignado en la máscara de afinidad
-    int start_y;                   // Fila inicial de la franja (inclusiva)
-    int end_y;                     // Fila final de la franja (exclusiva)
-    const camera* cam;             // Puntero a la cámara calibrada (read-only)
-    const hittable_list* world;    // Puntero a la escena 3D (read-only)
+    int start_y;                   // Fila inicial de la franja 
+    int end_y;                     // Fila final de la franja 
+    const camera* cam;             // Puntero a la cámara calibrada 
+    const hittable_list* world;    // Puntero a la escena 3D 
     Framebuffer* fb;               // Puntero al Framebuffer compartido en RAM
 };
 
 // ============================================================================
-// Rutina de Ejecución del Hilo Trabajador SMT
+// Rutina de Ejecución del Hilo SMT
 // ============================================================================
 void* worker_thread_smt(void* arg) {
     ContextoHiloSMT* ctx = static_cast<ContextoHiloSMT*>(arg);
@@ -174,7 +172,7 @@ int main(int argc, char* argv[]) {
 
     if (num_threads < 1) num_threads = 1;
 
-    // Diagnóstico de topología y CPUs online
+    // Diagnóstico CPUs online
     std::string smt_status = obtener_estado_smt_linux();
     std::vector<int> cpus_online = obtener_cpus_online();
     std::vector<int> cpus_fisicos = obtener_cpus_fisicos();
@@ -219,7 +217,7 @@ int main(int argc, char* argv[]) {
     // Creación del Framebuffer en RAM contigua
     Framebuffer fb(width, height);
 
-    // Particionado 1D en franjas de scanlines [0, height)
+    // Particionado 1D
     int filas_base = height / num_threads;
     int residuo = height % num_threads;
 

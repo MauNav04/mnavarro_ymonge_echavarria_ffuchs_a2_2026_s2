@@ -14,7 +14,11 @@ compile_commands.json
 
 # Binarios y objetos compilados
 inOneWeekend
-raytracing_*
+raytracing_seq
+raytracing_cmp
+raytracing_smt
+raytracing_coarse
+raytracing_fine
 scripts/raytracing_*
 *.o
 *.obj

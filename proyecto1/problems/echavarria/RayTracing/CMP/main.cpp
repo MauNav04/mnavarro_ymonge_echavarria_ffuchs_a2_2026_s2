@@ -1,21 +1,17 @@
 /**
  * ============================================================================
  * Modelo de Ejecución: CMP (Chip Multiprocessing - Paralelismo Real)
- * Problema: Trazado de Rayos 3D (Ray Tracing)
  * ============================================================================
  *
  * Características Arquitectónicas:
- * 1. Descomposición de Dominio 1D por Filas (Scanlines): La altura total de la
- *    imagen se particiona en franjas continuas horizontales [start_y, end_y).
+ * 1. Descomposición por Filas (Scanlines): La altura total de la
+ *    imagen se particiona en franjas continuas horizontales.
  * 2. Localidad Espacial y Caché L1/L2: Al procesar líneas completas en orden
- *    Row-Major, se activa el Hardware Prefetcher del núcleo físico y se elimina
- *    por completo el Falso Compartimiento (False Sharing) en el Framebuffer.
+ *    Row-Major, se activa el Hardware Prefetche y se elimina la penalización de fallos de caché L1/L2.
  * 3. Hilos Persistentes y Afinidad a Núcleos Físicos: Cada hilo del sistema
  *    operativo se fija a un núcleo físico independiente mediante pthread_setaffinity_np
- *    y detección de topología en Linux (/sys/devices/system/cpu/cpuX/topology/core_id),
- *    aislando el paralelismo CMP puro de la contención de SMT.
  * 4. Escritura Directa Libre de Cerrojos (Lock-Free): Cada hilo escribe
- *    exclusivamente en sus celdas de memoria RAM en el Framebuffer compartido.
+ *    exclusivamente en sus celdas de memoria RAM.
  * ============================================================================
  */
 
@@ -38,7 +34,7 @@
 #include <iomanip>
 
 // ============================================================================
-// Detección Dinámica de Núcleos Físicos en Linux (sysfs)
+// Detección Dinámica de Núcleos Físicos (sysfs)
 // ============================================================================
 std::vector<int> obtener_cpus_fisicos() {
     std::vector<int> cpus_fisicos;
@@ -76,20 +72,20 @@ std::vector<int> obtener_cpus_fisicos() {
 struct ContextoHiloCMP {
     int id;                        // Identificador lógico del hilo [0, num_threads - 1]
     int cpu_afinidad;              // Núcleo físico asignado en la máscara de afinidad
-    int start_y;                   // Fila inicial de la franja (inclusiva)
-    int end_y;                     // Fila final de la franja (exclusiva)
-    const camera* cam;             // Puntero a la cámara calibrada (read-only)
-    const hittable_list* world;    // Puntero a la escena 3D (read-only)
-    Framebuffer* fb;               // Puntero al Framebuffer compartido en RAM
+    int start_y;                   // Fila inicial de la franja 
+    int end_y;                     // Fila final de la franja 
+    const camera* cam;             // Puntero a la cámara calibrada 
+    const hittable_list* world;    // Puntero a la escena 3D 
+    Framebuffer* fb;               // Puntero al Framebuffer compartido 
 };
 
 // ============================================================================
-// Rutina de Ejecución del Hilo Trabajador (Worker Thread)
+// Rutina de Ejecución del Hilo (Worker Thread)
 // ============================================================================
 void* worker_thread_cmp(void* arg) {
     ContextoHiloCMP* ctx = static_cast<ContextoHiloCMP*>(arg);
 
-    // 1. Fijar afinidad del hilo al núcleo físico asignado
+    // 1. Hilo al núcleo físico asignado
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset);
     CPU_SET(ctx->cpu_afinidad, &cpuset);
@@ -98,7 +94,7 @@ void* worker_thread_cmp(void* arg) {
         std::cerr << "[ADVERTENCIA] No se pudo fijar afinidad CMP en CPU " << ctx->cpu_afinidad << "\n";
     }
 
-    // 2. Cómputo independiente del trazado de rayos en la franja asignada
+    // 2. Trazado de rayos en la franja asignada
     ctx->cam->render_slice(*(ctx->world), *(ctx->fb), ctx->start_y, ctx->end_y);
 
     return nullptr;
@@ -157,7 +153,7 @@ int main(int argc, char* argv[]) {
     // Creación del Framebuffer en RAM contigua
     Framebuffer fb(width, height);
 
-    // Particionado 1D de las scanlines [0, height)
+    // Particionado de las scanlines [0, height)
     int filas_base = height / num_threads;
     int residuo = height % num_threads;
 
@@ -179,7 +175,7 @@ int main(int argc, char* argv[]) {
     }
 
     // =========================================================================
-    // MEDICIÓN DE TIEMPO PURO DE CÓMPUTO CMP (Multinúcleo Real)
+    // MEDICIÓN DE TIEMPO PURO 
     // =========================================================================
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -214,7 +210,7 @@ int main(int argc, char* argv[]) {
     std::cout << "Tiempo Cómputo CMP : " << std::fixed << std::setprecision(3)
               << elapsed_cmp.count() << " ms (" << elapsed_cmp.count() / 1000.0 << " s)\n";
 
-    // Verificación numérica cruzada contra versión secuencial
+    // Verificación numérica contra versión secuencial
     if (verify) {
         std::cout << "--------------------------------------------------------\n";
         std::cout << " Ejecutando verificación numérica contra Secuencial...\n";
