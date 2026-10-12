@@ -1,17 +1,44 @@
 #include "sequential.hpp"
+
 #include "heat2d.hpp"
+#include "initial_conditions.hpp"
+
 #include <stdexcept>
 #include <utility>
 
 namespace heat2d {
 
+namespace {
+
 /**
- * @brief Ejecuta múltiples pasos temporales utilizando un único flujo secuencial.
- *
- * En cada iteración se calcula el estado siguiente de la superficie y luego
- * se intercambian current y next. De esta manera se reutilizan las mismas
- * dos regiones de memoria durante toda la simulación.
+ * @brief Validates the grid requirements shared by the sequential solver.
  */
+void validateGrids(
+    const Grid& current,
+    const Grid& next
+) {
+    if (
+        current.rows() != next.rows() ||
+        current.cols() != next.cols()
+    ) {
+        throw std::invalid_argument(
+            "Current and next grids must have the same dimensions."
+        );
+    }
+
+    if (
+        current.rows() < 3 ||
+        current.cols() < 3
+    ) {
+        throw std::invalid_argument(
+            "Grid must contain at least three rows and three columns."
+        );
+    }
+}
+
+}  // namespace
+
+
 void runSequential(
     Grid& current,
     Grid& next,
@@ -22,35 +49,62 @@ void runSequential(
     double dy,
     double boundaryTemperature
 ) {
-    if (current.rows() != next.rows() || current.cols() != next.cols()) {
-        throw std::invalid_argument(
-            "Current and next grids must have the same dimensions."
+    validateGrids(
+        current,
+        next
+    );
+
+    /*
+     * Coefficients are invariant during the complete simulation.
+     * Computing them once keeps the sequential execution path
+     * comparable with the other execution models.
+     */
+    const DiffusionCoefficients coefficients =
+        makeDiffusionCoefficients(
+            alpha,
+            dt,
+            dx,
+            dy
         );
-    }
 
     if (steps == 0) {
         return;
     }
 
-    if (!isStable(alpha, dt, dx, dy)) {
-        throw std::invalid_argument(
-            "The selected simulation parameters violate the stability condition."
-        );
-    }
+    for (
+        std::size_t step = 0;
+        step < steps;
+        ++step
+    ) {
+        for (
+            std::size_t row = 1;
+            row < current.rows() - 1;
+            ++row
+        ) {
+            for (
+                std::size_t column = 1;
+                column < current.cols() - 1;
+                ++column
+            ) {
+                computeCell(
+                    current,
+                    next,
+                    row,
+                    column,
+                    coefficients
+                );
+            }
+        }
 
-    for (std::size_t step = 0; step < steps; ++step) {
-        
-        diffusionStep(
-            current,
+        applyFixedBoundary(
             next,
-            alpha,
-            dt,
-            dx,
-            dy,
             boundaryTemperature
         );
 
-        std::swap(current, next);
+        std::swap(
+            current,
+            next
+        );
     }
 }
 

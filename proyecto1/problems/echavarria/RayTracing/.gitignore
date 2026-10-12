@@ -7,13 +7,15 @@ obj/
 CMakeCache.txt
 CMakeFiles/
 CMakeScripts/
-Makefile
+build/Makefile
 cmake_install.cmake
 install_manifest.txt
 compile_commands.json
 
 # Binarios y objetos compilados
 inOneWeekend
+raytracing_*
+scripts/raytracing_*
 *.o
 *.obj
 *.exe
@@ -31,3 +33,7 @@ Thumbs.db
 # Permitir imágenes de documentación y diagramas
 !images/*.png
 !docs/*.png
+
+# Excluir renders temporales de pruebas
+images/output_*
+output_*

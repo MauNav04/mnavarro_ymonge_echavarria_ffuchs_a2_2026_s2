@@ -39,3 +39,41 @@ proyecto1/problems/gray-scott/scripts/gray_scott_fine
 
 # Gray-Scott generated videos and temporary frames
 proyecto1/problems/gray-scott/videos/
+test_logical_thread
+test_round_robin_scheduler
+heat2d_stress_test
+heat2d_sequential
+test_fine_grained
+heat2d_fine_grained.vscode/
+heat2d_fine_grained_stress
+heat2d_fine_grained
+.vscode/c_cpp_properties.json.venv/
+heat2d_benchmark
+# Local development
+.venv/
+.vscode/
+
+# Heat2D benchmark generated artifacts
+proyecto1/problems/heat2d/benchmark_results/
+
+# Generated benchmark executables / temporary CSVs
+heat2d_benchmark
+benchmark_test.csv
+benchmark_test_summary.csv
+heat2d_benchmark.csv
+# Build products
+build/
+
+# Python virtual environment
+.venv/
+
+# IDE
+.vscode/
+
+# Generated benchmark results
+proyecto1/problems/heat2d/benchmark_results/
+
+# perf profiling output
+perf.data
+stress_coarse_grained
+test_coarse_grained
