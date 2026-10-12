@@ -10,7 +10,12 @@
 #   - Separate timing measurements from profiling
 # ============================================================
 
-CXX := clang++
+# Detect available C++ compiler (prefer clang++ if installed, otherwise fallback to g++)
+ifeq ($(shell which clang++ 2>/dev/null),)
+CXX ?= g++
+else
+CXX ?= clang++
+endif
 
 HEAT2D := proyecto1/problems/heat2d
 INCLUDE := $(HEAT2D)/include
