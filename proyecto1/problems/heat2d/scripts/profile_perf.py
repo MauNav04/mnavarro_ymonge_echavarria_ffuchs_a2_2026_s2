@@ -100,13 +100,21 @@ EVENTOS_PERF = [
 def ejecutar_comando_perf(comando, cwd, usar_sudo=False):
     """Ejecuta un comando monitoreado por perf stat y parsea la salida CSV."""
     eventos_str = ",".join(EVENTOS_PERF)
-    prefijo = ["sudo", "perf", "stat"] if usar_sudo else ["perf", "stat"]
-    cmd_full = prefijo + ["-x,", "-e", eventos_str, "--"] + comando
-
     env = os.environ.copy()
     env["LC_ALL"] = "C"
 
+    # Intentar ejecutar sin sudo primero
+    cmd_full = ["perf", "stat", "-x,", "-e", eventos_str, "--"] + comando
     proc = subprocess.run(cmd_full, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+
+    # Si falla y se solicitó sudo, reintentar con sudo
+    if proc.returncode != 0 and usar_sudo:
+        cmd_full = ["sudo", "perf", "stat", "-x,", "-e", eventos_str, "--"] + comando
+        proc = subprocess.run(cmd_full, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+
+    if proc.returncode != 0:
+        print(f"    [ADVERTENCIA perf] Código de error {proc.returncode}:\n{proc.stderr.strip()}", file=sys.stderr)
+
     metricas = {}
 
     for linea in proc.stderr.splitlines():
@@ -262,7 +270,22 @@ def main():
 
     scripts_dir = Path(__file__).resolve().parent
     base_dir = scripts_dir.parent
-    bin_dir = (scripts_dir / args.bin_dir).resolve()
+    repo_root = scripts_dir.parents[3]
+
+    candidate_dirs = [
+        Path(args.bin_dir).resolve(),
+        (Path.cwd() / args.bin_dir).resolve(),
+        (scripts_dir / args.bin_dir).resolve(),
+        (repo_root / "build/bin").resolve(),
+        (Path.cwd() / "build/bin").resolve(),
+    ]
+    bin_dir = next((d for d in candidate_dirs if (d / "heat2d_sequential").is_file()), None)
+    if bin_dir is None:
+        print("[ERROR] No se encontró el ejecutable 'heat2d_sequential' en ninguna de las rutas candidatas:", file=sys.stderr)
+        for c in candidate_dirs:
+            print(f"  - {c}", file=sys.stderr)
+        sys.exit(1)
+
     output_csv = (scripts_dir / args.output_csv).resolve()
     output_dir = (scripts_dir / args.output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -364,6 +387,10 @@ def main():
         }
 
         print(f"    -> IPC: {ipc:.2f} | L1-D Miss: {l1_miss_rate:.2f}% | LLC Miss: {llc_miss_rate:.2f}% | CS: {int(context_switches)}\n")
+
+    if not metricas_consolidadas:
+        print("[ERROR] No se pudo recopilar métricas para ningún modelo. Abortando guardado y graficación.", file=sys.stderr)
+        sys.exit(1)
 
     # Guardar CSV
     headers = ["modelo", "hilos", "corridas", "cycles", "instructions", "ipc", "l1_loads", "l1_misses", "l1_miss_rate_pct", "llc_loads", "llc_misses", "llc_miss_rate_pct", "context_switches"]

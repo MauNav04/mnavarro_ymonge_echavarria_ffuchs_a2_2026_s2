@@ -1049,7 +1049,7 @@ plot-heat2d-200:
 		--output-dir $(HEAT2D)/benchmark_results/ryzen_smt_200/plots
 
 profile-perf-heat2d: release
-	python3 $(SCRIPTS)/profile_perf.py --runs 3 --sudo
+	python3 $(SCRIPTS)/profile_perf.py --runs 3
 
 profile-plot-heat2d:
 	python3 $(SCRIPTS)/profile_perf.py --plot-only

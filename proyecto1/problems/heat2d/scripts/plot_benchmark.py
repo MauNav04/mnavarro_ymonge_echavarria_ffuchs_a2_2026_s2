@@ -1278,7 +1278,7 @@ def save_convergence_plot(
     )
     figure.savefig(
         output_directory /
-        "10_convergencia_estabilidad.png",
+        "11_convergencia_estabilidad.png",
         dpi=300,
     )
 
@@ -1463,7 +1463,7 @@ def main():
                 "time_distribution_boxplot.png",
                 "convergence.png",
                 "01_tiempos_ejecucion_boxplot.png",
-                "10_convergencia_estabilidad.png",
+                "11_convergencia_estabilidad.png",
             ]
         )
 
