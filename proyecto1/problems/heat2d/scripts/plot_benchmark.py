@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+import os
+import sys
+
+# Evitar advertencias de permisos en Linux para matplotlib
+os.environ["MPLCONFIGDIR"] = "/tmp/matplotlib_heat2d"
 
 import argparse
 import csv
@@ -6,8 +10,43 @@ from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+# ==============================================================================
+# CONFIGURACIÓN ESTÉTICA Y PALETA CIENTÍFICA ESTÁNDAR (CE 4302)
+# ==============================================================================
+plt.style.use("seaborn-v0_8-whitegrid" if "seaborn-v0_8-whitegrid" in plt.style.available else "default")
+plt.rcParams.update({
+    "font.family": "sans-serif",
+    "font.sans-serif": ["DejaVu Sans", "Helvetica", "Arial"],
+    "font.size": 11,
+    "axes.titlesize": 13,
+    "axes.titleweight": "bold",
+    "axes.labelsize": 11,
+    "axes.labelweight": "semibold",
+    "xtick.labelsize": 10,
+    "ytick.labelsize": 10,
+    "legend.fontsize": 10,
+    "figure.titlesize": 15,
+    "figure.titleweight": "bold",
+    "figure.dpi": 300,
+    "savefig.dpi": 300,
+    "savefig.bbox": "tight",
+    "axes.grid": True,
+    "grid.alpha": 0.35,
+    "grid.linestyle": "--",
+    "axes.axisbelow": True,
+})
+
+MODEL_COLORS = {
+    "sequential": "#64748b",      # Slate Gray
+    "cmp": "#1f77b4",             # Azul institucional
+    "smt": "#059669",             # Verde esmeralda
+    "coarse_grained": "#7c3aed",  # Púrpura
+    "fine_grained": "#0891b2",    # Teal / Cian
+}
 
 MODEL_ORDER = {
     "sequential": 0,
@@ -427,16 +466,36 @@ def save_execution_time_plot(
         upper,
     )
 
+    colors = [
+        MODEL_COLORS.get(row.model, "#1f77b4")
+        for row in rows
+    ]
+
     figure, axis = plt.subplots(
         figsize=(12, 7)
     )
 
-    axis.bar(
+    bars = axis.bar(
         labels,
         means,
         yerr=errors,
         capsize=4,
+        color=colors,
+        edgecolor="#1a1a1a",
+        alpha=0.85,
     )
+
+    for bar in bars:
+        h = bar.get_height()
+        axis.annotate(
+            f"{h:.2f}s",
+            xy=(bar.get_x() + bar.get_width() / 2, h),
+            xytext=(0, 4),
+            textcoords="offset points",
+            ha="center",
+            fontsize=9,
+            fontweight="bold"
+        )
 
     axis.set_title(
         "Heat2D execution time"
@@ -452,7 +511,8 @@ def save_execution_time_plot(
 
     axis.grid(
         axis="y",
-        alpha=0.3,
+        alpha=0.35,
+        linestyle="--",
     )
 
     finish_bar_plot(
@@ -463,7 +523,7 @@ def save_execution_time_plot(
     figure.savefig(
         output_directory /
         "execution_time.png",
-        dpi=200,
+        dpi=300,
     )
 
     plt.close(
@@ -500,19 +560,39 @@ def save_throughput_plot(
         upper,
     )
 
+    colors = [
+        MODEL_COLORS.get(row.model, "#1f77b4")
+        for row in rows
+    ]
+
     figure, axis = plt.subplots(
         figsize=(12, 7)
     )
 
-    axis.bar(
+    bars = axis.bar(
         labels,
         means,
         yerr=errors,
         capsize=4,
+        color=colors,
+        edgecolor="#1a1a1a",
+        alpha=0.85,
     )
 
+    for bar in bars:
+        h = bar.get_height()
+        axis.annotate(
+            f"{h:.1f}",
+            xy=(bar.get_x() + bar.get_width() / 2, h),
+            xytext=(0, 4),
+            textcoords="offset points",
+            ha="center",
+            fontsize=9,
+            fontweight="bold"
+        )
+
     axis.set_title(
-        "Heat2D throughput"
+        "Heat2D throughput (MUpdates/s)"
     )
 
     axis.set_xlabel(
@@ -520,12 +600,13 @@ def save_throughput_plot(
     )
 
     axis.set_ylabel(
-        "Million cell updates / second"
+        "Million cell updates / second (MUpdates/s)"
     )
 
     axis.grid(
         axis="y",
-        alpha=0.3,
+        alpha=0.35,
+        linestyle="--",
     )
 
     finish_bar_plot(
@@ -536,7 +617,12 @@ def save_throughput_plot(
     figure.savefig(
         output_directory /
         "throughput.png",
-        dpi=200,
+        dpi=300,
+    )
+    figure.savefig(
+        output_directory /
+        "09_throughput_mupdates.png",
+        dpi=300,
     )
 
     plt.close(
@@ -573,21 +659,50 @@ def save_speedup_plot(
         upper,
     )
 
+    colors = [
+        MODEL_COLORS.get(row.model, "#1f77b4")
+        for row in rows
+    ]
+
     figure, axis = plt.subplots(
         figsize=(12, 7)
     )
 
-    axis.bar(
+    bars = axis.bar(
         labels,
         means,
         yerr=errors,
         capsize=4,
+        color=colors,
+        edgecolor="#1a1a1a",
+        alpha=0.85,
     )
+
+    for bar in bars:
+        h = bar.get_height()
+        axis.annotate(
+            f"{h:.2f}x",
+            xy=(bar.get_x() + bar.get_width() / 2, h),
+            xytext=(0, 4),
+            textcoords="offset points",
+            ha="center",
+            fontsize=9,
+            fontweight="bold"
+        )
 
     axis.axhline(
         y=1.0,
+        color="#d90429",
         linestyle="--",
-        linewidth=1.0,
+        linewidth=1.2,
+        label="Sequential (1.0x)",
+    )
+    axis.axhline(
+        y=8.0,
+        color="#10b981",
+        linestyle=":",
+        linewidth=1.2,
+        label="Ideal 8 Cores (8.0x)",
     )
 
     axis.set_title(
@@ -599,12 +714,17 @@ def save_speedup_plot(
     )
 
     axis.set_ylabel(
-        "Paired speedup"
+        "Speedup vs Sequential ($S_p$)"
+    )
+
+    axis.legend(
+        loc="upper left"
     )
 
     axis.grid(
         axis="y",
-        alpha=0.3,
+        alpha=0.35,
+        linestyle="--",
     )
 
     finish_bar_plot(
@@ -615,7 +735,12 @@ def save_speedup_plot(
     figure.savefig(
         output_directory /
         "speedup_vs_sequential.png",
-        dpi=200,
+        dpi=300,
+    )
+    figure.savefig(
+        output_directory /
+        "02_speedup_comparativo.png",
+        dpi=300,
     )
 
     plt.close(
@@ -672,12 +797,25 @@ def save_model_scalability_plot(
             for row in model_rows
         ]
 
+        color = MODEL_COLORS.get(model, "#1f77b4")
         axis.plot(
             x_values,
             y_values,
             marker="o",
+            linewidth=2.2,
+            color=color,
             label=display_name,
         )
+        for x, y in zip(x_values, y_values):
+            axis.annotate(
+                f"{y:.2f}x",
+                xy=(x, y),
+                xytext=(0, 6),
+                textcoords="offset points",
+                ha="center",
+                fontsize=8.5,
+                fontweight="bold"
+            )
 
     if not found_model:
         plt.close(
@@ -688,8 +826,19 @@ def save_model_scalability_plot(
 
     axis.axhline(
         y=1.0,
-        linestyle="--",
+        color="#d90429",
+        linestyle=":",
         linewidth=1.0,
+        label="Baseline (1.0x)"
+    )
+
+    axis.axline(
+        (1, 1),
+        slope=1,
+        color="#6b7280",
+        linestyle="--",
+        alpha=0.7,
+        label="Ideal linear (S=p)"
     )
 
     axis.set_xscale(
@@ -702,25 +851,31 @@ def save_model_scalability_plot(
     )
 
     axis.set_xlabel(
-        "Execution contexts / worker threads"
+        "Execution contexts / worker threads ($p$)"
     )
 
     axis.set_ylabel(
-        "Model-1 time / model-p time"
+        "Model-1 time / model-p time ($S_p$)"
     )
 
     axis.grid(
-        alpha=0.3,
+        alpha=0.35,
+        linestyle="--",
     )
 
-    axis.legend()
+    axis.legend(loc="upper left")
 
     figure.tight_layout()
 
     figure.savefig(
         output_directory /
         "model_scalability.png",
-        dpi=200,
+        dpi=300,
+    )
+    figure.savefig(
+        output_directory /
+        "04_escalabilidad_hilos.png",
+        dpi=300,
     )
 
     plt.close(
@@ -776,12 +931,24 @@ def save_efficiency_plot(
         figsize=(10, 6)
     )
 
+    color = MODEL_COLORS.get(model, "#1f77b4")
     axis.errorbar(
         x_values,
         means,
         yerr=errors,
         marker="o",
+        linewidth=2.2,
+        color=color,
         capsize=4,
+        label=f"{model.upper()} efficiency"
+    )
+
+    axis.axhline(
+        y=1.0,
+        color="#10b981",
+        linestyle="--",
+        linewidth=1.2,
+        label="Ideal (1.0 / 100%)"
     )
 
     axis.set_xscale(
@@ -802,15 +969,23 @@ def save_efficiency_plot(
     )
 
     axis.grid(
-        alpha=0.3,
+        alpha=0.35,
+        linestyle="--",
     )
+
+    axis.legend(loc="upper right")
 
     figure.tight_layout()
 
     figure.savefig(
         output_directory /
         file_name,
-        dpi=200,
+        dpi=300,
+    )
+    figure.savefig(
+        output_directory /
+        "03_eficiencia_paralela.png",
+        dpi=300,
     )
 
     plt.close(
@@ -950,11 +1125,18 @@ def save_distribution_boxplot(
         figsize=(13, 7)
     )
 
-    axis.boxplot(
+    boxes = axis.boxplot(
         values,
         tick_labels=labels,
         showmeans=True,
+        patch_artist=True,
     )
+
+    for patch, key in zip(boxes['boxes'], keys):
+        c = MODEL_COLORS.get(key[0], "#1f77b4")
+        patch.set_facecolor(c)
+        patch.set_alpha(0.75)
+        patch.set_edgecolor("#1a1a1a")
 
     axis.set_title(
         "Heat2D execution-time distribution"
@@ -970,7 +1152,8 @@ def save_distribution_boxplot(
 
     axis.grid(
         axis="y",
-        alpha=0.3,
+        alpha=0.35,
+        linestyle="--",
     )
 
     axis.tick_params(
@@ -983,7 +1166,12 @@ def save_distribution_boxplot(
     figure.savefig(
         output_directory /
         "time_distribution_boxplot.png",
-        dpi=200,
+        dpi=300,
+    )
+    figure.savefig(
+        output_directory /
+        "01_tiempos_ejecucion_boxplot.png",
+        dpi=300,
     )
 
     plt.close(
@@ -1043,11 +1231,13 @@ def save_convergence_plot(
             for sample in samples
         ]
 
+        c = MODEL_COLORS.get(key[0], None)
         axis.plot(
             runs,
             running_means(
                 times
             ),
+            color=c,
             label=case_label(
                 key[0],
                 key[1],
@@ -1067,7 +1257,8 @@ def save_convergence_plot(
     )
 
     axis.grid(
-        alpha=0.3,
+        alpha=0.35,
+        linestyle="--",
     )
 
     axis.legend(
@@ -1083,12 +1274,75 @@ def save_convergence_plot(
     figure.savefig(
         output_directory /
         "convergence.png",
-        dpi=200,
+        dpi=300,
+    )
+    figure.savefig(
+        output_directory /
+        "10_convergencia_estabilidad.png",
+        dpi=300,
     )
 
     plt.close(
         figure
     )
+
+
+def save_consolidated_dashboard(
+    rows,
+    output_directory,
+):
+    labels = create_labels(rows)
+    colors = [MODEL_COLORS.get(row.model, "#1f77b4") for row in rows]
+    figure, axs = plt.subplots(2, 2, figsize=(16, 12))
+
+    # (0, 0) Execution Time (s)
+    means_t = [r.mean_seconds for r in rows]
+    err_t = create_asymmetric_errors(means_t, [r.time_ci95_low for r in rows], [r.time_ci95_high for r in rows])
+    bars_t = axs[0, 0].bar(labels, means_t, yerr=err_t, capsize=4, color=colors, edgecolor="#1a1a1a", alpha=0.85)
+    axs[0, 0].set_title("(A) Execution Time (s) [95% CI]")
+    axs[0, 0].set_ylabel("Seconds (s)")
+    axs[0, 0].tick_params(axis="x", labelrotation=35)
+    for b in bars_t:
+        axs[0, 0].annotate(f"{b.get_height():.2f}s", xy=(b.get_x() + b.get_width()/2, b.get_height()), xytext=(0, 4), textcoords="offset points", ha="center", fontsize=8.5, fontweight="bold")
+
+    # (0, 1) Speedup vs Sequential
+    sp_vals = [r.mean_speedup_vs_sequential for r in rows]
+    err_sp = create_asymmetric_errors(sp_vals, [r.speedup_vs_sequential_ci95_low for r in rows], [r.speedup_vs_sequential_ci95_high for r in rows])
+    bars_sp = axs[0, 1].bar(labels, sp_vals, yerr=err_sp, capsize=4, color=colors, edgecolor="#1a1a1a", alpha=0.85)
+    axs[0, 1].axhline(1.0, color="#d90429", linestyle="--", linewidth=1.2, label="Sequential (1.0x)")
+    axs[0, 1].axhline(8.0, color="#10b981", linestyle=":", linewidth=1.2, label="Ideal 8 Cores (8.0x)")
+    axs[0, 1].set_title("(B) Speedup vs Sequential ($S_p$)")
+    axs[0, 1].set_ylabel("Speedup ($S_p$)")
+    axs[0, 1].legend(loc="upper left", fontsize=9)
+    axs[0, 1].tick_params(axis="x", labelrotation=35)
+    for b in bars_sp:
+        axs[0, 1].annotate(f"{b.get_height():.2f}x", xy=(b.get_x() + b.get_width()/2, b.get_height()), xytext=(0, 4), textcoords="offset points", ha="center", fontsize=8.5, fontweight="bold")
+
+    # (1, 0) Parallel Efficiency (%)
+    eff_vals = [r.mean_model_efficiency * 100.0 if r.mean_model_efficiency <= 1.0 else r.mean_model_efficiency for r in rows]
+    bars_ef = axs[1, 0].bar(labels, eff_vals, color=colors, edgecolor="#1a1a1a", alpha=0.85)
+    axs[1, 0].axhline(100.0, color="#10b981", linestyle="--", linewidth=1.2, label="Ideal (100%)")
+    axs[1, 0].set_title("(C) Model Parallel Efficiency (%)")
+    axs[1, 0].set_ylabel("Efficiency (%)")
+    axs[1, 0].legend(loc="upper right", fontsize=9)
+    axs[1, 0].tick_params(axis="x", labelrotation=35)
+    for b in bars_ef:
+        axs[1, 0].annotate(f"{b.get_height():.1f}%", xy=(b.get_x() + b.get_width()/2, b.get_height()), xytext=(0, 4), textcoords="offset points", ha="center", fontsize=8.5, fontweight="bold")
+
+    # (1, 1) Simulation Throughput
+    tp_vals = [r.mean_mupdates_per_second for r in rows]
+    err_tp = create_asymmetric_errors(tp_vals, [r.throughput_ci95_low for r in rows], [r.throughput_ci95_high for r in rows])
+    bars_tp = axs[1, 1].bar(labels, tp_vals, yerr=err_tp, capsize=4, color=colors, edgecolor="#1a1a1a", alpha=0.85)
+    axs[1, 1].set_title("(D) Simulation Throughput (MUpdates/s)")
+    axs[1, 1].set_ylabel("MUpdates / s")
+    axs[1, 1].tick_params(axis="x", labelrotation=35)
+    for b in bars_tp:
+        axs[1, 0].annotate(f"{b.get_height():.0f}", xy=(b.get_x() + b.get_width()/2, b.get_height()), xytext=(0, 4), textcoords="offset points", ha="center", fontsize=8.5, fontweight="bold")
+
+    figure.suptitle("Heat2D Performance Dashboard - Standardized Metrics", fontsize=16, fontweight="bold")
+    figure.tight_layout()
+    figure.savefig(output_directory / "08_dashboard_consolidado.png", dpi=300)
+    plt.close(figure)
 
 
 def main():
@@ -1145,11 +1399,20 @@ def main():
         arguments.output_dir,
     )
 
+    save_consolidated_dashboard(
+        rows,
+        arguments.output_dir,
+    )
+
     generated_files = [
         "execution_time.png",
         "throughput.png",
         "speedup_vs_sequential.png",
         "model_scalability.png",
+        "02_speedup_comparativo.png",
+        "04_escalabilidad_hilos.png",
+        "08_dashboard_consolidado.png",
+        "09_throughput_mupdates.png",
     ]
 
     models_present = {
@@ -1176,6 +1439,9 @@ def main():
         generated_files.append(
             "smt_parallel_efficiency.png"
         )
+        generated_files.append(
+            "03_eficiencia_paralela.png"
+        )
 
     if arguments.raw is not None:
         raw_samples = load_raw_samples(
@@ -1196,6 +1462,8 @@ def main():
             [
                 "time_distribution_boxplot.png",
                 "convergence.png",
+                "01_tiempos_ejecucion_boxplot.png",
+                "10_convergencia_estabilidad.png",
             ]
         )
 

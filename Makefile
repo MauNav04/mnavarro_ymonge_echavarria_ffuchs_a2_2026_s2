@@ -1039,8 +1039,20 @@ campaign-run: release python-deps
 	@echo
 
 # ============================================================
-# perf - software events
+# Heat2D Standardized Plotting and PMU Profiling Targets
 # ============================================================
+
+plot-heat2d-200:
+	python3 $(SCRIPTS)/plot_benchmark.py \
+		$(HEAT2D)/benchmark_results/ryzen_smt_200/summary.csv \
+		--raw $(HEAT2D)/benchmark_results/ryzen_smt_200/raw_results.csv \
+		--output-dir $(HEAT2D)/benchmark_results/ryzen_smt_200/plots
+
+profile-perf-heat2d: release
+	python3 $(SCRIPTS)/profile_perf.py --runs 3 --sudo
+
+profile-plot-heat2d:
+	python3 $(SCRIPTS)/profile_perf.py --plot-only
 
 perf-soft-seq: $(SEQ_BIN)
 	sudo perf stat \
