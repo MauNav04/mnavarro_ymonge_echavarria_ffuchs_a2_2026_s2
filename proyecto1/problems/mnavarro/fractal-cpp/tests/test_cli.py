@@ -5,9 +5,10 @@ import sys
 import tempfile
 
 binary = pathlib.Path(sys.argv[1]).resolve()
+fine_binary = pathlib.Path(sys.argv[2]).resolve()
 
-def run(*args):
-    result = subprocess.run([str(binary), *map(str, args)], capture_output=True, text=True, timeout=30)
+def run(*args, executable=binary):
+    result = subprocess.run([str(executable), *map(str, args)], capture_output=True, text=True, timeout=30)
     if result.returncode:
         raise AssertionError(result.stderr)
     return result.stdout
@@ -16,6 +17,8 @@ with tempfile.TemporaryDirectory(prefix="fractal-cli-") as directory:
     work = pathlib.Path(directory)
     image = work / "input.ppm"
     image.write_bytes(b"P6\n16 24\n255\n" + bytes((i * 17 + i // 7) % 256 for i in range(16 * 24 * 3)))
+    assert "fractal_seq" in run("--help")
+    assert "fractal_fine" in run("--help",executable=fine_binary)
     assert "--threads-per-team" in run("--help")
     for mode in ["compress", "compress-gray"]:
         legacy, named = work / "legacy.frc", work / "named.frc"
@@ -30,6 +33,23 @@ with tempfile.TemporaryDirectory(prefix="fractal-cli-") as directory:
         assert first.read_bytes() == second.read_bytes()
         compare = "compare" if mode == "compress" else "compare-gray"
         assert "MSE global [0,1]: 0" in run(compare, first, second)
+    # El modelo nuevo comparte exactamente reglas y reconstrucción con la base.
+    import csv
+    for mode in ["compress", "compress-gray"]:
+        reference = work / "reference.frc"
+        run(mode, image, reference, 4, 3)
+        for quantum in [1, 3, 100]:
+            fine, trace = work / "fine.frc", work / "schedule.csv"
+            output = run(mode, image, fine, 4, 3, "--teams", 5,
+                         "--threads-per-team", 2, "--quantum-domains", quantum, "--trace-schedule", trace, executable=fine_binary)
+            assert "Round-Robin cooperativo" in output
+            assert reference.read_bytes() == fine.read_bytes()
+            with trace.open() as file:
+                events = list(csv.DictReader(file))
+            assert events and int(events[0]["worker"]) == 0
+            assert all(0 < int(e["domain_end"])-int(e["domain_begin"]) <= quantum for e in events)
+            assert set(int(e["channel"]) for e in events) == ({0,1,2} if mode == "compress" else {0})
+            run("decompress", fine, work / "fine.png", 80)
     # Rechazar entradas inválidas antes de E/S, sin truncar una salida existente.
     sentinel = work / "sentinel.frc"
     sentinel.write_bytes(b"preservar")
@@ -57,12 +77,23 @@ with tempfile.TemporaryDirectory(prefix="fractal-cli-") as directory:
         (["compress", image, sentinel, 4, 3, 1], "Cantidad de argumentos"),
         (["compress", image, image, 4, 3], "archivos distintos"),
     ]
-    for model in ["fine-grained", "coarse-grained", "CMP", "SMT"]:
+    for model in ["coarse-grained", "CMP", "SMT"]:
         invalid.append((["compress", image, sentinel, "--model", model, "--teams", 5,
-                         "--threads-per-team", 2], "aun no implementado"))
+                         "--threads-per-team", 2], "solo admite el modelo"))
+    invalid = [(binary,args,message) for args,message in invalid]
+    invalid.extend([
+        (fine_binary,["compress", image, sentinel, "--quantum-domains", 0], "entero positivo"),
+        (binary,["compress", image, sentinel, "--quantum-domains", 1], "requieren fine-grained"),
+        (binary,["compress", image, sentinel, "--trace-schedule", work / "bad.csv"], "requieren fine-grained"),
+        (fine_binary,["decompress", sentinel, image], "Decodificacion fine-grained"),
+        (fine_binary,["compress", image, sentinel, "--trace-schedule", image], "archivos distintos"),
+        (fine_binary,["compress", image, sentinel, "--trace-schedule", sentinel], "archivos distintos"),
+        (binary,["compress", image, sentinel, "--model", "fine-grained"], "solo admite el modelo"),
+        (fine_binary,["compress", image, sentinel, "--model", "sequential"], "solo admite el modelo"),
+    ])
     original = image.read_bytes()
-    for args, message in invalid:
-        result = subprocess.run([str(binary), *map(str, args)], capture_output=True, text=True, timeout=30)
+    for executable,args,message in invalid:
+        result = subprocess.run([str(executable), *map(str, args)], capture_output=True, text=True, timeout=30)
         assert result.returncode != 0, args
         assert message in result.stderr, (args, result.stderr)
         assert sentinel.read_bytes() == b"preservar"

@@ -11,8 +11,13 @@ Antes de modificar código, consultar [README.md](README.md), fuente de verdad d
 [README_Cod.md](README_Cod.md) es la referencia original de criterios, no un segundo tablero.
 La guía histórica en `sequential/README.md` no autoriza avanzar automáticamente de etapa.
 
-El punto de entrada secuencial reside en `sequential/`; el núcleo único compartido está en
-`src/` e `include/` y la E/S compartida en `app/`, extraídos durante la etapa 1 autorizada.
+Cada modelo tiene su propio `main.cpp` y `CMakeLists.txt` en su carpeta, y un ejecutable
+separado: `sequential/` → `fractal_seq`, `fine-grained/` → `fractal_fine`.
+Esta organización fue aprobada por el usuario para las siguientes etapas: `coarse-grained/`
+→ `fractal_coarse`, `CMP/` → `fractal_cmp` y `SMT/` → `fractal_smt`, cuando se soliciten.
+Cada main fija su modelo; no permite ejecutar otro mediante `--model`.
+El núcleo único compartido está en `src/` e `include/`. Argumentos, E/S y mediciones se
+reutilizan desde `app/`; los main deben mantenerse pequeños, sin copiar el controlador.
 Conservar el algoritmo matemático y los formatos FRC1/FRC2.
 Diseño aprobado: equipos de hilos por range; cada hilo evalúa dominios distintos y el equipo
 reduce mínimos para publicar una única regla. En empates conservar el orden dominio/simetría

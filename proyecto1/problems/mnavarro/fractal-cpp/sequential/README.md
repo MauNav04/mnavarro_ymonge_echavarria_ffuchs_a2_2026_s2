@@ -133,9 +133,9 @@ ctest --test-dir build --output-on-failure
 ### Demostración RGB
 
 ```bash
-./build/fractal compress examples/color.png prueba_color.frc 8 8
-./build/fractal decompress prueba_color.frc reconstruida_color.png 80
-./build/fractal compare examples/color.png reconstruida_color.png
+./build/fractal_seq compress examples/color.png prueba_color.frc 8 8
+./build/fractal_seq decompress prueba_color.frc reconstruida_color.png 80
+./build/fractal_seq compare examples/color.png reconstruida_color.png
 ```
 
 - Los dos últimos argumentos de `compress` son range y stride; el dominio tiene el doble del lado del range.
@@ -146,9 +146,9 @@ ctest --test-dir build --output-on-failure
 ### Demostración en gris y compatibilidad
 
 ```bash
-./build/fractal compress-gray examples/color.png prueba_gris.frc 8 8
-./build/fractal decompress prueba_gris.frc reconstruida_gris.png 80
-./build/fractal compare-gray examples/color.png reconstruida_gris.png
+./build/fractal_seq compress-gray examples/color.png prueba_gris.frc 8 8
+./build/fractal_seq decompress prueba_gris.frc reconstruida_gris.png 80
+./build/fractal_seq compare-gray examples/color.png reconstruida_gris.png
 ```
 
 RGB usa `FRC2`; gris conserva `FRC1`. El decodificador nuevo reconoce ambos formatos. La extensión es `.frc` en los dos casos. OpenCV convierte su representación BGR a los planos RGB propios, y revierte ese orden al guardar.

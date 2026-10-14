@@ -5,8 +5,8 @@ Este README es la **única fuente de verdad del progreso, arquitectura y validac
 están en [AGENTS.md](AGENTS.md) y la guía académica de la versión base en
 [sequential/README.md](sequential/README.md).
 
-Alcance autorizado: **etapa 1**, con equipos de hilos por range como diseño aprobado.
-Las etapas 2–8 continúan pendientes y requieren solicitud explícita.
+Alcance autorizado: **etapa 2**, con equipos de hilos por range como diseño aprobado.
+Las etapas 3–8 continúan pendientes y requieren solicitud explícita.
 
 ## 1. Descripción del proyecto
 
@@ -40,7 +40,7 @@ La topología real de núcleos físicos, P-cores, E-cores e hilos SMT debe verif
 Estructura vigente tras la extracción de la etapa 1:
 
 - `sequential/`: punto de entrada secuencial (nombre actualizado por solicitud del usuario).
-- `app/`: entrada/salida compartida y serialización FRC1/FRC2.
+- `app/`: controlador CLI, entrada/salida, mediciones y serialización FRC1/FRC2 compartidos.
 - `tests/`: pruebas del núcleo, ejecución y entrada/salida.
 - `fine-grained/`: simulación de planificación de grano fino.
 - `coarse-grained/`: implementación de grano grueso.
@@ -51,6 +51,18 @@ Estructura vigente tras la extracción de la etapa 1:
 - `scripts/`: automatización de compilación, pruebas, benchmarks, métricas y profiling.
 - `metrics/`: resultados experimentales y gráficas.
 - `docs/`: documentación técnica complementaria.
+
+**Puntos de entrada y ejecutables aprobados:** cada carpeta de modelo tiene su propio
+`main.cpp` y `CMakeLists.txt`. Los main delegan argumentos y E/S en `app/cli.cpp` y fijan
+su modelo; el núcleo continúa compartido en `fractal_codec`.
+
+| Modelo | Punto de entrada | Ejecutable |
+|---|---|---|
+| Secuencial | `sequential/main.cpp` | `fractal_seq` |
+| Fine-Grained | `fine-grained/main.cpp` | `fractal_fine` |
+| Coarse-Grained (pendiente) | `coarse-grained/main.cpp` | `fractal_coarse` |
+| CMP (pendiente) | `CMP/main.cpp` | `fractal_cmp` |
+| SMT (pendiente) | `SMT/main.cpp` | `fractal_smt` |
 
 **Diseño aprobado:** equipos de hilos por range, reparto de dominios entre sus miembros y reducción de mínimos para publicar una regla. Ejemplo: 10 hilos = 5 equipos × 2 hilos.
 
@@ -75,18 +87,18 @@ Una etapa se considera completa únicamente cuando se cumplen sus criterios de a
 - [x] Validar que la versión secuencial mantiene su funcionalidad.
 
 **Aceptación cumplida:** núcleo único reutilizable y ejecución secuencial validada.
-Pruebas y equivalencia registradas en el historial; no se implementaron las etapas 2–8.
+Pruebas y equivalencia registradas en el historial.
 
 ### Etapa 2 — Fine-Grained
 
-- [ ] Implementar ejecución mediante pthreads.
-- [ ] Implementar planificación cooperativa Round-Robin.
-- [ ] Definir cuantums mínimos de trabajo.
-- [ ] Implementar sincronización entre trabajadores.
-- [ ] Verificar la alternancia de ejecución.
-- [ ] Validar resultados contra la versión secuencial.
+- [x] Implementar ejecución mediante pthreads.
+- [x] Implementar planificación cooperativa Round-Robin.
+- [x] Definir cuantums mínimos de trabajo.
+- [x] Implementar sincronización entre trabajadores.
+- [x] Verificar la alternancia de ejecución.
+- [x] Validar resultados contra la versión secuencial.
 
-**Aceptación:** Simulación funcional de alternancia por cuantums, con comportamiento verificable y resultados correctos.
+**Aceptación cumplida:** pthreads con Round-Robin cooperativo, cuantums verificables y resultados idénticos a la base. La comprobación adicional con ThreadSanitizer queda pendiente por limitación del entorno.
 
 ### Etapa 3 — Coarse-Grained
 
@@ -184,21 +196,43 @@ Desde `proyecto1/problems/mnavarro/fractal-cpp/`:
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_APP=ON
 cmake --build build -j2
 ctest --test-dir build --output-on-failure
-./build/fractal --help
-./build/fractal compress sequential/examples/color128.png sequential/examples/results/color.frc --model sequential --teams 1 --threads-per-team 1 --range 8 --stride 8
-./build/fractal decompress sequential/examples/results/color.frc sequential/examples/results/color.png --iterations 80
-./build/fractal compare sequential/examples/color128.png sequential/examples/results/color.png
+mkdir -p sequential/examples/results
+./build/fractal_seq --help
+./build/fractal_fine --help
+./build/fractal_seq compress sequential/examples/color128.png sequential/examples/results/color.frc --teams 1 --threads-per-team 1 --range 8 --stride 8
+./build/fractal_seq decompress sequential/examples/results/color.frc sequential/examples/results/color.png --iterations 80
+./build/fractal_seq compare sequential/examples/color128.png sequential/examples/results/color.png
 ```
 
-Se conservan los argumentos posicionales originales (`compress entrada salida 8 8` y
-`decompress entrada salida 80`), el modo gris (`compress-gray`, `compare-gray`) y el alias
-`--model sequential`. Las opciones no se pueden repetir ni duplicar con argumentos posicionales.
+Fine-Grained, con 10 trabajadores organizados en 5 equipos de 2:
 
-`--teams` y `--threads-per-team` describen la configuración común. En etapa 1 deben valer 1.
-Fine-Grained, Coarse-Grained, CMP y SMT se reconocen pero se rechazan como no implementados.
+```bash
+mkdir -p fine-grained/results
+./build/fractal_fine compress sequential/examples/color128.png fine-grained/results/color.frc --teams 5 --threads-per-team 2 --quantum-domains 1
+./build/fractal_seq decompress fine-grained/results/color.frc fine-grained/results/color.png --iterations 80
+./build/fractal_seq compare sequential/examples/color128.png fine-grained/results/color.png
+```
+
+Cuantum por defecto: 1 dominio y sus ocho simetrías; se configura con `--quantum-domains N`.
+Agregar `--trace-schedule fine-grained/results/schedule.csv` a `compress` o `compress-gray`
+permite inspeccionar los turnos. Es una traza de software opcional, no un contador de hardware;
+registrarla añade tiempo y memoria. Ver [docs/fine_grained.md](docs/fine_grained.md).
+
+Se conservan los argumentos posicionales originales (`compress entrada salida 8 8` y
+`decompress entrada salida 80`), el modo gris (`compress-gray`, `compare-gray`). Por compatibilidad, `--model` es opcional
+y solo acepta el modelo del ejecutable (`sequential`/`secuencial` para `fractal_seq`,
+`fine-grained` para `fractal_fine`). Los modelos cruzados se rechazan.
+Las opciones no se pueden repetir ni duplicar con argumentos posicionales.
+
+`--teams` y `--threads-per-team` describen la configuración común; para `sequential` deben valer 1.
+Fine-Grained está disponible para compresión; Coarse-Grained, CMP y SMT continúan pendientes.
+La reconstrucción se ejecuta mediante `fractal_seq decompress`; `fractal_fine` la rechaza.
 No se aceptan opciones de ejecución en `compare` ni parámetros de compresión en `decompress`.
 
-También se puede construir desde `sequential/` con `cmake -S sequential -B build`.
+También se puede configurar desde una carpeta de modelo con `cmake -S sequential -B build`
+o `cmake -S fine-grained -B build`. Ambos casos reutilizan las bibliotecas de la raíz.
+Para construir un ejecutable específico, usar `cmake --build build --target fractal_seq`
+o `cmake --build build --target fractal_fine`.
 `-DBUILD_APP=OFF` permite construir la biblioteca y pruebas sin OpenCV.
 CTest registra la prueba `cli_tests` cuando Python3 está disponible; no es dependencia de
 la biblioteca C++. Las pruebas del núcleo no requieren OpenCV ni Python.
@@ -226,6 +260,16 @@ Cada decisión debe incluir:
 - La etapa 1 ofrece las operaciones reutilizables y ejecuta solo el modelo secuencial.
   Cuantum, eventos de stall y afinidad pertenecen a etapas futuras.
 
+**Etapa 2 — Referencia indicada por el usuario:**
+
+- Se adapta el modo cooperativo de RayTracing: Q=1 unidad de trabajo por defecto,
+  configurable y rotación incondicional. En fractales la unidad es un dominio y sus ocho
+  simetrías, con pthreads reales y turnos estrictos globales. No se implementa su modo
+  paralelo cíclico porque no verifica alternancia cooperativa.
+- Se conserva el diseño de equipos por range y se reducen los mínimos antes de publicar.
+  Decodificación secuencial; las trazas registran turnos de software, no ciclos de hardware
+  ni cambios de contexto del SO. Ver [docs/fine_grained.md](docs/fine_grained.md).
+
 **Decisiones iniciales:**
 
 - C++ como lenguaje de implementación.
@@ -240,15 +284,17 @@ Registrar problemas conocidos, tareas bloqueadas y validaciones que requieren in
 
 **Pendientes:**
 
-- Implementar equipos reales y sincronización en las etapas concurrentes autorizadas.
-- Confirmar cuantums para Fine-Grained y eventos de stall para Coarse-Grained antes
-  de sus respectivas implementaciones; no bloquean la etapa 1.
+- [ ] Repetir la comprobación adicional con ThreadSanitizer en un entorno compatible.
+  Las dos ejecuciones locales fallaron antes de iniciar la prueba con
+  `FATAL: ThreadSanitizer: unexpected memory mapping`; no se afirma validación con TSan.
+
+- Implementar las etapas 3–8 únicamente cuando se soliciten explícitamente.
+- Confirmar eventos de stall antes de implementar Coarse-Grained.
 - La configuración secuencial rechaza varios equipos/hilos para evitar informar
-  paralelismo inexistente. `10 hilos = 5 equipos × 2` describe el diseño futuro.
+  paralelismo inexistente. `10 hilos = 5 equipos × 2` ya está disponible para Fine-Grained.
 
 
 - Confirmar topología física y lógica de la CPU.
-- Definir el tamaño de cuantum de Fine-Grained.
 - Definir cómo se modelarán los stalls de Coarse-Grained.
 - Establecer configuraciones equivalentes de comparación.
 - Verificar los requisitos académicos adicionales de la especificación.
@@ -316,3 +362,58 @@ Mantener este historial breve. Git conserva el historial detallado de modificaci
   (`/tmp/fractal-rename-root-20261014`) y desde `sequential/`
   (`/tmp/fractal-rename-direct-20261014`): **5/5 pruebas aprobadas en ambas construcciones**.
   Enlaces locales y `git diff --check` correctos. Sin nuevos pendientes por este renombre.
+
+
+### 2026-10-14 — Etapa 2 — Fine-Grained implementado y validado
+
+- `fine-grained/encoder.cpp`: pthreads, compuerta de inicio, mutex/condición, Round-Robin
+  global, Q=1 dominio configurable, reducción de mínimos por equipo y joins de todos los
+  trabajadores. Equipos/ranges y miembros/dominios se reparten de manera contigua equilibrada.
+- Interfaz común y CLI: `--model fine-grained`, `--quantum-domains` y `--trace-schedule`.
+  Solo codificación gris/RGB; la reconstrucción usa el codec secuencial.
+  Todos los archivos y carpetas nuevos tienen nombres en inglés.
+- Release con OpenCV: `cmake -S . -B /tmp/fractal-stage2-release -DCMAKE_BUILD_TYPE=Release -DBUILD_APP=ON`,
+  `cmake --build /tmp/fractal-stage2-release -j2` y
+  `ctest --test-dir /tmp/fractal-stage2-release --output-on-failure`: **6/6 aprobadas**.
+- Sin OpenCV (`BUILD_APP=OFF`, `/tmp/fractal-stage2-core`): **4/4 aprobadas**.
+- `fine_grained_tests`: **48 configuraciones monocanal y un caso RGB**; reglas y
+  reconstrucciones exactas, turnos globales reproducidos desde traza, cobertura completa
+  sin duplicados, cuantums acotados, empates, barrera del equipo e intervalos/equipos vacíos.
+  Configuraciones 1×1, 1×3, 5×2 y 7×4, Q=1/2/100; CTest impone timeout de 45 segundos.
+- `cli_tests`: compatibilidad original y seis compresiones Fine-Grained (gris/RGB,
+  5×2, Q=1/3/100), traza, reconstrucción y **31 rechazos** de parámetros/rutas inválidos.
+- Contra el binario anterior `/tmp/fractal-stage2-baseline/fractal`, `color128.png`,
+  range=8, stride=8 y 80 iteraciones: gris y RGB, 5×2 trabajadores, Q=1/4.
+  **Cuatro compresiones FRC y reconstrucciones PNG idénticas byte por byte**.
+  Artefactos: `/tmp/fractal-stage2-check-if9gnijo/`.
+- Fallo de creación inducido limitando únicamente el subproceso de prueba a 128 MiB
+  (`RLIMIT_AS`): se propagó `pthread_create: Resource temporarily unavailable` y terminó
+  sin bloqueo dentro de un timeout de 15 segundos.
+- ThreadSanitizer: ambas construcciones Debug compilaron (normal y sin PIE), pero ambas
+  ejecuciones fallaron antes de los tests por `unexpected memory mapping`. Ver pendiente.
+  No se reportan resultados de benchmarking ni se extrapolan medidas físicas desde WSL2.
+- README: seis tareas de etapa 2 completadas; etapas 3–8 pendientes.
+  Próximo paso, solo bajo solicitud explícita: etapa 3 y definición de eventos de stall.
+
+### 2026-10-14 — Organización aprobada — Ejecutables separados por modelo
+
+- `sequential/main.cpp` → `fractal_seq`; `fine-grained/main.cpp` → `fractal_fine`,
+  cada uno con su CMake. Los puntos de entrada fijan su modelo y delegan en `app/cli.cpp`.
+- El controlador antes ubicado en `sequential/main.cpp` se trasladó a `app/cli.cpp`.
+  `fractal_app` comparte argumentos, E/S y mediciones; `fractal_codec` conserva el núcleo.
+  No se duplicó el algoritmo ni se cambió la planificación Fine-Grained.
+- Ya no se construye el ejecutable único `fractal`. `--model` es opcional por compatibilidad
+  y rechaza modelos que no correspondan al ejecutable. Reconstrucción con `fractal_seq`.
+- Esta estructura queda como regla permanente para Coarse-Grained, CMP y SMT en sus etapas;
+  sus ejecutables y puntos de entrada todavía no se implementan.
+- Release con OpenCV desde la raíz (`/tmp/fractal-split-root`) y desde `fine-grained/`
+  (`/tmp/fractal-split-direct`): construcción `-j2` y CTest, **6/6 aprobadas en cada caso**.
+  Sin OpenCV (`/tmp/fractal-split-core`): **4/4 aprobadas**.
+- Pruebas CLI adaptadas a los dos binarios: modelo predeterminado, ayuda, rechazo de
+  modelos cruzados, trazas, igualdad de reglas y reconstrucción de archivos Fine-Grained
+  con el ejecutable secuencial. Enlaces locales y `git diff --check` revisados.
+- Contra el ejecutable único anterior, `color128.png`, range=8, stride=8, 80 iteraciones,
+  secuencial y Fine-Grained 5×2: cuatro casos RGB/gris con FRC y PNG idénticos byte por byte.
+  Artefactos: `/tmp/fractal-split-check-frop1mgw/`.
+- Actualizados comandos actuales y reglas; se conservan los registros históricos.
+  Etapas 1 y 2 completas; etapas 3–8 y la comprobación adicional con TSan siguen pendientes.
