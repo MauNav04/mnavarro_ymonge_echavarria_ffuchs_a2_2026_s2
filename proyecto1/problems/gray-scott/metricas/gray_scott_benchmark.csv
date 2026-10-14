@@ -1,36 +1,1401 @@
 run_id,modelo,modo,hilos,quantum,size,steps,eventos_contexto,tiempo_ms,tiempo_s,timestamp
-1,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,955.803,0.9558,2026-10-13T23:49:44.574618
-2,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1233.040,1.2330,2026-10-13T23:49:45.861755
-3,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1168.970,1.1690,2026-10-13T23:49:47.085006
-4,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,858.316,0.8583,2026-10-13T23:49:47.997451
-5,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1332.520,1.3325,2026-10-13T23:49:49.384074
-1,Secuencial,baseline,1,0,512,16000,0,3933.790,3.9338,2026-10-13T23:49:54.624027
-2,Secuencial,baseline,1,0,512,16000,0,4136.610,4.1366,2026-10-13T23:49:58.814720
-3,Secuencial,baseline,1,0,512,16000,0,3919.530,3.9195,2026-10-13T23:50:02.788359
-4,Secuencial,baseline,1,0,512,16000,0,4124.880,4.1249,2026-10-13T23:50:06.967506
-5,Secuencial,baseline,1,0,512,16000,0,4067.250,4.0672,2026-10-13T23:50:11.088986
-1,CMP,dedicated_cores,8,0,512,16000,0,801.015,0.8010,2026-10-13T23:50:11.944429
-2,CMP,dedicated_cores,8,0,512,16000,0,710.079,0.7101,2026-10-13T23:50:12.708630
-3,CMP,dedicated_cores,8,0,512,16000,0,751.906,0.7519,2026-10-13T23:50:13.514910
-4,CMP,dedicated_cores,8,0,512,16000,0,723.554,0.7236,2026-10-13T23:50:14.292560
-5,CMP,dedicated_cores,8,0,512,16000,0,757.937,0.7579,2026-10-13T23:50:15.104586
-1,SMT (HW Real),hardware_smt,16,0,512,16000,0,1730.470,1.7305,2026-10-13T23:50:16.889283
-2,SMT (HW Real),hardware_smt,16,0,512,16000,0,1277.780,1.2778,2026-10-13T23:50:18.221349
-3,SMT (HW Real),hardware_smt,16,0,512,16000,0,1026.140,1.0261,2026-10-13T23:50:19.301713
-4,SMT (HW Real),hardware_smt,16,0,512,16000,0,1434.630,1.4346,2026-10-13T23:50:20.790491
-5,SMT (HW Real),hardware_smt,16,0,512,16000,0,1359.110,1.3591,2026-10-13T23:50:22.203819
-1,Coarse-Grained,burst_block,8,0,512,16000,16000,995.826,0.9958,2026-10-13T23:50:23.253900
-2,Coarse-Grained,burst_block,8,0,512,16000,16000,1018.830,1.0188,2026-10-13T23:50:24.326707
-3,Coarse-Grained,burst_block,8,0,512,16000,16000,977.233,0.9772,2026-10-13T23:50:25.358329
-4,Coarse-Grained,burst_block,8,0,512,16000,16000,1080.660,1.0807,2026-10-13T23:50:26.493007
-5,Coarse-Grained,burst_block,8,0,512,16000,16000,1063.900,1.0639,2026-10-13T23:50:27.611249
-1,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4030.300,4.0303,2026-10-13T23:50:31.695436
-2,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4161.070,4.1611,2026-10-13T23:50:35.910647
-3,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4175.570,4.1756,2026-10-13T23:50:40.140279
-4,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4068.710,4.0687,2026-10-13T23:50:44.263144
-5,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4040.830,4.0408,2026-10-13T23:50:48.358016
-1,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1294.630,1.2946,2026-10-13T23:50:49.707130
-2,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1290.280,1.2903,2026-10-13T23:50:51.052665
-3,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1134.450,1.1344,2026-10-13T23:50:52.241134
-4,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1204.980,1.2050,2026-10-13T23:50:53.500382
-5,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1148.160,1.1482,2026-10-13T23:50:54.702753
+1,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,3000.860,3.0009,2026-10-14T01:26:39.451522
+2,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,3355.820,3.3558,2026-10-14T01:26:42.866132
+3,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,3222.270,3.2223,2026-10-14T01:26:46.146557
+4,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,2882.200,2.8822,2026-10-14T01:26:49.087616
+5,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,2938.340,2.9383,2026-10-14T01:26:52.082807
+6,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,2579.020,2.5790,2026-10-14T01:26:54.718854
+7,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,2682.900,2.6829,2026-10-14T01:26:57.458887
+8,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1863.330,1.8633,2026-10-14T01:26:59.377402
+9,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1660.600,1.6606,2026-10-14T01:27:01.095548
+10,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1516.540,1.5165,2026-10-14T01:27:02.668408
+11,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1483.520,1.4835,2026-10-14T01:27:04.210269
+12,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1630.020,1.6300,2026-10-14T01:27:05.896331
+13,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1624.640,1.6246,2026-10-14T01:27:07.577402
+14,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1429.020,1.4290,2026-10-14T01:27:09.063532
+15,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1596.040,1.5960,2026-10-14T01:27:10.714984
+16,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1801.750,1.8017,2026-10-14T01:27:12.572132
+17,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1583.420,1.5834,2026-10-14T01:27:14.211444
+18,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1487.250,1.4872,2026-10-14T01:27:15.755276
+19,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1826.870,1.8269,2026-10-14T01:27:17.637985
+20,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1557.280,1.5573,2026-10-14T01:27:19.250838
+21,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1466.770,1.4668,2026-10-14T01:27:20.773774
+22,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1563.150,1.5632,2026-10-14T01:27:22.394079
+23,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1241.330,1.2413,2026-10-14T01:27:23.693273
+24,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1235.400,1.2354,2026-10-14T01:27:24.986193
+25,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1287.860,1.2879,2026-10-14T01:27:26.332248
+26,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1285.910,1.2859,2026-10-14T01:27:27.673395
+27,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1212.210,1.2122,2026-10-14T01:27:28.943459
+28,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1222.400,1.2224,2026-10-14T01:27:30.223467
+29,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1384.700,1.3847,2026-10-14T01:27:31.666046
+30,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1264.310,1.2643,2026-10-14T01:27:32.988237
+31,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1246.280,1.2463,2026-10-14T01:27:34.290251
+32,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1262.500,1.2625,2026-10-14T01:27:35.610243
+33,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1348.320,1.3483,2026-10-14T01:27:37.016380
+34,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1266.080,1.2661,2026-10-14T01:27:38.340193
+35,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1235.970,1.2360,2026-10-14T01:27:39.633895
+36,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1250.550,1.2506,2026-10-14T01:27:40.942232
+37,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1422.520,1.4225,2026-10-14T01:27:42.422275
+38,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1247.600,1.2476,2026-10-14T01:27:43.727917
+39,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1281.860,1.2819,2026-10-14T01:27:45.067156
+40,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1222.330,1.2223,2026-10-14T01:27:46.346871
+41,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1389.830,1.3898,2026-10-14T01:27:47.794574
+42,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1363.350,1.3633,2026-10-14T01:27:49.216038
+43,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1268.250,1.2683,2026-10-14T01:27:50.541761
+44,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1387.470,1.3875,2026-10-14T01:27:51.986766
+45,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1277.800,1.2778,2026-10-14T01:27:53.322569
+46,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1292.930,1.2929,2026-10-14T01:27:54.673587
+47,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1304.570,1.3046,2026-10-14T01:27:56.035824
+48,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1393.390,1.3934,2026-10-14T01:27:57.486901
+49,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1246.020,1.2460,2026-10-14T01:27:58.790627
+50,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1202.530,1.2025,2026-10-14T01:28:00.050972
+51,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1217.450,1.2175,2026-10-14T01:28:01.326813
+52,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1424.450,1.4244,2026-10-14T01:28:02.809196
+53,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1299.670,1.2997,2026-10-14T01:28:04.166844
+54,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1276.440,1.2764,2026-10-14T01:28:05.500775
+55,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1228.080,1.2281,2026-10-14T01:28:06.786469
+56,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1483.860,1.4839,2026-10-14T01:28:08.326230
+57,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1298.760,1.2988,2026-10-14T01:28:09.682561
+58,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1306.150,1.3062,2026-10-14T01:28:11.046671
+59,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1450.490,1.4505,2026-10-14T01:28:12.554826
+60,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1313.710,1.3137,2026-10-14T01:28:13.926419
+61,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1326.120,1.3261,2026-10-14T01:28:15.310583
+62,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1220.130,1.2201,2026-10-14T01:28:16.587958
+63,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1436.010,1.4360,2026-10-14T01:28:18.081784
+64,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1289.080,1.2891,2026-10-14T01:28:19.428508
+65,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1326.660,1.3267,2026-10-14T01:28:20.812778
+66,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1345.950,1.3459,2026-10-14T01:28:22.216883
+67,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1360.180,1.3602,2026-10-14T01:28:23.632239
+68,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1280.260,1.2803,2026-10-14T01:28:24.969902
+69,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1269.320,1.2693,2026-10-14T01:28:26.297094
+70,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1433.770,1.4338,2026-10-14T01:28:27.788824
+71,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1310.320,1.3103,2026-10-14T01:28:29.156936
+72,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1318.090,1.3181,2026-10-14T01:28:30.532457
+73,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1277.480,1.2775,2026-10-14T01:28:31.867397
+74,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1437.080,1.4371,2026-10-14T01:28:33.361834
+75,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1340.220,1.3402,2026-10-14T01:28:34.759421
+76,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1261.780,1.2618,2026-10-14T01:28:36.079078
+77,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1332.720,1.3327,2026-10-14T01:28:37.469641
+78,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1399.370,1.3994,2026-10-14T01:28:38.924097
+79,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1290.050,1.2900,2026-10-14T01:28:40.271737
+80,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1316.750,1.3168,2026-10-14T01:28:41.646809
+81,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1449.360,1.4494,2026-10-14T01:28:43.154160
+82,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1363.870,1.3639,2026-10-14T01:28:44.575675
+83,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1245.370,1.2454,2026-10-14T01:28:45.878635
+84,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1307.040,1.3070,2026-10-14T01:28:47.243534
+85,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1465.270,1.4653,2026-10-14T01:28:48.766784
+86,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1345.110,1.3451,2026-10-14T01:28:50.170117
+87,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1296.930,1.2969,2026-10-14T01:28:51.525031
+88,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1372.350,1.3723,2026-10-14T01:28:52.954774
+89,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1396.660,1.3967,2026-10-14T01:28:54.409739
+90,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1333.010,1.3330,2026-10-14T01:28:55.800705
+91,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1311.070,1.3111,2026-10-14T01:28:57.169988
+92,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1513.720,1.5137,2026-10-14T01:28:58.741494
+93,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1291.620,1.2916,2026-10-14T01:29:00.090906
+94,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1299.370,1.2994,2026-10-14T01:29:01.448226
+95,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1430.130,1.4301,2026-10-14T01:29:02.936810
+96,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1421.040,1.4210,2026-10-14T01:29:04.412908
+97,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1328.590,1.3286,2026-10-14T01:29:05.799323
+98,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1294.160,1.2942,2026-10-14T01:29:07.150322
+99,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1463.500,1.4635,2026-10-14T01:29:08.671443
+100,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1341.370,1.3414,2026-10-14T01:29:10.067655
+101,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1295.810,1.2958,2026-10-14T01:29:11.421329
+102,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1314.640,1.3146,2026-10-14T01:29:12.793999
+103,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1468.690,1.4687,2026-10-14T01:29:14.317665
+104,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1307.990,1.3080,2026-10-14T01:29:15.683844
+105,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1355.430,1.3554,2026-10-14T01:29:17.097378
+106,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1514.380,1.5144,2026-10-14T01:29:18.669587
+107,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1375.770,1.3758,2026-10-14T01:29:20.103654
+108,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1380.170,1.3802,2026-10-14T01:29:21.541731
+109,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1322.790,1.3228,2026-10-14T01:29:22.922534
+110,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1541.170,1.5412,2026-10-14T01:29:24.520686
+111,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1356.360,1.3564,2026-10-14T01:29:25.935207
+112,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1373.230,1.3732,2026-10-14T01:29:27.366239
+113,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1506.090,1.5061,2026-10-14T01:29:28.930349
+114,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1313.530,1.3135,2026-10-14T01:29:30.301730
+115,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1382.190,1.3822,2026-10-14T01:29:31.742042
+116,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1338.120,1.3381,2026-10-14T01:29:33.137952
+117,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1485.540,1.4855,2026-10-14T01:29:34.680070
+118,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1307.570,1.3076,2026-10-14T01:29:36.045386
+119,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1292.860,1.2929,2026-10-14T01:29:37.396527
+120,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1492.090,1.4921,2026-10-14T01:29:38.946467
+121,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1351.270,1.3513,2026-10-14T01:29:40.355768
+122,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1329.180,1.3292,2026-10-14T01:29:41.742818
+123,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1368.530,1.3685,2026-10-14T01:29:43.168679
+124,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1485.950,1.4860,2026-10-14T01:29:44.712744
+125,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1370.910,1.3709,2026-10-14T01:29:46.141501
+126,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1360.090,1.3601,2026-10-14T01:29:47.559328
+127,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1490.170,1.4902,2026-10-14T01:29:49.106717
+128,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1357.580,1.3576,2026-10-14T01:29:50.522163
+129,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1381.540,1.3815,2026-10-14T01:29:51.961567
+130,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1390.110,1.3901,2026-10-14T01:29:53.409372
+131,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1471.990,1.4720,2026-10-14T01:29:54.937678
+132,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1344.550,1.3445,2026-10-14T01:29:56.339827
+133,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1376.780,1.3768,2026-10-14T01:29:57.773236
+134,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1486.970,1.4870,2026-10-14T01:29:59.317810
+135,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1369.740,1.3697,2026-10-14T01:30:00.745998
+136,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1349.470,1.3495,2026-10-14T01:30:02.153934
+137,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1467.650,1.4677,2026-10-14T01:30:03.679275
+138,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1457.490,1.4575,2026-10-14T01:30:05.192874
+139,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1313.900,1.3139,2026-10-14T01:30:06.564691
+140,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1353.020,1.3530,2026-10-14T01:30:07.974198
+141,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1490.870,1.4909,2026-10-14T01:30:09.522983
+142,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1332.390,1.3324,2026-10-14T01:30:10.913064
+143,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1365.320,1.3653,2026-10-14T01:30:12.335911
+144,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1361.400,1.3614,2026-10-14T01:30:13.754740
+145,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1464.730,1.4647,2026-10-14T01:30:15.274730
+146,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1397.220,1.3972,2026-10-14T01:30:16.729601
+147,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1335.330,1.3353,2026-10-14T01:30:18.122800
+148,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1504.750,1.5048,2026-10-14T01:30:19.684939
+149,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1324.920,1.3249,2026-10-14T01:30:21.066875
+150,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1348.910,1.3489,2026-10-14T01:30:22.474220
+151,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1423.650,1.4237,2026-10-14T01:30:23.956238
+152,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1441.420,1.4414,2026-10-14T01:30:25.452780
+153,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1356.120,1.3561,2026-10-14T01:30:26.866721
+154,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1320.050,1.3200,2026-10-14T01:30:28.244841
+155,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1496.600,1.4966,2026-10-14T01:30:29.799409
+156,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1387.270,1.3873,2026-10-14T01:30:31.243749
+157,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1363.460,1.3635,2026-10-14T01:30:32.664436
+158,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1468.730,1.4687,2026-10-14T01:30:34.191013
+159,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1424.820,1.4248,2026-10-14T01:30:35.672084
+160,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1400.410,1.4004,2026-10-14T01:30:37.129187
+161,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1370.180,1.3702,2026-10-14T01:30:38.557261
+162,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1480.090,1.4801,2026-10-14T01:30:40.095569
+163,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1385.240,1.3852,2026-10-14T01:30:41.538718
+164,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1392.640,1.3926,2026-10-14T01:30:42.989348
+165,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1467.630,1.4676,2026-10-14T01:30:44.514320
+166,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1400.880,1.4009,2026-10-14T01:30:45.970448
+167,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1398.790,1.3988,2026-10-14T01:30:47.427439
+168,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1410.260,1.4103,2026-10-14T01:30:48.895469
+169,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1541.150,1.5412,2026-10-14T01:30:50.494547
+170,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1338.120,1.3381,2026-10-14T01:30:51.890795
+171,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1381.170,1.3812,2026-10-14T01:30:53.330310
+172,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1488.610,1.4886,2026-10-14T01:30:54.876694
+173,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1357.700,1.3577,2026-10-14T01:30:56.292063
+174,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1375.040,1.3750,2026-10-14T01:30:57.724869
+175,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1413.880,1.4139,2026-10-14T01:30:59.196358
+176,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1502.700,1.5027,2026-10-14T01:31:00.756656
+177,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1391.990,1.3920,2026-10-14T01:31:02.206595
+178,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1421.030,1.4210,2026-10-14T01:31:03.685242
+179,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1520.590,1.5206,2026-10-14T01:31:05.262995
+180,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1380.660,1.3807,2026-10-14T01:31:06.701323
+181,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1376.730,1.3767,2026-10-14T01:31:08.136013
+182,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1409.420,1.4094,2026-10-14T01:31:09.602912
+183,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1501.170,1.5012,2026-10-14T01:31:11.162650
+184,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1372.550,1.3725,2026-10-14T01:31:12.593085
+185,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1417.790,1.4178,2026-10-14T01:31:14.068685
+186,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1467.800,1.4678,2026-10-14T01:31:15.593049
+187,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1432.490,1.4325,2026-10-14T01:31:17.083438
+188,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1399.880,1.3999,2026-10-14T01:31:18.541372
+189,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1506.090,1.5061,2026-10-14T01:31:20.105107
+190,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1418.040,1.4180,2026-10-14T01:31:21.578419
+191,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1324.990,1.3250,2026-10-14T01:31:22.961465
+192,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1429.380,1.4294,2026-10-14T01:31:24.449369
+193,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1511.640,1.5116,2026-10-14T01:31:26.018792
+194,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1397.950,1.3980,2026-10-14T01:31:27.474894
+195,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1393.420,1.3934,2026-10-14T01:31:28.926080
+196,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1519.670,1.5197,2026-10-14T01:31:30.503272
+197,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1398.110,1.3981,2026-10-14T01:31:31.959469
+198,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1430.880,1.4309,2026-10-14T01:31:33.448348
+199,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1408.700,1.4087,2026-10-14T01:31:34.914829
+200,SMT (Sobre-suscripción SW),software_oversubscription,16,0,512,16000,0,1522.220,1.5222,2026-10-14T01:31:36.495408
+1,Secuencial,baseline,1,0,512,16000,0,4806.830,4.8068,2026-10-14T01:31:42.282087
+2,Secuencial,baseline,1,0,512,16000,0,4661.800,4.6618,2026-10-14T01:31:47.002443
+3,Secuencial,baseline,1,0,512,16000,0,4596.710,4.5967,2026-10-14T01:31:51.657454
+4,Secuencial,baseline,1,0,512,16000,0,4439.420,4.4394,2026-10-14T01:31:56.155328
+5,Secuencial,baseline,1,0,512,16000,0,4348.450,4.3484,2026-10-14T01:32:00.561464
+6,Secuencial,baseline,1,0,512,16000,0,4340.860,4.3409,2026-10-14T01:32:04.957683
+7,Secuencial,baseline,1,0,512,16000,0,4338.980,4.3390,2026-10-14T01:32:09.354559
+8,Secuencial,baseline,1,0,512,16000,0,4301.110,4.3011,2026-10-14T01:32:13.713820
+9,Secuencial,baseline,1,0,512,16000,0,4295.110,4.2951,2026-10-14T01:32:18.066706
+10,Secuencial,baseline,1,0,512,16000,0,4551.470,4.5515,2026-10-14T01:32:22.675985
+11,Secuencial,baseline,1,0,512,16000,0,4324.450,4.3244,2026-10-14T01:32:27.058393
+12,Secuencial,baseline,1,0,512,16000,0,4292.480,4.2925,2026-10-14T01:32:31.407910
+13,Secuencial,baseline,1,0,512,16000,0,4222.290,4.2223,2026-10-14T01:32:35.686316
+14,Secuencial,baseline,1,0,512,16000,0,4303.190,4.3032,2026-10-14T01:32:40.047680
+15,Secuencial,baseline,1,0,512,16000,0,4232.760,4.2328,2026-10-14T01:32:44.338349
+16,Secuencial,baseline,1,0,512,16000,0,4320.660,4.3207,2026-10-14T01:32:48.716933
+17,Secuencial,baseline,1,0,512,16000,0,4320.280,4.3203,2026-10-14T01:32:53.095510
+18,Secuencial,baseline,1,0,512,16000,0,4346.270,4.3463,2026-10-14T01:32:57.500152
+19,Secuencial,baseline,1,0,512,16000,0,4273.940,4.2739,2026-10-14T01:33:01.831936
+20,Secuencial,baseline,1,0,512,16000,0,4206.530,4.2065,2026-10-14T01:33:06.093982
+21,Secuencial,baseline,1,0,512,16000,0,4300.250,4.3003,2026-10-14T01:33:10.452851
+22,Secuencial,baseline,1,0,512,16000,0,4409.180,4.4092,2026-10-14T01:33:14.919938
+23,Secuencial,baseline,1,0,512,16000,0,4401.320,4.4013,2026-10-14T01:33:19.376592
+24,Secuencial,baseline,1,0,512,16000,0,4288.450,4.2885,2026-10-14T01:33:23.723319
+25,Secuencial,baseline,1,0,512,16000,0,4206.140,4.2061,2026-10-14T01:33:27.987449
+26,Secuencial,baseline,1,0,512,16000,0,4196.120,4.1961,2026-10-14T01:33:32.240985
+27,Secuencial,baseline,1,0,512,16000,0,4268.850,4.2689,2026-10-14T01:33:36.565243
+28,Secuencial,baseline,1,0,512,16000,0,4467.340,4.4673,2026-10-14T01:33:41.090382
+29,Secuencial,baseline,1,0,512,16000,0,4241.030,4.2410,2026-10-14T01:33:45.389606
+30,Secuencial,baseline,1,0,512,16000,0,4257.880,4.2579,2026-10-14T01:33:49.705758
+31,Secuencial,baseline,1,0,512,16000,0,4233.420,4.2334,2026-10-14T01:33:53.997583
+32,Secuencial,baseline,1,0,512,16000,0,4253.920,4.2539,2026-10-14T01:33:58.309651
+33,Secuencial,baseline,1,0,512,16000,0,4204.000,4.2040,2026-10-14T01:34:02.571543
+34,Secuencial,baseline,1,0,512,16000,0,4248.090,4.2481,2026-10-14T01:34:06.877199
+35,Secuencial,baseline,1,0,512,16000,0,4227.290,4.2273,2026-10-14T01:34:11.162292
+36,Secuencial,baseline,1,0,512,16000,0,4383.350,4.3834,2026-10-14T01:34:15.603703
+37,Secuencial,baseline,1,0,512,16000,0,4282.990,4.2830,2026-10-14T01:34:19.944981
+38,Secuencial,baseline,1,0,512,16000,0,4275.790,4.2758,2026-10-14T01:34:24.279236
+39,Secuencial,baseline,1,0,512,16000,0,4176.180,4.1762,2026-10-14T01:34:28.513675
+40,Secuencial,baseline,1,0,512,16000,0,4217.980,4.2180,2026-10-14T01:34:32.788099
+41,Secuencial,baseline,1,0,512,16000,0,4246.640,4.2466,2026-10-14T01:34:37.092359
+42,Secuencial,baseline,1,0,512,16000,0,4296.690,4.2967,2026-10-14T01:34:41.447702
+43,Secuencial,baseline,1,0,512,16000,0,4271.700,4.2717,2026-10-14T01:34:45.776050
+44,Secuencial,baseline,1,0,512,16000,0,4266.650,4.2666,2026-10-14T01:34:50.100414
+45,Secuencial,baseline,1,0,512,16000,0,4269.330,4.2693,2026-10-14T01:34:54.427515
+46,Secuencial,baseline,1,0,512,16000,0,4250.250,4.2503,2026-10-14T01:34:58.735770
+47,Secuencial,baseline,1,0,512,16000,0,4254.900,4.2549,2026-10-14T01:35:03.049482
+48,Secuencial,baseline,1,0,512,16000,0,4246.750,4.2467,2026-10-14T01:35:07.351333
+49,Secuencial,baseline,1,0,512,16000,0,4259.140,4.2591,2026-10-14T01:35:11.669303
+50,Secuencial,baseline,1,0,512,16000,0,4486.970,4.4870,2026-10-14T01:35:16.214740
+51,Secuencial,baseline,1,0,512,16000,0,4528.910,4.5289,2026-10-14T01:35:20.801474
+52,Secuencial,baseline,1,0,512,16000,0,4363.990,4.3640,2026-10-14T01:35:25.223432
+53,Secuencial,baseline,1,0,512,16000,0,4411.820,4.4118,2026-10-14T01:35:29.693263
+54,Secuencial,baseline,1,0,512,16000,0,4298.280,4.2983,2026-10-14T01:35:34.047330
+55,Secuencial,baseline,1,0,512,16000,0,4300.910,4.3009,2026-10-14T01:35:38.406322
+56,Secuencial,baseline,1,0,512,16000,0,4307.590,4.3076,2026-10-14T01:35:42.771636
+57,Secuencial,baseline,1,0,512,16000,0,4298.570,4.2986,2026-10-14T01:35:47.128979
+58,Secuencial,baseline,1,0,512,16000,0,4307.000,4.3070,2026-10-14T01:35:51.494593
+59,Secuencial,baseline,1,0,512,16000,0,4286.500,4.2865,2026-10-14T01:35:55.838980
+60,Secuencial,baseline,1,0,512,16000,0,4275.570,4.2756,2026-10-14T01:36:00.172329
+61,Secuencial,baseline,1,0,512,16000,0,4292.480,4.2925,2026-10-14T01:36:04.520960
+62,Secuencial,baseline,1,0,512,16000,0,4310.800,4.3108,2026-10-14T01:36:08.889916
+63,Secuencial,baseline,1,0,512,16000,0,4395.820,4.3958,2026-10-14T01:36:13.344529
+64,Secuencial,baseline,1,0,512,16000,0,4303.440,4.3034,2026-10-14T01:36:17.706302
+65,Secuencial,baseline,1,0,512,16000,0,4358.060,4.3581,2026-10-14T01:36:22.122512
+66,Secuencial,baseline,1,0,512,16000,0,4310.740,4.3107,2026-10-14T01:36:26.491858
+67,Secuencial,baseline,1,0,512,16000,0,4239.900,4.2399,2026-10-14T01:36:30.789561
+68,Secuencial,baseline,1,0,512,16000,0,4541.380,4.5414,2026-10-14T01:36:35.389317
+69,Secuencial,baseline,1,0,512,16000,0,4463.010,4.4630,2026-10-14T01:36:39.910409
+70,Secuencial,baseline,1,0,512,16000,0,4255.590,4.2556,2026-10-14T01:36:44.224297
+71,Secuencial,baseline,1,0,512,16000,0,4232.810,4.2328,2026-10-14T01:36:48.514930
+72,Secuencial,baseline,1,0,512,16000,0,4381.160,4.3812,2026-10-14T01:36:52.954317
+73,Secuencial,baseline,1,0,512,16000,0,4317.300,4.3173,2026-10-14T01:36:57.329799
+74,Secuencial,baseline,1,0,512,16000,0,4281.830,4.2818,2026-10-14T01:37:01.669461
+75,Secuencial,baseline,1,0,512,16000,0,4221.240,4.2212,2026-10-14T01:37:05.948607
+76,Secuencial,baseline,1,0,512,16000,0,4249.630,4.2496,2026-10-14T01:37:10.256588
+77,Secuencial,baseline,1,0,512,16000,0,4270.950,4.2710,2026-10-14T01:37:14.585941
+78,Secuencial,baseline,1,0,512,16000,0,4252.070,4.2521,2026-10-14T01:37:18.895755
+79,Secuencial,baseline,1,0,512,16000,0,4255.130,4.2551,2026-10-14T01:37:23.208352
+80,Secuencial,baseline,1,0,512,16000,0,4343.400,4.3434,2026-10-14T01:37:27.610160
+81,Secuencial,baseline,1,0,512,16000,0,4338.090,4.3381,2026-10-14T01:37:32.005845
+82,Secuencial,baseline,1,0,512,16000,0,4229.060,4.2291,2026-10-14T01:37:36.291100
+83,Secuencial,baseline,1,0,512,16000,0,4525.240,4.5252,2026-10-14T01:37:40.873145
+84,Secuencial,baseline,1,0,512,16000,0,4348.290,4.3483,2026-10-14T01:37:45.278288
+85,Secuencial,baseline,1,0,512,16000,0,4346.030,4.3460,2026-10-14T01:37:49.682951
+86,Secuencial,baseline,1,0,512,16000,0,4412.140,4.4121,2026-10-14T01:37:54.153530
+87,Secuencial,baseline,1,0,512,16000,0,4535.440,4.5354,2026-10-14T01:37:58.746919
+88,Secuencial,baseline,1,0,512,16000,0,4314.120,4.3141,2026-10-14T01:38:03.118675
+89,Secuencial,baseline,1,0,512,16000,0,4305.910,4.3059,2026-10-14T01:38:07.482320
+90,Secuencial,baseline,1,0,512,16000,0,4567.410,4.5674,2026-10-14T01:38:12.106022
+91,Secuencial,baseline,1,0,512,16000,0,4323.810,4.3238,2026-10-14T01:38:16.487568
+92,Secuencial,baseline,1,0,512,16000,0,4325.260,4.3253,2026-10-14T01:38:20.871252
+93,Secuencial,baseline,1,0,512,16000,0,4248.890,4.2489,2026-10-14T01:38:25.178607
+94,Secuencial,baseline,1,0,512,16000,0,4508.580,4.5086,2026-10-14T01:38:29.744750
+95,Secuencial,baseline,1,0,512,16000,0,4312.210,4.3122,2026-10-14T01:38:34.114975
+96,Secuencial,baseline,1,0,512,16000,0,4233.540,4.2335,2026-10-14T01:38:38.405081
+97,Secuencial,baseline,1,0,512,16000,0,4316.560,4.3166,2026-10-14T01:38:42.780252
+98,Secuencial,baseline,1,0,512,16000,0,4281.180,4.2812,2026-10-14T01:38:47.119443
+99,Secuencial,baseline,1,0,512,16000,0,4419.100,4.4191,2026-10-14T01:38:51.597262
+100,Secuencial,baseline,1,0,512,16000,0,4259.500,4.2595,2026-10-14T01:38:55.914997
+101,Secuencial,baseline,1,0,512,16000,0,4481.300,4.4813,2026-10-14T01:39:00.454162
+102,Secuencial,baseline,1,0,512,16000,0,4455.760,4.4558,2026-10-14T01:39:04.967995
+103,Secuencial,baseline,1,0,512,16000,0,4409.690,4.4097,2026-10-14T01:39:09.435367
+104,Secuencial,baseline,1,0,512,16000,0,4276.120,4.2761,2026-10-14T01:39:13.768974
+105,Secuencial,baseline,1,0,512,16000,0,4256.610,4.2566,2026-10-14T01:39:18.080846
+106,Secuencial,baseline,1,0,512,16000,0,4263.860,4.2639,2026-10-14T01:39:22.402222
+107,Secuencial,baseline,1,0,512,16000,0,4276.290,4.2763,2026-10-14T01:39:26.736188
+108,Secuencial,baseline,1,0,512,16000,0,4260.750,4.2607,2026-10-14T01:39:31.054646
+109,Secuencial,baseline,1,0,512,16000,0,4292.840,4.2928,2026-10-14T01:39:35.405890
+110,Secuencial,baseline,1,0,512,16000,0,4271.120,4.2711,2026-10-14T01:39:39.734418
+111,Secuencial,baseline,1,0,512,16000,0,4258.660,4.2587,2026-10-14T01:39:44.050903
+112,Secuencial,baseline,1,0,512,16000,0,4527.140,4.5271,2026-10-14T01:39:48.635672
+113,Secuencial,baseline,1,0,512,16000,0,4290.780,4.2908,2026-10-14T01:39:52.984373
+114,Secuencial,baseline,1,0,512,16000,0,4291.430,4.2914,2026-10-14T01:39:57.333842
+115,Secuencial,baseline,1,0,512,16000,0,4471.790,4.4718,2026-10-14T01:40:01.863788
+116,Secuencial,baseline,1,0,512,16000,0,4469.060,4.4691,2026-10-14T01:40:06.391719
+117,Secuencial,baseline,1,0,512,16000,0,4350.070,4.3501,2026-10-14T01:40:10.800090
+118,Secuencial,baseline,1,0,512,16000,0,4289.540,4.2895,2026-10-14T01:40:15.147302
+119,Secuencial,baseline,1,0,512,16000,0,4297.150,4.2971,2026-10-14T01:40:19.500356
+120,Secuencial,baseline,1,0,512,16000,0,4307.610,4.3076,2026-10-14T01:40:23.865876
+121,Secuencial,baseline,1,0,512,16000,0,4443.190,4.4432,2026-10-14T01:40:28.367283
+122,Secuencial,baseline,1,0,512,16000,0,4494.620,4.4946,2026-10-14T01:40:32.919517
+123,Secuencial,baseline,1,0,512,16000,0,4324.870,4.3249,2026-10-14T01:40:37.302401
+124,Secuencial,baseline,1,0,512,16000,0,4302.220,4.3022,2026-10-14T01:40:41.662670
+125,Secuencial,baseline,1,0,512,16000,0,4336.710,4.3367,2026-10-14T01:40:46.057771
+126,Secuencial,baseline,1,0,512,16000,0,4351.840,4.3518,2026-10-14T01:40:50.467862
+127,Secuencial,baseline,1,0,512,16000,0,4289.100,4.2891,2026-10-14T01:40:54.814820
+128,Secuencial,baseline,1,0,512,16000,0,4279.150,4.2791,2026-10-14T01:40:59.152079
+129,Secuencial,baseline,1,0,512,16000,0,4390.190,4.3902,2026-10-14T01:41:03.599583
+130,Secuencial,baseline,1,0,512,16000,0,4278.610,4.2786,2026-10-14T01:41:07.937347
+131,Secuencial,baseline,1,0,512,16000,0,4357.450,4.3575,2026-10-14T01:41:12.351804
+132,Secuencial,baseline,1,0,512,16000,0,4415.000,4.4150,2026-10-14T01:41:16.825274
+133,Secuencial,baseline,1,0,512,16000,0,4406.420,4.4064,2026-10-14T01:41:21.289356
+134,Secuencial,baseline,1,0,512,16000,0,4344.280,4.3443,2026-10-14T01:41:25.689094
+135,Secuencial,baseline,1,0,512,16000,0,4362.000,4.3620,2026-10-14T01:41:30.107854
+136,Secuencial,baseline,1,0,512,16000,0,4297.340,4.2973,2026-10-14T01:41:34.463272
+137,Secuencial,baseline,1,0,512,16000,0,4279.590,4.2796,2026-10-14T01:41:38.800465
+138,Secuencial,baseline,1,0,512,16000,0,4351.850,4.3519,2026-10-14T01:41:43.209924
+139,Secuencial,baseline,1,0,512,16000,0,4284.010,4.2840,2026-10-14T01:41:47.552091
+140,Secuencial,baseline,1,0,512,16000,0,4315.310,4.3153,2026-10-14T01:41:51.925199
+141,Secuencial,baseline,1,0,512,16000,0,4328.470,4.3285,2026-10-14T01:41:56.309120
+142,Secuencial,baseline,1,0,512,16000,0,4321.150,4.3211,2026-10-14T01:42:00.688329
+143,Secuencial,baseline,1,0,512,16000,0,4320.870,4.3209,2026-10-14T01:42:05.067490
+144,Secuencial,baseline,1,0,512,16000,0,4606.660,4.6067,2026-10-14T01:42:09.731621
+145,Secuencial,baseline,1,0,512,16000,0,4331.880,4.3319,2026-10-14T01:42:14.121398
+146,Secuencial,baseline,1,0,512,16000,0,4262.870,4.2629,2026-10-14T01:42:18.442150
+147,Secuencial,baseline,1,0,512,16000,0,4400.000,4.4000,2026-10-14T01:42:22.900302
+148,Secuencial,baseline,1,0,512,16000,0,4324.840,4.3248,2026-10-14T01:42:27.283064
+149,Secuencial,baseline,1,0,512,16000,0,4556.120,4.5561,2026-10-14T01:42:31.897191
+150,Secuencial,baseline,1,0,512,16000,0,4481.780,4.4818,2026-10-14T01:42:36.437463
+151,Secuencial,baseline,1,0,512,16000,0,4313.550,4.3136,2026-10-14T01:42:40.809478
+152,Secuencial,baseline,1,0,512,16000,0,4301.210,4.3012,2026-10-14T01:42:45.169218
+153,Secuencial,baseline,1,0,512,16000,0,4368.200,4.3682,2026-10-14T01:42:49.595657
+154,Secuencial,baseline,1,0,512,16000,0,4262.530,4.2625,2026-10-14T01:42:53.915864
+155,Secuencial,baseline,1,0,512,16000,0,4311.900,4.3119,2026-10-14T01:42:58.285681
+156,Secuencial,baseline,1,0,512,16000,0,4272.840,4.2728,2026-10-14T01:43:02.613847
+157,Secuencial,baseline,1,0,512,16000,0,4296.000,4.2960,2026-10-14T01:43:06.967903
+158,Secuencial,baseline,1,0,512,16000,0,4274.360,4.2744,2026-10-14T01:43:11.300468
+159,Secuencial,baseline,1,0,512,16000,0,4282.120,4.2821,2026-10-14T01:43:15.640257
+160,Secuencial,baseline,1,0,512,16000,0,4291.610,4.2916,2026-10-14T01:43:19.990108
+161,Secuencial,baseline,1,0,512,16000,0,4291.240,4.2912,2026-10-14T01:43:24.340157
+162,Secuencial,baseline,1,0,512,16000,0,4289.080,4.2891,2026-10-14T01:43:28.687114
+163,Secuencial,baseline,1,0,512,16000,0,4330.050,4.3300,2026-10-14T01:43:33.072878
+164,Secuencial,baseline,1,0,512,16000,0,4607.970,4.6080,2026-10-14T01:43:37.735220
+165,Secuencial,baseline,1,0,512,16000,0,4335.470,4.3355,2026-10-14T01:43:42.129296
+166,Secuencial,baseline,1,0,512,16000,0,4298.200,4.2982,2026-10-14T01:43:46.486350
+167,Secuencial,baseline,1,0,512,16000,0,4607.810,4.6078,2026-10-14T01:43:51.152030
+168,Secuencial,baseline,1,0,512,16000,0,4326.080,4.3261,2026-10-14T01:43:55.536359
+169,Secuencial,baseline,1,0,512,16000,0,4247.690,4.2477,2026-10-14T01:43:59.842282
+170,Secuencial,baseline,1,0,512,16000,0,4285.200,4.2852,2026-10-14T01:44:04.185350
+171,Secuencial,baseline,1,0,512,16000,0,4520.230,4.5202,2026-10-14T01:44:08.760992
+172,Secuencial,baseline,1,0,512,16000,0,4528.170,4.5282,2026-10-14T01:44:13.347557
+173,Secuencial,baseline,1,0,512,16000,0,4445.050,4.4451,2026-10-14T01:44:17.847776
+174,Secuencial,baseline,1,0,512,16000,0,4361.070,4.3611,2026-10-14T01:44:22.266880
+175,Secuencial,baseline,1,0,512,16000,0,4500.970,4.5010,2026-10-14T01:44:26.825858
+176,Secuencial,baseline,1,0,512,16000,0,4333.120,4.3331,2026-10-14T01:44:31.218000
+177,Secuencial,baseline,1,0,512,16000,0,4329.990,4.3300,2026-10-14T01:44:35.606699
+178,Secuencial,baseline,1,0,512,16000,0,4303.630,4.3036,2026-10-14T01:44:39.968075
+179,Secuencial,baseline,1,0,512,16000,0,4356.850,4.3569,2026-10-14T01:44:44.380049
+180,Secuencial,baseline,1,0,512,16000,0,4481.380,4.4814,2026-10-14T01:44:48.919448
+181,Secuencial,baseline,1,0,512,16000,0,4344.820,4.3448,2026-10-14T01:44:53.322353
+182,Secuencial,baseline,1,0,512,16000,0,4515.400,4.5154,2026-10-14T01:44:57.897208
+183,Secuencial,baseline,1,0,512,16000,0,4328.010,4.3280,2026-10-14T01:45:02.283387
+184,Secuencial,baseline,1,0,512,16000,0,4701.060,4.7011,2026-10-14T01:45:07.042616
+185,Secuencial,baseline,1,0,512,16000,0,4402.620,4.4026,2026-10-14T01:45:11.503606
+186,Secuencial,baseline,1,0,512,16000,0,4343.160,4.3432,2026-10-14T01:45:15.905500
+187,Secuencial,baseline,1,0,512,16000,0,4313.820,4.3138,2026-10-14T01:45:20.277780
+188,Secuencial,baseline,1,0,512,16000,0,4581.730,4.5817,2026-10-14T01:45:24.914696
+189,Secuencial,baseline,1,0,512,16000,0,4334.700,4.3347,2026-10-14T01:45:29.307355
+190,Secuencial,baseline,1,0,512,16000,0,4361.240,4.3612,2026-10-14T01:45:33.726326
+191,Secuencial,baseline,1,0,512,16000,0,4358.200,4.3582,2026-10-14T01:45:38.142033
+192,Secuencial,baseline,1,0,512,16000,0,4355.970,4.3560,2026-10-14T01:45:42.555986
+193,Secuencial,baseline,1,0,512,16000,0,4348.840,4.3488,2026-10-14T01:45:46.962625
+194,Secuencial,baseline,1,0,512,16000,0,4225.460,4.2255,2026-10-14T01:45:51.246655
+195,Secuencial,baseline,1,0,512,16000,0,4294.380,4.2944,2026-10-14T01:45:55.599236
+196,Secuencial,baseline,1,0,512,16000,0,4290.860,4.2909,2026-10-14T01:45:59.948064
+197,Secuencial,baseline,1,0,512,16000,0,4529.930,4.5299,2026-10-14T01:46:04.535907
+198,Secuencial,baseline,1,0,512,16000,0,4409.020,4.4090,2026-10-14T01:46:09.003105
+199,Secuencial,baseline,1,0,512,16000,0,4351.210,4.3512,2026-10-14T01:46:13.413404
+200,Secuencial,baseline,1,0,512,16000,0,4351.270,4.3513,2026-10-14T01:46:17.823062
+1,CMP,dedicated_cores,8,0,512,16000,0,958.065,0.9581,2026-10-14T01:46:18.842484
+2,CMP,dedicated_cores,8,0,512,16000,0,998.595,0.9986,2026-10-14T01:46:19.896673
+3,CMP,dedicated_cores,8,0,512,16000,0,981.855,0.9819,2026-10-14T01:46:20.936715
+4,CMP,dedicated_cores,8,0,512,16000,0,993.799,0.9938,2026-10-14T01:46:21.988907
+5,CMP,dedicated_cores,8,0,512,16000,0,1020.190,1.0202,2026-10-14T01:46:23.064483
+6,CMP,dedicated_cores,8,0,512,16000,0,999.060,0.9991,2026-10-14T01:46:24.119317
+7,CMP,dedicated_cores,8,0,512,16000,0,990.794,0.9908,2026-10-14T01:46:25.168044
+8,CMP,dedicated_cores,8,0,512,16000,0,979.619,0.9796,2026-10-14T01:46:26.206054
+9,CMP,dedicated_cores,8,0,512,16000,0,1006.650,1.0067,2026-10-14T01:46:27.271476
+10,CMP,dedicated_cores,8,0,512,16000,0,1016.410,1.0164,2026-10-14T01:46:28.343371
+11,CMP,dedicated_cores,8,0,512,16000,0,990.004,0.9900,2026-10-14T01:46:29.391537
+12,CMP,dedicated_cores,8,0,512,16000,0,981.232,0.9812,2026-10-14T01:46:30.430946
+13,CMP,dedicated_cores,8,0,512,16000,0,995.477,0.9955,2026-10-14T01:46:31.482936
+14,CMP,dedicated_cores,8,0,512,16000,0,1084.320,1.0843,2026-10-14T01:46:32.625075
+15,CMP,dedicated_cores,8,0,512,16000,0,992.099,0.9921,2026-10-14T01:46:33.674617
+16,CMP,dedicated_cores,8,0,512,16000,0,987.116,0.9871,2026-10-14T01:46:34.720090
+17,CMP,dedicated_cores,8,0,512,16000,0,987.012,0.9870,2026-10-14T01:46:35.765202
+18,CMP,dedicated_cores,8,0,512,16000,0,989.617,0.9896,2026-10-14T01:46:36.812838
+19,CMP,dedicated_cores,8,0,512,16000,0,1039.530,1.0395,2026-10-14T01:46:37.910447
+20,CMP,dedicated_cores,8,0,512,16000,0,1008.550,1.0086,2026-10-14T01:46:38.977269
+21,CMP,dedicated_cores,8,0,512,16000,0,996.182,0.9962,2026-10-14T01:46:40.031264
+22,CMP,dedicated_cores,8,0,512,16000,0,985.170,0.9852,2026-10-14T01:46:41.074484
+23,CMP,dedicated_cores,8,0,512,16000,0,982.867,0.9829,2026-10-14T01:46:42.114061
+24,CMP,dedicated_cores,8,0,512,16000,0,1110.730,1.1107,2026-10-14T01:46:43.282725
+25,CMP,dedicated_cores,8,0,512,16000,0,987.551,0.9876,2026-10-14T01:46:44.328771
+26,CMP,dedicated_cores,8,0,512,16000,0,979.063,0.9791,2026-10-14T01:46:45.366209
+27,CMP,dedicated_cores,8,0,512,16000,0,987.418,0.9874,2026-10-14T01:46:46.412091
+28,CMP,dedicated_cores,8,0,512,16000,0,1016.120,1.0161,2026-10-14T01:46:47.486146
+29,CMP,dedicated_cores,8,0,512,16000,0,1044.830,1.0448,2026-10-14T01:46:48.586111
+30,CMP,dedicated_cores,8,0,512,16000,0,990.517,0.9905,2026-10-14T01:46:49.635033
+31,CMP,dedicated_cores,8,0,512,16000,0,994.980,0.9950,2026-10-14T01:46:50.688498
+32,CMP,dedicated_cores,8,0,512,16000,0,990.915,0.9909,2026-10-14T01:46:51.737554
+33,CMP,dedicated_cores,8,0,512,16000,0,1091.830,1.0918,2026-10-14T01:46:52.887583
+34,CMP,dedicated_cores,8,0,512,16000,0,1010.310,1.0103,2026-10-14T01:46:53.956040
+35,CMP,dedicated_cores,8,0,512,16000,0,1011.660,1.0117,2026-10-14T01:46:55.026152
+36,CMP,dedicated_cores,8,0,512,16000,0,1005.740,1.0057,2026-10-14T01:46:56.089772
+37,CMP,dedicated_cores,8,0,512,16000,0,1006.560,1.0066,2026-10-14T01:46:57.154441
+38,CMP,dedicated_cores,8,0,512,16000,0,1091.010,1.0910,2026-10-14T01:46:58.303371
+39,CMP,dedicated_cores,8,0,512,16000,0,1010.890,1.0109,2026-10-14T01:46:59.372766
+40,CMP,dedicated_cores,8,0,512,16000,0,1010.370,1.0104,2026-10-14T01:47:00.441461
+41,CMP,dedicated_cores,8,0,512,16000,0,1011.970,1.0120,2026-10-14T01:47:01.511621
+42,CMP,dedicated_cores,8,0,512,16000,0,1020.040,1.0200,2026-10-14T01:47:02.589614
+43,CMP,dedicated_cores,8,0,512,16000,0,1108.340,1.1083,2026-10-14T01:47:03.755941
+44,CMP,dedicated_cores,8,0,512,16000,0,1031.460,1.0315,2026-10-14T01:47:04.845731
+45,CMP,dedicated_cores,8,0,512,16000,0,1018.450,1.0185,2026-10-14T01:47:05.922269
+46,CMP,dedicated_cores,8,0,512,16000,0,1019.520,1.0195,2026-10-14T01:47:06.999888
+47,CMP,dedicated_cores,8,0,512,16000,0,1152.850,1.1528,2026-10-14T01:47:08.211226
+48,CMP,dedicated_cores,8,0,512,16000,0,1040.720,1.0407,2026-10-14T01:47:09.309989
+49,CMP,dedicated_cores,8,0,512,16000,0,1025.340,1.0253,2026-10-14T01:47:10.393204
+50,CMP,dedicated_cores,8,0,512,16000,0,1031.110,1.0311,2026-10-14T01:47:11.481736
+51,CMP,dedicated_cores,8,0,512,16000,0,1036.170,1.0362,2026-10-14T01:47:12.575850
+52,CMP,dedicated_cores,8,0,512,16000,0,1163.090,1.1631,2026-10-14T01:47:13.796955
+53,CMP,dedicated_cores,8,0,512,16000,0,1036.230,1.0362,2026-10-14T01:47:14.891438
+54,CMP,dedicated_cores,8,0,512,16000,0,1020.760,1.0208,2026-10-14T01:47:15.970902
+55,CMP,dedicated_cores,8,0,512,16000,0,1031.720,1.0317,2026-10-14T01:47:17.061277
+56,CMP,dedicated_cores,8,0,512,16000,0,1088.110,1.0881,2026-10-14T01:47:18.207720
+57,CMP,dedicated_cores,8,0,512,16000,0,1095.070,1.0951,2026-10-14T01:47:19.358288
+58,CMP,dedicated_cores,8,0,512,16000,0,1036.480,1.0365,2026-10-14T01:47:20.452856
+59,CMP,dedicated_cores,8,0,512,16000,0,1029.750,1.0297,2026-10-14T01:47:21.540822
+60,CMP,dedicated_cores,8,0,512,16000,0,1043.040,1.0430,2026-10-14T01:47:22.642374
+61,CMP,dedicated_cores,8,0,512,16000,0,1173.090,1.1731,2026-10-14T01:47:23.874405
+62,CMP,dedicated_cores,8,0,512,16000,0,1035.710,1.0357,2026-10-14T01:47:24.968459
+63,CMP,dedicated_cores,8,0,512,16000,0,1028.800,1.0288,2026-10-14T01:47:26.055955
+64,CMP,dedicated_cores,8,0,512,16000,0,1034.410,1.0344,2026-10-14T01:47:27.148462
+65,CMP,dedicated_cores,8,0,512,16000,0,1068.530,1.0685,2026-10-14T01:47:28.275011
+66,CMP,dedicated_cores,8,0,512,16000,0,1148.960,1.1490,2026-10-14T01:47:29.480081
+67,CMP,dedicated_cores,8,0,512,16000,0,1042.630,1.0426,2026-10-14T01:47:30.580730
+68,CMP,dedicated_cores,8,0,512,16000,0,1039.880,1.0399,2026-10-14T01:47:31.678958
+69,CMP,dedicated_cores,8,0,512,16000,0,1040.660,1.0407,2026-10-14T01:47:32.778397
+70,CMP,dedicated_cores,8,0,512,16000,0,1108.020,1.1080,2026-10-14T01:47:33.944826
+71,CMP,dedicated_cores,8,0,512,16000,0,1048.550,1.0485,2026-10-14T01:47:35.051500
+72,CMP,dedicated_cores,8,0,512,16000,0,1037.780,1.0378,2026-10-14T01:47:36.147401
+73,CMP,dedicated_cores,8,0,512,16000,0,1039.310,1.0393,2026-10-14T01:47:37.244638
+74,CMP,dedicated_cores,8,0,512,16000,0,1051.460,1.0515,2026-10-14T01:47:38.354225
+75,CMP,dedicated_cores,8,0,512,16000,0,1130.030,1.1300,2026-10-14T01:47:39.543601
+76,CMP,dedicated_cores,8,0,512,16000,0,1034.530,1.0345,2026-10-14T01:47:40.637148
+77,CMP,dedicated_cores,8,0,512,16000,0,1039.770,1.0398,2026-10-14T01:47:41.734946
+78,CMP,dedicated_cores,8,0,512,16000,0,1049.780,1.0498,2026-10-14T01:47:42.843039
+79,CMP,dedicated_cores,8,0,512,16000,0,1103.820,1.1038,2026-10-14T01:47:44.005084
+80,CMP,dedicated_cores,8,0,512,16000,0,1052.180,1.0522,2026-10-14T01:47:45.115457
+81,CMP,dedicated_cores,8,0,512,16000,0,1074.650,1.0747,2026-10-14T01:47:46.248043
+82,CMP,dedicated_cores,8,0,512,16000,0,1037.390,1.0374,2026-10-14T01:47:47.343700
+83,CMP,dedicated_cores,8,0,512,16000,0,1066.540,1.0665,2026-10-14T01:47:48.468137
+84,CMP,dedicated_cores,8,0,512,16000,0,1125.820,1.1258,2026-10-14T01:47:49.652181
+85,CMP,dedicated_cores,8,0,512,16000,0,1041.550,1.0415,2026-10-14T01:47:50.751807
+86,CMP,dedicated_cores,8,0,512,16000,0,1048.560,1.0486,2026-10-14T01:47:51.858416
+87,CMP,dedicated_cores,8,0,512,16000,0,1042.500,1.0425,2026-10-14T01:47:52.959463
+88,CMP,dedicated_cores,8,0,512,16000,0,1164.140,1.1641,2026-10-14T01:47:54.182430
+89,CMP,dedicated_cores,8,0,512,16000,0,1051.050,1.0511,2026-10-14T01:47:55.290121
+90,CMP,dedicated_cores,8,0,512,16000,0,1047.260,1.0473,2026-10-14T01:47:56.395753
+91,CMP,dedicated_cores,8,0,512,16000,0,1043.270,1.0433,2026-10-14T01:47:57.497713
+92,CMP,dedicated_cores,8,0,512,16000,0,1072.430,1.0724,2026-10-14T01:47:58.628447
+93,CMP,dedicated_cores,8,0,512,16000,0,1150.090,1.1501,2026-10-14T01:47:59.836701
+94,CMP,dedicated_cores,8,0,512,16000,0,1048.310,1.0483,2026-10-14T01:48:00.943180
+95,CMP,dedicated_cores,8,0,512,16000,0,1047.610,1.0476,2026-10-14T01:48:02.049006
+96,CMP,dedicated_cores,8,0,512,16000,0,1052.590,1.0526,2026-10-14T01:48:03.158649
+97,CMP,dedicated_cores,8,0,512,16000,0,1141.930,1.1419,2026-10-14T01:48:04.356320
+98,CMP,dedicated_cores,8,0,512,16000,0,1058.950,1.0590,2026-10-14T01:48:05.472573
+99,CMP,dedicated_cores,8,0,512,16000,0,1046.830,1.0468,2026-10-14T01:48:06.577969
+100,CMP,dedicated_cores,8,0,512,16000,0,1050.690,1.0507,2026-10-14T01:48:07.687089
+101,CMP,dedicated_cores,8,0,512,16000,0,1058.240,1.0582,2026-10-14T01:48:08.803439
+102,CMP,dedicated_cores,8,0,512,16000,0,1187.750,1.1878,2026-10-14T01:48:10.049419
+103,CMP,dedicated_cores,8,0,512,16000,0,1050.220,1.0502,2026-10-14T01:48:11.156381
+104,CMP,dedicated_cores,8,0,512,16000,0,1049.610,1.0496,2026-10-14T01:48:12.264249
+105,CMP,dedicated_cores,8,0,512,16000,0,1058.840,1.0588,2026-10-14T01:48:13.381022
+106,CMP,dedicated_cores,8,0,512,16000,0,1172.350,1.1724,2026-10-14T01:48:14.611552
+107,CMP,dedicated_cores,8,0,512,16000,0,1061.840,1.0618,2026-10-14T01:48:15.730258
+108,CMP,dedicated_cores,8,0,512,16000,0,1051.440,1.0514,2026-10-14T01:48:16.839938
+109,CMP,dedicated_cores,8,0,512,16000,0,1045.010,1.0450,2026-10-14T01:48:17.943056
+110,CMP,dedicated_cores,8,0,512,16000,0,1054.410,1.0544,2026-10-14T01:48:19.055922
+111,CMP,dedicated_cores,8,0,512,16000,0,1190.040,1.1900,2026-10-14T01:48:20.304231
+112,CMP,dedicated_cores,8,0,512,16000,0,1052.820,1.0528,2026-10-14T01:48:21.414899
+113,CMP,dedicated_cores,8,0,512,16000,0,1056.510,1.0565,2026-10-14T01:48:22.529641
+114,CMP,dedicated_cores,8,0,512,16000,0,1055.470,1.0555,2026-10-14T01:48:23.643245
+115,CMP,dedicated_cores,8,0,512,16000,0,1191.740,1.1917,2026-10-14T01:48:24.893020
+116,CMP,dedicated_cores,8,0,512,16000,0,1059.380,1.0594,2026-10-14T01:48:26.010562
+117,CMP,dedicated_cores,8,0,512,16000,0,1048.890,1.0489,2026-10-14T01:48:27.116648
+118,CMP,dedicated_cores,8,0,512,16000,0,1061.500,1.0615,2026-10-14T01:48:28.236060
+119,CMP,dedicated_cores,8,0,512,16000,0,1065.320,1.0653,2026-10-14T01:48:29.359255
+120,CMP,dedicated_cores,8,0,512,16000,0,1127.840,1.1278,2026-10-14T01:48:30.545293
+121,CMP,dedicated_cores,8,0,512,16000,0,1047.600,1.0476,2026-10-14T01:48:31.651222
+122,CMP,dedicated_cores,8,0,512,16000,0,1056.790,1.0568,2026-10-14T01:48:32.766300
+123,CMP,dedicated_cores,8,0,512,16000,0,1059.930,1.0599,2026-10-14T01:48:33.884305
+124,CMP,dedicated_cores,8,0,512,16000,0,1163.900,1.1639,2026-10-14T01:48:35.106090
+125,CMP,dedicated_cores,8,0,512,16000,0,1053.260,1.0533,2026-10-14T01:48:36.217583
+126,CMP,dedicated_cores,8,0,512,16000,0,1057.630,1.0576,2026-10-14T01:48:37.333009
+127,CMP,dedicated_cores,8,0,512,16000,0,1065.480,1.0655,2026-10-14T01:48:38.456853
+128,CMP,dedicated_cores,8,0,512,16000,0,1048.960,1.0490,2026-10-14T01:48:39.563646
+129,CMP,dedicated_cores,8,0,512,16000,0,1124.480,1.1245,2026-10-14T01:48:40.744850
+130,CMP,dedicated_cores,8,0,512,16000,0,1047.760,1.0478,2026-10-14T01:48:41.850539
+131,CMP,dedicated_cores,8,0,512,16000,0,1051.210,1.0512,2026-10-14T01:48:42.959942
+132,CMP,dedicated_cores,8,0,512,16000,0,1072.600,1.0726,2026-10-14T01:48:44.090620
+133,CMP,dedicated_cores,8,0,512,16000,0,1112.210,1.1122,2026-10-14T01:48:45.261223
+134,CMP,dedicated_cores,8,0,512,16000,0,1063.050,1.0631,2026-10-14T01:48:46.382410
+135,CMP,dedicated_cores,8,0,512,16000,0,1057.480,1.0575,2026-10-14T01:48:47.497798
+136,CMP,dedicated_cores,8,0,512,16000,0,1072.560,1.0726,2026-10-14T01:48:48.628528
+137,CMP,dedicated_cores,8,0,512,16000,0,1061.620,1.0616,2026-10-14T01:48:49.748407
+138,CMP,dedicated_cores,8,0,512,16000,0,1107.070,1.1071,2026-10-14T01:48:50.913478
+139,CMP,dedicated_cores,8,0,512,16000,0,1054.080,1.0541,2026-10-14T01:48:52.025938
+140,CMP,dedicated_cores,8,0,512,16000,0,1058.810,1.0588,2026-10-14T01:48:53.142815
+141,CMP,dedicated_cores,8,0,512,16000,0,1069.530,1.0695,2026-10-14T01:48:54.268700
+142,CMP,dedicated_cores,8,0,512,16000,0,1128.380,1.1284,2026-10-14T01:48:55.455410
+143,CMP,dedicated_cores,8,0,512,16000,0,1067.410,1.0674,2026-10-14T01:48:56.580859
+144,CMP,dedicated_cores,8,0,512,16000,0,1057.580,1.0576,2026-10-14T01:48:57.696396
+145,CMP,dedicated_cores,8,0,512,16000,0,1077.260,1.0773,2026-10-14T01:48:58.831905
+146,CMP,dedicated_cores,8,0,512,16000,0,1066.450,1.0665,2026-10-14T01:48:59.956305
+147,CMP,dedicated_cores,8,0,512,16000,0,1182.690,1.1827,2026-10-14T01:49:01.197263
+148,CMP,dedicated_cores,8,0,512,16000,0,1061.510,1.0615,2026-10-14T01:49:02.317150
+149,CMP,dedicated_cores,8,0,512,16000,0,1091.030,1.0910,2026-10-14T01:49:03.466238
+150,CMP,dedicated_cores,8,0,512,16000,0,1068.250,1.0682,2026-10-14T01:49:04.592849
+151,CMP,dedicated_cores,8,0,512,16000,0,1193.590,1.1936,2026-10-14T01:49:05.842380
+152,CMP,dedicated_cores,8,0,512,16000,0,1055.460,1.0555,2026-10-14T01:49:06.955873
+153,CMP,dedicated_cores,8,0,512,16000,0,1051.550,1.0515,2026-10-14T01:49:08.065801
+154,CMP,dedicated_cores,8,0,512,16000,0,1072.220,1.0722,2026-10-14T01:49:09.195679
+155,CMP,dedicated_cores,8,0,512,16000,0,1074.310,1.0743,2026-10-14T01:49:10.326985
+156,CMP,dedicated_cores,8,0,512,16000,0,1085.540,1.0855,2026-10-14T01:49:11.469022
+157,CMP,dedicated_cores,8,0,512,16000,0,1060.430,1.0604,2026-10-14T01:49:12.587504
+158,CMP,dedicated_cores,8,0,512,16000,0,1074.820,1.0748,2026-10-14T01:49:13.720628
+159,CMP,dedicated_cores,8,0,512,16000,0,1065.510,1.0655,2026-10-14T01:49:14.844023
+160,CMP,dedicated_cores,8,0,512,16000,0,1194.330,1.1943,2026-10-14T01:49:16.096531
+161,CMP,dedicated_cores,8,0,512,16000,0,1059.100,1.0591,2026-10-14T01:49:17.213826
+162,CMP,dedicated_cores,8,0,512,16000,0,1075.230,1.0752,2026-10-14T01:49:18.347023
+163,CMP,dedicated_cores,8,0,512,16000,0,1068.970,1.0690,2026-10-14T01:49:19.474200
+164,CMP,dedicated_cores,8,0,512,16000,0,1119.860,1.1199,2026-10-14T01:49:20.652011
+165,CMP,dedicated_cores,8,0,512,16000,0,1114.110,1.1141,2026-10-14T01:49:21.821964
+166,CMP,dedicated_cores,8,0,512,16000,0,1062.010,1.0620,2026-10-14T01:49:22.942197
+167,CMP,dedicated_cores,8,0,512,16000,0,1076.350,1.0763,2026-10-14T01:49:24.076432
+168,CMP,dedicated_cores,8,0,512,16000,0,1062.700,1.0627,2026-10-14T01:49:25.197349
+169,CMP,dedicated_cores,8,0,512,16000,0,1196.500,1.1965,2026-10-14T01:49:26.451877
+170,CMP,dedicated_cores,8,0,512,16000,0,1062.250,1.0622,2026-10-14T01:49:27.572654
+171,CMP,dedicated_cores,8,0,512,16000,0,1069.740,1.0697,2026-10-14T01:49:28.701241
+172,CMP,dedicated_cores,8,0,512,16000,0,1067.440,1.0674,2026-10-14T01:49:29.826937
+173,CMP,dedicated_cores,8,0,512,16000,0,1150.360,1.1504,2026-10-14T01:49:31.035622
+174,CMP,dedicated_cores,8,0,512,16000,0,1079.020,1.0790,2026-10-14T01:49:32.170227
+175,CMP,dedicated_cores,8,0,512,16000,0,1084.220,1.0842,2026-10-14T01:49:33.312668
+176,CMP,dedicated_cores,8,0,512,16000,0,1074.710,1.0747,2026-10-14T01:49:34.445313
+177,CMP,dedicated_cores,8,0,512,16000,0,1061.190,1.0612,2026-10-14T01:49:35.564633
+178,CMP,dedicated_cores,8,0,512,16000,0,1103.380,1.1034,2026-10-14T01:49:36.726587
+179,CMP,dedicated_cores,8,0,512,16000,0,1065.740,1.0657,2026-10-14T01:49:37.850510
+180,CMP,dedicated_cores,8,0,512,16000,0,1087.550,1.0876,2026-10-14T01:49:38.996274
+181,CMP,dedicated_cores,8,0,512,16000,0,1073.100,1.0731,2026-10-14T01:49:40.127400
+182,CMP,dedicated_cores,8,0,512,16000,0,1096.480,1.0965,2026-10-14T01:49:41.281975
+183,CMP,dedicated_cores,8,0,512,16000,0,1074.100,1.0741,2026-10-14T01:49:42.411931
+184,CMP,dedicated_cores,8,0,512,16000,0,1093.840,1.0938,2026-10-14T01:49:43.562263
+185,CMP,dedicated_cores,8,0,512,16000,0,1071.220,1.0712,2026-10-14T01:49:44.691802
+186,CMP,dedicated_cores,8,0,512,16000,0,1070.150,1.0702,2026-10-14T01:49:45.820185
+187,CMP,dedicated_cores,8,0,512,16000,0,1125.120,1.1251,2026-10-14T01:49:47.003853
+188,CMP,dedicated_cores,8,0,512,16000,0,1068.430,1.0684,2026-10-14T01:49:48.130659
+189,CMP,dedicated_cores,8,0,512,16000,0,1071.600,1.0716,2026-10-14T01:49:49.257624
+190,CMP,dedicated_cores,8,0,512,16000,0,1069.210,1.0692,2026-10-14T01:49:50.385128
+191,CMP,dedicated_cores,8,0,512,16000,0,1090.440,1.0904,2026-10-14T01:49:51.533186
+192,CMP,dedicated_cores,8,0,512,16000,0,1075.000,1.0750,2026-10-14T01:49:52.663821
+193,CMP,dedicated_cores,8,0,512,16000,0,1080.550,1.0805,2026-10-14T01:49:53.802344
+194,CMP,dedicated_cores,8,0,512,16000,0,1063.370,1.0634,2026-10-14T01:49:54.924157
+195,CMP,dedicated_cores,8,0,512,16000,0,1065.340,1.0653,2026-10-14T01:49:56.047727
+196,CMP,dedicated_cores,8,0,512,16000,0,1131.570,1.1316,2026-10-14T01:49:57.237190
+197,CMP,dedicated_cores,8,0,512,16000,0,1084.030,1.0840,2026-10-14T01:49:58.379955
+198,CMP,dedicated_cores,8,0,512,16000,0,1070.140,1.0701,2026-10-14T01:49:59.508256
+199,CMP,dedicated_cores,8,0,512,16000,0,1069.490,1.0695,2026-10-14T01:50:00.635724
+200,CMP,dedicated_cores,8,0,512,16000,0,1104.800,1.1048,2026-10-14T01:50:01.798698
+1,SMT (HW Real),hardware_smt,16,0,512,16000,0,1195.970,1.1960,2026-10-14T01:50:03.051711
+2,SMT (HW Real),hardware_smt,16,0,512,16000,0,1062.160,1.0622,2026-10-14T01:50:04.169237
+3,SMT (HW Real),hardware_smt,16,0,512,16000,0,1021.600,1.0216,2026-10-14T01:50:05.247033
+4,SMT (HW Real),hardware_smt,16,0,512,16000,0,997.973,0.9980,2026-10-14T01:50:06.302811
+5,SMT (HW Real),hardware_smt,16,0,512,16000,0,1335.510,1.3355,2026-10-14T01:50:07.696205
+6,SMT (HW Real),hardware_smt,16,0,512,16000,0,1053.590,1.0536,2026-10-14T01:50:08.807939
+7,SMT (HW Real),hardware_smt,16,0,512,16000,0,1016.380,1.0164,2026-10-14T01:50:09.881122
+8,SMT (HW Real),hardware_smt,16,0,512,16000,0,1001.790,1.0018,2026-10-14T01:50:10.940795
+9,SMT (HW Real),hardware_smt,16,0,512,16000,0,1323.440,1.3234,2026-10-14T01:50:12.322284
+10,SMT (HW Real),hardware_smt,16,0,512,16000,0,1046.460,1.0465,2026-10-14T01:50:13.426785
+11,SMT (HW Real),hardware_smt,16,0,512,16000,0,1016.360,1.0164,2026-10-14T01:50:14.500853
+12,SMT (HW Real),hardware_smt,16,0,512,16000,0,1002.770,1.0028,2026-10-14T01:50:15.561513
+13,SMT (HW Real),hardware_smt,16,0,512,16000,0,1001.130,1.0011,2026-10-14T01:50:16.620596
+14,SMT (HW Real),hardware_smt,16,0,512,16000,0,1357.890,1.3579,2026-10-14T01:50:18.036485
+15,SMT (HW Real),hardware_smt,16,0,512,16000,0,1045.130,1.0451,2026-10-14T01:50:19.139321
+16,SMT (HW Real),hardware_smt,16,0,512,16000,0,1011.250,1.0112,2026-10-14T01:50:20.207102
+17,SMT (HW Real),hardware_smt,16,0,512,16000,0,1006.180,1.0062,2026-10-14T01:50:21.271412
+18,SMT (HW Real),hardware_smt,16,0,512,16000,0,1341.410,1.3414,2026-10-14T01:50:22.670584
+19,SMT (HW Real),hardware_smt,16,0,512,16000,0,1043.540,1.0435,2026-10-14T01:50:23.771984
+20,SMT (HW Real),hardware_smt,16,0,512,16000,0,1016.830,1.0168,2026-10-14T01:50:24.846611
+21,SMT (HW Real),hardware_smt,16,0,512,16000,0,1009.410,1.0094,2026-10-14T01:50:25.913875
+22,SMT (HW Real),hardware_smt,16,0,512,16000,0,1232.920,1.2329,2026-10-14T01:50:27.204843
+23,SMT (HW Real),hardware_smt,16,0,512,16000,0,1130.050,1.1300,2026-10-14T01:50:28.390686
+24,SMT (HW Real),hardware_smt,16,0,512,16000,0,1017.670,1.0177,2026-10-14T01:50:29.466572
+25,SMT (HW Real),hardware_smt,16,0,512,16000,0,1008.700,1.0087,2026-10-14T01:50:30.533266
+26,SMT (HW Real),hardware_smt,16,0,512,16000,0,995.893,0.9959,2026-10-14T01:50:31.587050
+27,SMT (HW Real),hardware_smt,16,0,512,16000,0,1368.990,1.3690,2026-10-14T01:50:33.014114
+28,SMT (HW Real),hardware_smt,16,0,512,16000,0,1051.420,1.0514,2026-10-14T01:50:34.123292
+29,SMT (HW Real),hardware_smt,16,0,512,16000,0,1019.630,1.0196,2026-10-14T01:50:35.200225
+30,SMT (HW Real),hardware_smt,16,0,512,16000,0,1005.730,1.0057,2026-10-14T01:50:36.264031
+31,SMT (HW Real),hardware_smt,16,0,512,16000,0,1339.590,1.3396,2026-10-14T01:50:37.661406
+32,SMT (HW Real),hardware_smt,16,0,512,16000,0,1056.990,1.0570,2026-10-14T01:50:38.776147
+33,SMT (HW Real),hardware_smt,16,0,512,16000,0,1015.680,1.0157,2026-10-14T01:50:39.848730
+34,SMT (HW Real),hardware_smt,16,0,512,16000,0,1015.880,1.0159,2026-10-14T01:50:40.922445
+35,SMT (HW Real),hardware_smt,16,0,512,16000,0,1000.540,1.0005,2026-10-14T01:50:41.981276
+36,SMT (HW Real),hardware_smt,16,0,512,16000,0,1365.600,1.3656,2026-10-14T01:50:43.404338
+37,SMT (HW Real),hardware_smt,16,0,512,16000,0,1021.270,1.0213,2026-10-14T01:50:44.483332
+38,SMT (HW Real),hardware_smt,16,0,512,16000,0,1009.750,1.0097,2026-10-14T01:50:45.551051
+39,SMT (HW Real),hardware_smt,16,0,512,16000,0,1017.470,1.0175,2026-10-14T01:50:46.625445
+40,SMT (HW Real),hardware_smt,16,0,512,16000,0,1326.400,1.3264,2026-10-14T01:50:48.009724
+41,SMT (HW Real),hardware_smt,16,0,512,16000,0,1055.230,1.0552,2026-10-14T01:50:49.123283
+42,SMT (HW Real),hardware_smt,16,0,512,16000,0,1025.720,1.0257,2026-10-14T01:50:50.206767
+43,SMT (HW Real),hardware_smt,16,0,512,16000,0,1009.010,1.0090,2026-10-14T01:50:51.273609
+44,SMT (HW Real),hardware_smt,16,0,512,16000,0,1037.140,1.0371,2026-10-14T01:50:52.368963
+45,SMT (HW Real),hardware_smt,16,0,512,16000,0,1274.620,1.2746,2026-10-14T01:50:53.726074
+46,SMT (HW Real),hardware_smt,16,0,512,16000,0,1035.370,1.0354,2026-10-14T01:50:54.819468
+47,SMT (HW Real),hardware_smt,16,0,512,16000,0,1008.600,1.0086,2026-10-14T01:50:55.886091
+48,SMT (HW Real),hardware_smt,16,0,512,16000,0,1011.990,1.0120,2026-10-14T01:50:56.956586
+49,SMT (HW Real),hardware_smt,16,0,512,16000,0,1390.620,1.3906,2026-10-14T01:50:58.405431
+50,SMT (HW Real),hardware_smt,16,0,512,16000,0,1037.460,1.0375,2026-10-14T01:50:59.500989
+51,SMT (HW Real),hardware_smt,16,0,512,16000,0,1018.310,1.0183,2026-10-14T01:51:00.577263
+52,SMT (HW Real),hardware_smt,16,0,512,16000,0,1006.860,1.0069,2026-10-14T01:51:01.642236
+53,SMT (HW Real),hardware_smt,16,0,512,16000,0,1278.690,1.2787,2026-10-14T01:51:02.978873
+54,SMT (HW Real),hardware_smt,16,0,512,16000,0,1058.570,1.0586,2026-10-14T01:51:04.095375
+55,SMT (HW Real),hardware_smt,16,0,512,16000,0,1027.640,1.0276,2026-10-14T01:51:05.179752
+56,SMT (HW Real),hardware_smt,16,0,512,16000,0,1011.100,1.0111,2026-10-14T01:51:06.248768
+57,SMT (HW Real),hardware_smt,16,0,512,16000,0,1012.530,1.0125,2026-10-14T01:51:07.318997
+58,SMT (HW Real),hardware_smt,16,0,512,16000,0,1383.890,1.3839,2026-10-14T01:51:08.759645
+59,SMT (HW Real),hardware_smt,16,0,512,16000,0,1032.430,1.0324,2026-10-14T01:51:09.850132
+60,SMT (HW Real),hardware_smt,16,0,512,16000,0,1023.710,1.0237,2026-10-14T01:51:10.932260
+61,SMT (HW Real),hardware_smt,16,0,512,16000,0,1007.880,1.0079,2026-10-14T01:51:11.997882
+62,SMT (HW Real),hardware_smt,16,0,512,16000,0,1374.170,1.3742,2026-10-14T01:51:13.429842
+63,SMT (HW Real),hardware_smt,16,0,512,16000,0,1027.000,1.0270,2026-10-14T01:51:14.514727
+64,SMT (HW Real),hardware_smt,16,0,512,16000,0,1009.980,1.0100,2026-10-14T01:51:15.582494
+65,SMT (HW Real),hardware_smt,16,0,512,16000,0,1020.020,1.0200,2026-10-14T01:51:16.660377
+66,SMT (HW Real),hardware_smt,16,0,512,16000,0,1011.850,1.0118,2026-10-14T01:51:17.728723
+67,SMT (HW Real),hardware_smt,16,0,512,16000,0,1349.360,1.3494,2026-10-14T01:51:19.134798
+68,SMT (HW Real),hardware_smt,16,0,512,16000,0,1021.660,1.0217,2026-10-14T01:51:20.214240
+69,SMT (HW Real),hardware_smt,16,0,512,16000,0,1005.880,1.0059,2026-10-14T01:51:21.277930
+70,SMT (HW Real),hardware_smt,16,0,512,16000,0,1013.650,1.0136,2026-10-14T01:51:22.349478
+71,SMT (HW Real),hardware_smt,16,0,512,16000,0,1335.920,1.3359,2026-10-14T01:51:23.743285
+72,SMT (HW Real),hardware_smt,16,0,512,16000,0,1030.230,1.0302,2026-10-14T01:51:24.831257
+73,SMT (HW Real),hardware_smt,16,0,512,16000,0,1011.400,1.0114,2026-10-14T01:51:25.899244
+74,SMT (HW Real),hardware_smt,16,0,512,16000,0,1011.920,1.0119,2026-10-14T01:51:26.969154
+75,SMT (HW Real),hardware_smt,16,0,512,16000,0,1166.570,1.1666,2026-10-14T01:51:28.193641
+76,SMT (HW Real),hardware_smt,16,0,512,16000,0,1149.600,1.1496,2026-10-14T01:51:29.398835
+77,SMT (HW Real),hardware_smt,16,0,512,16000,0,1012.140,1.0121,2026-10-14T01:51:30.469372
+78,SMT (HW Real),hardware_smt,16,0,512,16000,0,1011.580,1.0116,2026-10-14T01:51:31.538864
+79,SMT (HW Real),hardware_smt,16,0,512,16000,0,1028.470,1.0285,2026-10-14T01:51:32.625149
+80,SMT (HW Real),hardware_smt,16,0,512,16000,0,1302.830,1.3028,2026-10-14T01:51:33.985282
+81,SMT (HW Real),hardware_smt,16,0,512,16000,0,1031.130,1.0311,2026-10-14T01:51:35.074417
+82,SMT (HW Real),hardware_smt,16,0,512,16000,0,1010.910,1.0109,2026-10-14T01:51:36.142518
+83,SMT (HW Real),hardware_smt,16,0,512,16000,0,1014.130,1.0141,2026-10-14T01:51:37.213588
+84,SMT (HW Real),hardware_smt,16,0,512,16000,0,1355.300,1.3553,2026-10-14T01:51:38.627123
+85,SMT (HW Real),hardware_smt,16,0,512,16000,0,1050.790,1.0508,2026-10-14T01:51:39.734852
+86,SMT (HW Real),hardware_smt,16,0,512,16000,0,1024.640,1.0246,2026-10-14T01:51:40.817620
+87,SMT (HW Real),hardware_smt,16,0,512,16000,0,1017.360,1.0174,2026-10-14T01:51:41.892778
+88,SMT (HW Real),hardware_smt,16,0,512,16000,0,1031.230,1.0312,2026-10-14T01:51:42.982127
+89,SMT (HW Real),hardware_smt,16,0,512,16000,0,1407.710,1.4077,2026-10-14T01:51:44.447927
+90,SMT (HW Real),hardware_smt,16,0,512,16000,0,1011.710,1.0117,2026-10-14T01:51:45.518684
+91,SMT (HW Real),hardware_smt,16,0,512,16000,0,1018.170,1.0182,2026-10-14T01:51:46.594729
+92,SMT (HW Real),hardware_smt,16,0,512,16000,0,1011.700,1.0117,2026-10-14T01:51:47.664269
+93,SMT (HW Real),hardware_smt,16,0,512,16000,0,1413.170,1.4132,2026-10-14T01:51:49.133998
+94,SMT (HW Real),hardware_smt,16,0,512,16000,0,1032.390,1.0324,2026-10-14T01:51:50.224336
+95,SMT (HW Real),hardware_smt,16,0,512,16000,0,1013.740,1.0137,2026-10-14T01:51:51.295869
+96,SMT (HW Real),hardware_smt,16,0,512,16000,0,1013.390,1.0134,2026-10-14T01:51:52.367288
+97,SMT (HW Real),hardware_smt,16,0,512,16000,0,1137.130,1.1371,2026-10-14T01:51:53.562624
+98,SMT (HW Real),hardware_smt,16,0,512,16000,0,1257.800,1.2578,2026-10-14T01:51:54.876299
+99,SMT (HW Real),hardware_smt,16,0,512,16000,0,1013.390,1.0134,2026-10-14T01:51:55.947878
+100,SMT (HW Real),hardware_smt,16,0,512,16000,0,1020.150,1.0201,2026-10-14T01:51:57.025869
+101,SMT (HW Real),hardware_smt,16,0,512,16000,0,1018.340,1.0183,2026-10-14T01:51:58.102442
+102,SMT (HW Real),hardware_smt,16,0,512,16000,0,1337.230,1.3372,2026-10-14T01:51:59.494512
+103,SMT (HW Real),hardware_smt,16,0,512,16000,0,1023.730,1.0237,2026-10-14T01:52:00.576028
+104,SMT (HW Real),hardware_smt,16,0,512,16000,0,1016.950,1.0170,2026-10-14T01:52:01.649900
+105,SMT (HW Real),hardware_smt,16,0,512,16000,0,1024.100,1.0241,2026-10-14T01:52:02.732395
+106,SMT (HW Real),hardware_smt,16,0,512,16000,0,1326.250,1.3262,2026-10-14T01:52:04.116478
+107,SMT (HW Real),hardware_smt,16,0,512,16000,0,1074.810,1.0748,2026-10-14T01:52:05.247405
+108,SMT (HW Real),hardware_smt,16,0,512,16000,0,1019.850,1.0198,2026-10-14T01:52:06.325077
+109,SMT (HW Real),hardware_smt,16,0,512,16000,0,1024.650,1.0247,2026-10-14T01:52:07.408102
+110,SMT (HW Real),hardware_smt,16,0,512,16000,0,1065.160,1.0652,2026-10-14T01:52:08.531192
+111,SMT (HW Real),hardware_smt,16,0,512,16000,0,1329.180,1.3292,2026-10-14T01:52:09.918481
+112,SMT (HW Real),hardware_smt,16,0,512,16000,0,1038.860,1.0389,2026-10-14T01:52:11.015218
+113,SMT (HW Real),hardware_smt,16,0,512,16000,0,1029.440,1.0294,2026-10-14T01:52:12.102528
+114,SMT (HW Real),hardware_smt,16,0,512,16000,0,1066.250,1.0662,2026-10-14T01:52:13.227451
+115,SMT (HW Real),hardware_smt,16,0,512,16000,0,1357.650,1.3577,2026-10-14T01:52:14.642975
+116,SMT (HW Real),hardware_smt,16,0,512,16000,0,1019.020,1.0190,2026-10-14T01:52:15.720250
+117,SMT (HW Real),hardware_smt,16,0,512,16000,0,1073.160,1.0732,2026-10-14T01:52:16.851512
+118,SMT (HW Real),hardware_smt,16,0,512,16000,0,1019.100,1.0191,2026-10-14T01:52:17.928357
+119,SMT (HW Real),hardware_smt,16,0,512,16000,0,1235.550,1.2355,2026-10-14T01:52:19.221424
+120,SMT (HW Real),hardware_smt,16,0,512,16000,0,1160.920,1.1609,2026-10-14T01:52:20.437909
+121,SMT (HW Real),hardware_smt,16,0,512,16000,0,1026.110,1.0261,2026-10-14T01:52:21.521777
+122,SMT (HW Real),hardware_smt,16,0,512,16000,0,1015.440,1.0154,2026-10-14T01:52:22.595042
+123,SMT (HW Real),hardware_smt,16,0,512,16000,0,1064.320,1.0643,2026-10-14T01:52:23.716042
+124,SMT (HW Real),hardware_smt,16,0,512,16000,0,1315.810,1.3158,2026-10-14T01:52:25.089526
+125,SMT (HW Real),hardware_smt,16,0,512,16000,0,1016.710,1.0167,2026-10-14T01:52:26.163128
+126,SMT (HW Real),hardware_smt,16,0,512,16000,0,1018.880,1.0189,2026-10-14T01:52:27.239836
+127,SMT (HW Real),hardware_smt,16,0,512,16000,0,1066.830,1.0668,2026-10-14T01:52:28.364673
+128,SMT (HW Real),hardware_smt,16,0,512,16000,0,1318.650,1.3187,2026-10-14T01:52:29.741286
+129,SMT (HW Real),hardware_smt,16,0,512,16000,0,1031.650,1.0317,2026-10-14T01:52:30.830639
+130,SMT (HW Real),hardware_smt,16,0,512,16000,0,1023.220,1.0232,2026-10-14T01:52:31.912236
+131,SMT (HW Real),hardware_smt,16,0,512,16000,0,1025.920,1.0259,2026-10-14T01:52:32.995828
+132,SMT (HW Real),hardware_smt,16,0,512,16000,0,1060.710,1.0607,2026-10-14T01:52:34.114364
+133,SMT (HW Real),hardware_smt,16,0,512,16000,0,1382.510,1.3825,2026-10-14T01:52:35.554577
+134,SMT (HW Real),hardware_smt,16,0,512,16000,0,1021.320,1.0213,2026-10-14T01:52:36.633691
+135,SMT (HW Real),hardware_smt,16,0,512,16000,0,1025.070,1.0251,2026-10-14T01:52:37.715536
+136,SMT (HW Real),hardware_smt,16,0,512,16000,0,1072.440,1.0724,2026-10-14T01:52:38.845824
+137,SMT (HW Real),hardware_smt,16,0,512,16000,0,1355.110,1.3551,2026-10-14T01:52:40.258798
+138,SMT (HW Real),hardware_smt,16,0,512,16000,0,1026.240,1.0262,2026-10-14T01:52:41.342938
+139,SMT (HW Real),hardware_smt,16,0,512,16000,0,1020.110,1.0201,2026-10-14T01:52:42.420767
+140,SMT (HW Real),hardware_smt,16,0,512,16000,0,1065.760,1.0658,2026-10-14T01:52:43.544115
+141,SMT (HW Real),hardware_smt,16,0,512,16000,0,1264.340,1.2643,2026-10-14T01:52:44.866464
+142,SMT (HW Real),hardware_smt,16,0,512,16000,0,1079.140,1.0791,2026-10-14T01:52:46.001271
+143,SMT (HW Real),hardware_smt,16,0,512,16000,0,1021.690,1.0217,2026-10-14T01:52:47.080749
+144,SMT (HW Real),hardware_smt,16,0,512,16000,0,1067.090,1.0671,2026-10-14T01:52:48.205841
+145,SMT (HW Real),hardware_smt,16,0,512,16000,0,1033.370,1.0334,2026-10-14T01:52:49.296208
+146,SMT (HW Real),hardware_smt,16,0,512,16000,0,1362.900,1.3629,2026-10-14T01:52:50.717027
+147,SMT (HW Real),hardware_smt,16,0,512,16000,0,1024.880,1.0249,2026-10-14T01:52:51.799719
+148,SMT (HW Real),hardware_smt,16,0,512,16000,0,1022.220,1.0222,2026-10-14T01:52:52.879604
+149,SMT (HW Real),hardware_smt,16,0,512,16000,0,1065.290,1.0653,2026-10-14T01:52:54.002894
+150,SMT (HW Real),hardware_smt,16,0,512,16000,0,1393.770,1.3938,2026-10-14T01:52:55.454562
+151,SMT (HW Real),hardware_smt,16,0,512,16000,0,1026.130,1.0261,2026-10-14T01:52:56.538686
+152,SMT (HW Real),hardware_smt,16,0,512,16000,0,1017.400,1.0174,2026-10-14T01:52:57.613874
+153,SMT (HW Real),hardware_smt,16,0,512,16000,0,1070.900,1.0709,2026-10-14T01:52:58.743228
+154,SMT (HW Real),hardware_smt,16,0,512,16000,0,1124.840,1.1248,2026-10-14T01:52:59.926387
+155,SMT (HW Real),hardware_smt,16,0,512,16000,0,1241.880,1.2419,2026-10-14T01:53:01.223786
+156,SMT (HW Real),hardware_smt,16,0,512,16000,0,1019.570,1.0196,2026-10-14T01:53:02.301301
+157,SMT (HW Real),hardware_smt,16,0,512,16000,0,1071.160,1.0712,2026-10-14T01:53:03.430530
+158,SMT (HW Real),hardware_smt,16,0,512,16000,0,1051.730,1.0517,2026-10-14T01:53:04.540283
+159,SMT (HW Real),hardware_smt,16,0,512,16000,0,1331.270,1.3313,2026-10-14T01:53:05.929621
+160,SMT (HW Real),hardware_smt,16,0,512,16000,0,1031.040,1.0310,2026-10-14T01:53:07.018759
+161,SMT (HW Real),hardware_smt,16,0,512,16000,0,1024.280,1.0243,2026-10-14T01:53:08.100751
+162,SMT (HW Real),hardware_smt,16,0,512,16000,0,1050.930,1.0509,2026-10-14T01:53:09.206695
+163,SMT (HW Real),hardware_smt,16,0,512,16000,0,1335.420,1.3354,2026-10-14T01:53:10.599158
+164,SMT (HW Real),hardware_smt,16,0,512,16000,0,1023.840,1.0238,2026-10-14T01:53:11.678520
+165,SMT (HW Real),hardware_smt,16,0,512,16000,0,1022.140,1.0221,2026-10-14T01:53:12.758370
+166,SMT (HW Real),hardware_smt,16,0,512,16000,0,1060.460,1.0605,2026-10-14T01:53:13.876691
+167,SMT (HW Real),hardware_smt,16,0,512,16000,0,1037.260,1.0373,2026-10-14T01:53:14.972450
+168,SMT (HW Real),hardware_smt,16,0,512,16000,0,1355.210,1.3552,2026-10-14T01:53:16.385807
+169,SMT (HW Real),hardware_smt,16,0,512,16000,0,1041.730,1.0417,2026-10-14T01:53:17.486022
+170,SMT (HW Real),hardware_smt,16,0,512,16000,0,1071.010,1.0710,2026-10-14T01:53:18.614850
+171,SMT (HW Real),hardware_smt,16,0,512,16000,0,1033.610,1.0336,2026-10-14T01:53:19.706462
+172,SMT (HW Real),hardware_smt,16,0,512,16000,0,1353.400,1.3534,2026-10-14T01:53:21.117796
+173,SMT (HW Real),hardware_smt,16,0,512,16000,0,1023.360,1.0234,2026-10-14T01:53:22.198820
+174,SMT (HW Real),hardware_smt,16,0,512,16000,0,1068.420,1.0684,2026-10-14T01:53:23.325231
+175,SMT (HW Real),hardware_smt,16,0,512,16000,0,1043.300,1.0433,2026-10-14T01:53:24.425363
+176,SMT (HW Real),hardware_smt,16,0,512,16000,0,1336.560,1.3366,2026-10-14T01:53:25.819745
+177,SMT (HW Real),hardware_smt,16,0,512,16000,0,1050.730,1.0507,2026-10-14T01:53:26.928513
+178,SMT (HW Real),hardware_smt,16,0,512,16000,0,1023.460,1.0235,2026-10-14T01:53:28.009879
+179,SMT (HW Real),hardware_smt,16,0,512,16000,0,1083.160,1.0832,2026-10-14T01:53:29.150915
+180,SMT (HW Real),hardware_smt,16,0,512,16000,0,1026.550,1.0265,2026-10-14T01:53:30.233373
+181,SMT (HW Real),hardware_smt,16,0,512,16000,0,1363.610,1.3636,2026-10-14T01:53:31.655877
+182,SMT (HW Real),hardware_smt,16,0,512,16000,0,1037.660,1.0377,2026-10-14T01:53:32.751253
+183,SMT (HW Real),hardware_smt,16,0,512,16000,0,1072.730,1.0727,2026-10-14T01:53:33.882198
+184,SMT (HW Real),hardware_smt,16,0,512,16000,0,1047.700,1.0477,2026-10-14T01:53:34.987815
+185,SMT (HW Real),hardware_smt,16,0,512,16000,0,1398.570,1.3986,2026-10-14T01:53:36.443335
+186,SMT (HW Real),hardware_smt,16,0,512,16000,0,1024.560,1.0246,2026-10-14T01:53:37.524851
+187,SMT (HW Real),hardware_smt,16,0,512,16000,0,1071.530,1.0715,2026-10-14T01:53:38.654644
+188,SMT (HW Real),hardware_smt,16,0,512,16000,0,1039.790,1.0398,2026-10-14T01:53:39.752375
+189,SMT (HW Real),hardware_smt,16,0,512,16000,0,1369.260,1.3693,2026-10-14T01:53:41.179766
+190,SMT (HW Real),hardware_smt,16,0,512,16000,0,1047.200,1.0472,2026-10-14T01:53:42.284685
+191,SMT (HW Real),hardware_smt,16,0,512,16000,0,1079.840,1.0798,2026-10-14T01:53:43.422378
+192,SMT (HW Real),hardware_smt,16,0,512,16000,0,1042.890,1.0429,2026-10-14T01:53:44.523002
+193,SMT (HW Real),hardware_smt,16,0,512,16000,0,1028.060,1.0281,2026-10-14T01:53:45.607972
+194,SMT (HW Real),hardware_smt,16,0,512,16000,0,1339.400,1.3394,2026-10-14T01:53:47.005262
+195,SMT (HW Real),hardware_smt,16,0,512,16000,0,1022.930,1.0229,2026-10-14T01:53:48.085928
+196,SMT (HW Real),hardware_smt,16,0,512,16000,0,1068.320,1.0683,2026-10-14T01:53:49.208720
+197,SMT (HW Real),hardware_smt,16,0,512,16000,0,1030.360,1.0304,2026-10-14T01:53:50.295839
+198,SMT (HW Real),hardware_smt,16,0,512,16000,0,1346.830,1.3468,2026-10-14T01:53:51.700853
+199,SMT (HW Real),hardware_smt,16,0,512,16000,0,1037.260,1.0373,2026-10-14T01:53:52.796229
+200,SMT (HW Real),hardware_smt,16,0,512,16000,0,1073.990,1.0740,2026-10-14T01:53:53.928223
+1,Coarse-Grained,burst_block,8,0,512,16000,16000,1390.840,1.3908,2026-10-14T01:53:55.377016
+2,Coarse-Grained,burst_block,8,0,512,16000,16000,1358.700,1.3587,2026-10-14T01:53:56.792428
+3,Coarse-Grained,burst_block,8,0,512,16000,16000,1240.470,1.2405,2026-10-14T01:53:58.090982
+4,Coarse-Grained,burst_block,8,0,512,16000,16000,1290.830,1.2908,2026-10-14T01:53:59.436606
+5,Coarse-Grained,burst_block,8,0,512,16000,16000,1243.220,1.2432,2026-10-14T01:54:00.736966
+6,Coarse-Grained,burst_block,8,0,512,16000,16000,1371.850,1.3719,2026-10-14T01:54:02.166504
+7,Coarse-Grained,burst_block,8,0,512,16000,16000,1285.260,1.2853,2026-10-14T01:54:03.509421
+8,Coarse-Grained,burst_block,8,0,512,16000,16000,1217.630,1.2176,2026-10-14T01:54:04.785379
+9,Coarse-Grained,burst_block,8,0,512,16000,16000,1234.250,1.2343,2026-10-14T01:54:06.077199
+10,Coarse-Grained,burst_block,8,0,512,16000,16000,1340.340,1.3403,2026-10-14T01:54:07.475459
+11,Coarse-Grained,burst_block,8,0,512,16000,16000,1278.390,1.2784,2026-10-14T01:54:08.810456
+12,Coarse-Grained,burst_block,8,0,512,16000,16000,1236.580,1.2366,2026-10-14T01:54:10.104525
+13,Coarse-Grained,burst_block,8,0,512,16000,16000,1322.290,1.3223,2026-10-14T01:54:11.484754
+14,Coarse-Grained,burst_block,8,0,512,16000,16000,1299.110,1.2991,2026-10-14T01:54:12.839286
+15,Coarse-Grained,burst_block,8,0,512,16000,16000,1271.810,1.2718,2026-10-14T01:54:14.169420
+16,Coarse-Grained,burst_block,8,0,512,16000,16000,1299.290,1.2993,2026-10-14T01:54:15.526099
+17,Coarse-Grained,burst_block,8,0,512,16000,16000,1327.070,1.3271,2026-10-14T01:54:16.910105
+18,Coarse-Grained,burst_block,8,0,512,16000,16000,1236.400,1.2364,2026-10-14T01:54:18.204012
+19,Coarse-Grained,burst_block,8,0,512,16000,16000,1217.300,1.2173,2026-10-14T01:54:19.477817
+20,Coarse-Grained,burst_block,8,0,512,16000,16000,1203.370,1.2034,2026-10-14T01:54:20.737986
+21,Coarse-Grained,burst_block,8,0,512,16000,16000,1337.130,1.3371,2026-10-14T01:54:22.132486
+22,Coarse-Grained,burst_block,8,0,512,16000,16000,1268.640,1.2686,2026-10-14T01:54:23.458945
+23,Coarse-Grained,burst_block,8,0,512,16000,16000,1261.130,1.2611,2026-10-14T01:54:24.777952
+24,Coarse-Grained,burst_block,8,0,512,16000,16000,1193.300,1.1933,2026-10-14T01:54:26.028727
+25,Coarse-Grained,burst_block,8,0,512,16000,16000,1344.430,1.3444,2026-10-14T01:54:27.430806
+26,Coarse-Grained,burst_block,8,0,512,16000,16000,1275.470,1.2755,2026-10-14T01:54:28.763806
+27,Coarse-Grained,burst_block,8,0,512,16000,16000,1204.710,1.2047,2026-10-14T01:54:30.026357
+28,Coarse-Grained,burst_block,8,0,512,16000,16000,1169.330,1.1693,2026-10-14T01:54:31.253369
+29,Coarse-Grained,burst_block,8,0,512,16000,16000,1333.560,1.3336,2026-10-14T01:54:32.644746
+30,Coarse-Grained,burst_block,8,0,512,16000,16000,1200.240,1.2002,2026-10-14T01:54:33.902613
+31,Coarse-Grained,burst_block,8,0,512,16000,16000,1194.970,1.1950,2026-10-14T01:54:35.155202
+32,Coarse-Grained,burst_block,8,0,512,16000,16000,1209.930,1.2099,2026-10-14T01:54:36.422458
+33,Coarse-Grained,burst_block,8,0,512,16000,16000,1361.600,1.3616,2026-10-14T01:54:37.842102
+34,Coarse-Grained,burst_block,8,0,512,16000,16000,1242.220,1.2422,2026-10-14T01:54:39.142199
+35,Coarse-Grained,burst_block,8,0,512,16000,16000,1239.350,1.2393,2026-10-14T01:54:40.437463
+36,Coarse-Grained,burst_block,8,0,512,16000,16000,1204.240,1.2042,2026-10-14T01:54:41.696958
+37,Coarse-Grained,burst_block,8,0,512,16000,16000,1359.090,1.3591,2026-10-14T01:54:43.113890
+38,Coarse-Grained,burst_block,8,0,512,16000,16000,1287.630,1.2876,2026-10-14T01:54:44.456270
+39,Coarse-Grained,burst_block,8,0,512,16000,16000,1219.300,1.2193,2026-10-14T01:54:45.733604
+40,Coarse-Grained,burst_block,8,0,512,16000,16000,1243.330,1.2433,2026-10-14T01:54:47.035380
+41,Coarse-Grained,burst_block,8,0,512,16000,16000,1343.890,1.3439,2026-10-14T01:54:48.435082
+42,Coarse-Grained,burst_block,8,0,512,16000,16000,1195.620,1.1956,2026-10-14T01:54:49.688712
+43,Coarse-Grained,burst_block,8,0,512,16000,16000,1262.460,1.2625,2026-10-14T01:54:51.008185
+44,Coarse-Grained,burst_block,8,0,512,16000,16000,1353.280,1.3533,2026-10-14T01:54:52.419786
+45,Coarse-Grained,burst_block,8,0,512,16000,16000,1260.670,1.2607,2026-10-14T01:54:53.738190
+46,Coarse-Grained,burst_block,8,0,512,16000,16000,1261.200,1.2612,2026-10-14T01:54:55.057699
+47,Coarse-Grained,burst_block,8,0,512,16000,16000,1226.600,1.2266,2026-10-14T01:54:56.342013
+48,Coarse-Grained,burst_block,8,0,512,16000,16000,1351.500,1.3515,2026-10-14T01:54:57.751161
+49,Coarse-Grained,burst_block,8,0,512,16000,16000,1244.590,1.2446,2026-10-14T01:54:59.053448
+50,Coarse-Grained,burst_block,8,0,512,16000,16000,1202.090,1.2021,2026-10-14T01:55:00.313530
+51,Coarse-Grained,burst_block,8,0,512,16000,16000,1273.930,1.2739,2026-10-14T01:55:01.645513
+52,Coarse-Grained,burst_block,8,0,512,16000,16000,1366.410,1.3664,2026-10-14T01:55:03.069504
+53,Coarse-Grained,burst_block,8,0,512,16000,16000,1264.480,1.2645,2026-10-14T01:55:04.391095
+54,Coarse-Grained,burst_block,8,0,512,16000,16000,1244.340,1.2443,2026-10-14T01:55:05.693253
+55,Coarse-Grained,burst_block,8,0,512,16000,16000,1237.760,1.2378,2026-10-14T01:55:06.988968
+56,Coarse-Grained,burst_block,8,0,512,16000,16000,1354.940,1.3549,2026-10-14T01:55:08.401707
+57,Coarse-Grained,burst_block,8,0,512,16000,16000,1271.880,1.2719,2026-10-14T01:55:09.731247
+58,Coarse-Grained,burst_block,8,0,512,16000,16000,1275.460,1.2755,2026-10-14T01:55:11.065022
+59,Coarse-Grained,burst_block,8,0,512,16000,16000,1296.020,1.2960,2026-10-14T01:55:12.418985
+60,Coarse-Grained,burst_block,8,0,512,16000,16000,1335.880,1.3359,2026-10-14T01:55:13.811259
+61,Coarse-Grained,burst_block,8,0,512,16000,16000,1247.630,1.2476,2026-10-14T01:55:15.116674
+62,Coarse-Grained,burst_block,8,0,512,16000,16000,1220.150,1.2202,2026-10-14T01:55:16.394994
+63,Coarse-Grained,burst_block,8,0,512,16000,16000,1305.770,1.3058,2026-10-14T01:55:17.758412
+64,Coarse-Grained,burst_block,8,0,512,16000,16000,1250.890,1.2509,2026-10-14T01:55:19.065186
+65,Coarse-Grained,burst_block,8,0,512,16000,16000,1277.760,1.2778,2026-10-14T01:55:20.400671
+66,Coarse-Grained,burst_block,8,0,512,16000,16000,1199.830,1.1998,2026-10-14T01:55:21.658419
+67,Coarse-Grained,burst_block,8,0,512,16000,16000,1345.260,1.3453,2026-10-14T01:55:23.061854
+68,Coarse-Grained,burst_block,8,0,512,16000,16000,1272.780,1.2728,2026-10-14T01:55:24.392631
+69,Coarse-Grained,burst_block,8,0,512,16000,16000,1226.310,1.2263,2026-10-14T01:55:25.676555
+70,Coarse-Grained,burst_block,8,0,512,16000,16000,1227.150,1.2272,2026-10-14T01:55:26.960506
+71,Coarse-Grained,burst_block,8,0,512,16000,16000,1407.840,1.4078,2026-10-14T01:55:28.426214
+72,Coarse-Grained,burst_block,8,0,512,16000,16000,1226.990,1.2270,2026-10-14T01:55:29.710884
+73,Coarse-Grained,burst_block,8,0,512,16000,16000,1219.750,1.2197,2026-10-14T01:55:30.988469
+74,Coarse-Grained,burst_block,8,0,512,16000,16000,1226.720,1.2267,2026-10-14T01:55:32.273195
+75,Coarse-Grained,burst_block,8,0,512,16000,16000,1361.910,1.3619,2026-10-14T01:55:33.693558
+76,Coarse-Grained,burst_block,8,0,512,16000,16000,1201.970,1.2020,2026-10-14T01:55:34.953614
+77,Coarse-Grained,burst_block,8,0,512,16000,16000,1212.420,1.2124,2026-10-14T01:55:36.222840
+78,Coarse-Grained,burst_block,8,0,512,16000,16000,1263.350,1.2633,2026-10-14T01:55:37.544067
+79,Coarse-Grained,burst_block,8,0,512,16000,16000,1366.620,1.3666,2026-10-14T01:55:38.967689
+80,Coarse-Grained,burst_block,8,0,512,16000,16000,1332.590,1.3326,2026-10-14T01:55:40.357072
+81,Coarse-Grained,burst_block,8,0,512,16000,16000,1237.480,1.2375,2026-10-14T01:55:41.651848
+82,Coarse-Grained,burst_block,8,0,512,16000,16000,1267.690,1.2677,2026-10-14T01:55:42.977380
+83,Coarse-Grained,burst_block,8,0,512,16000,16000,1373.460,1.3735,2026-10-14T01:55:44.406311
+84,Coarse-Grained,burst_block,8,0,512,16000,16000,1280.520,1.2805,2026-10-14T01:55:45.744756
+85,Coarse-Grained,burst_block,8,0,512,16000,16000,1192.140,1.1921,2026-10-14T01:55:46.994455
+86,Coarse-Grained,burst_block,8,0,512,16000,16000,1336.340,1.3363,2026-10-14T01:55:48.388445
+87,Coarse-Grained,burst_block,8,0,512,16000,16000,1231.970,1.2320,2026-10-14T01:55:49.678754
+88,Coarse-Grained,burst_block,8,0,512,16000,16000,1224.400,1.2244,2026-10-14T01:55:50.959567
+89,Coarse-Grained,burst_block,8,0,512,16000,16000,1230.700,1.2307,2026-10-14T01:55:52.248235
+90,Coarse-Grained,burst_block,8,0,512,16000,16000,1308.720,1.3087,2026-10-14T01:55:53.615223
+91,Coarse-Grained,burst_block,8,0,512,16000,16000,1186.150,1.1862,2026-10-14T01:55:54.859019
+92,Coarse-Grained,burst_block,8,0,512,16000,16000,1226.920,1.2269,2026-10-14T01:55:56.143007
+93,Coarse-Grained,burst_block,8,0,512,16000,16000,1208.380,1.2084,2026-10-14T01:55:57.409196
+94,Coarse-Grained,burst_block,8,0,512,16000,16000,1319.450,1.3195,2026-10-14T01:55:58.786742
+95,Coarse-Grained,burst_block,8,0,512,16000,16000,1195.070,1.1951,2026-10-14T01:56:00.039842
+96,Coarse-Grained,burst_block,8,0,512,16000,16000,1201.170,1.2012,2026-10-14T01:56:01.299015
+97,Coarse-Grained,burst_block,8,0,512,16000,16000,1224.450,1.2245,2026-10-14T01:56:02.580742
+98,Coarse-Grained,burst_block,8,0,512,16000,16000,1340.620,1.3406,2026-10-14T01:56:03.979414
+99,Coarse-Grained,burst_block,8,0,512,16000,16000,1208.890,1.2089,2026-10-14T01:56:05.246303
+100,Coarse-Grained,burst_block,8,0,512,16000,16000,1213.720,1.2137,2026-10-14T01:56:06.518116
+101,Coarse-Grained,burst_block,8,0,512,16000,16000,1250.110,1.2501,2026-10-14T01:56:07.825871
+102,Coarse-Grained,burst_block,8,0,512,16000,16000,1409.060,1.4091,2026-10-14T01:56:09.292886
+103,Coarse-Grained,burst_block,8,0,512,16000,16000,1290.200,1.2902,2026-10-14T01:56:10.640158
+104,Coarse-Grained,burst_block,8,0,512,16000,16000,1193.710,1.1937,2026-10-14T01:56:11.891911
+105,Coarse-Grained,burst_block,8,0,512,16000,16000,1291.110,1.2911,2026-10-14T01:56:13.240614
+106,Coarse-Grained,burst_block,8,0,512,16000,16000,1412.470,1.4125,2026-10-14T01:56:14.710097
+107,Coarse-Grained,burst_block,8,0,512,16000,16000,1184.420,1.1844,2026-10-14T01:56:15.952338
+108,Coarse-Grained,burst_block,8,0,512,16000,16000,1173.330,1.1733,2026-10-14T01:56:17.183630
+109,Coarse-Grained,burst_block,8,0,512,16000,16000,1196.440,1.1964,2026-10-14T01:56:18.437757
+110,Coarse-Grained,burst_block,8,0,512,16000,16000,1317.290,1.3173,2026-10-14T01:56:19.812601
+111,Coarse-Grained,burst_block,8,0,512,16000,16000,1179.580,1.1796,2026-10-14T01:56:21.048347
+112,Coarse-Grained,burst_block,8,0,512,16000,16000,1232.390,1.2324,2026-10-14T01:56:22.338573
+113,Coarse-Grained,burst_block,8,0,512,16000,16000,1217.960,1.2180,2026-10-14T01:56:23.614715
+114,Coarse-Grained,burst_block,8,0,512,16000,16000,1310.320,1.3103,2026-10-14T01:56:24.980671
+115,Coarse-Grained,burst_block,8,0,512,16000,16000,1217.970,1.2180,2026-10-14T01:56:26.256261
+116,Coarse-Grained,burst_block,8,0,512,16000,16000,1239.370,1.2394,2026-10-14T01:56:27.553550
+117,Coarse-Grained,burst_block,8,0,512,16000,16000,1302.630,1.3026,2026-10-14T01:56:28.913019
+118,Coarse-Grained,burst_block,8,0,512,16000,16000,1313.420,1.3134,2026-10-14T01:56:30.282313
+119,Coarse-Grained,burst_block,8,0,512,16000,16000,1263.100,1.2631,2026-10-14T01:56:31.603395
+120,Coarse-Grained,burst_block,8,0,512,16000,16000,1220.420,1.2204,2026-10-14T01:56:32.881690
+121,Coarse-Grained,burst_block,8,0,512,16000,16000,1315.780,1.3158,2026-10-14T01:56:34.255675
+122,Coarse-Grained,burst_block,8,0,512,16000,16000,1261.680,1.2617,2026-10-14T01:56:35.573841
+123,Coarse-Grained,burst_block,8,0,512,16000,16000,1206.370,1.2064,2026-10-14T01:56:36.838282
+124,Coarse-Grained,burst_block,8,0,512,16000,16000,1297.460,1.2975,2026-10-14T01:56:38.193532
+125,Coarse-Grained,burst_block,8,0,512,16000,16000,1385.820,1.3858,2026-10-14T01:56:39.636192
+126,Coarse-Grained,burst_block,8,0,512,16000,16000,1265.290,1.2653,2026-10-14T01:56:40.959730
+127,Coarse-Grained,burst_block,8,0,512,16000,16000,1228.150,1.2282,2026-10-14T01:56:42.245690
+128,Coarse-Grained,burst_block,8,0,512,16000,16000,1280.630,1.2806,2026-10-14T01:56:43.584560
+129,Coarse-Grained,burst_block,8,0,512,16000,16000,1349.330,1.3493,2026-10-14T01:56:44.991768
+130,Coarse-Grained,burst_block,8,0,512,16000,16000,1246.270,1.2463,2026-10-14T01:56:46.296010
+131,Coarse-Grained,burst_block,8,0,512,16000,16000,1202.840,1.2028,2026-10-14T01:56:47.556393
+132,Coarse-Grained,burst_block,8,0,512,16000,16000,1230.580,1.2306,2026-10-14T01:56:48.845637
+133,Coarse-Grained,burst_block,8,0,512,16000,16000,1370.220,1.3702,2026-10-14T01:56:50.273638
+134,Coarse-Grained,burst_block,8,0,512,16000,16000,1230.610,1.2306,2026-10-14T01:56:51.562707
+135,Coarse-Grained,burst_block,8,0,512,16000,16000,1265.350,1.2653,2026-10-14T01:56:52.884978
+136,Coarse-Grained,burst_block,8,0,512,16000,16000,1223.870,1.2239,2026-10-14T01:56:54.166659
+137,Coarse-Grained,burst_block,8,0,512,16000,16000,1415.750,1.4158,2026-10-14T01:56:55.639860
+138,Coarse-Grained,burst_block,8,0,512,16000,16000,1272.330,1.2723,2026-10-14T01:56:56.969942
+139,Coarse-Grained,burst_block,8,0,512,16000,16000,1244.600,1.2446,2026-10-14T01:56:58.272255
+140,Coarse-Grained,burst_block,8,0,512,16000,16000,1339.790,1.3398,2026-10-14T01:56:59.669769
+141,Coarse-Grained,burst_block,8,0,512,16000,16000,1217.970,1.2180,2026-10-14T01:57:00.943126
+142,Coarse-Grained,burst_block,8,0,512,16000,16000,1225.510,1.2255,2026-10-14T01:57:02.226351
+143,Coarse-Grained,burst_block,8,0,512,16000,16000,1301.140,1.3011,2026-10-14T01:57:03.585080
+144,Coarse-Grained,burst_block,8,0,512,16000,16000,1359.920,1.3599,2026-10-14T01:57:05.002911
+145,Coarse-Grained,burst_block,8,0,512,16000,16000,1197.830,1.1978,2026-10-14T01:57:06.257967
+146,Coarse-Grained,burst_block,8,0,512,16000,16000,1283.940,1.2839,2026-10-14T01:57:07.599704
+147,Coarse-Grained,burst_block,8,0,512,16000,16000,1276.010,1.2760,2026-10-14T01:57:08.933767
+148,Coarse-Grained,burst_block,8,0,512,16000,16000,1364.670,1.3647,2026-10-14T01:57:10.356292
+149,Coarse-Grained,burst_block,8,0,512,16000,16000,1284.420,1.2844,2026-10-14T01:57:11.698537
+150,Coarse-Grained,burst_block,8,0,512,16000,16000,1221.020,1.2210,2026-10-14T01:57:12.977330
+151,Coarse-Grained,burst_block,8,0,512,16000,16000,1279.490,1.2795,2026-10-14T01:57:14.314489
+152,Coarse-Grained,burst_block,8,0,512,16000,16000,1393.400,1.3934,2026-10-14T01:57:15.765686
+153,Coarse-Grained,burst_block,8,0,512,16000,16000,1267.980,1.2680,2026-10-14T01:57:17.091038
+154,Coarse-Grained,burst_block,8,0,512,16000,16000,1235.940,1.2359,2026-10-14T01:57:18.384618
+155,Coarse-Grained,burst_block,8,0,512,16000,16000,1206.100,1.2061,2026-10-14T01:57:19.648902
+156,Coarse-Grained,burst_block,8,0,512,16000,16000,1340.570,1.3406,2026-10-14T01:57:21.047240
+157,Coarse-Grained,burst_block,8,0,512,16000,16000,1279.870,1.2799,2026-10-14T01:57:22.384739
+158,Coarse-Grained,burst_block,8,0,512,16000,16000,1257.270,1.2573,2026-10-14T01:57:23.699625
+159,Coarse-Grained,burst_block,8,0,512,16000,16000,1294.420,1.2944,2026-10-14T01:57:25.051958
+160,Coarse-Grained,burst_block,8,0,512,16000,16000,1269.690,1.2697,2026-10-14T01:57:26.377547
+161,Coarse-Grained,burst_block,8,0,512,16000,16000,1185.020,1.1850,2026-10-14T01:57:27.620333
+162,Coarse-Grained,burst_block,8,0,512,16000,16000,1196.060,1.1961,2026-10-14T01:57:28.874185
+163,Coarse-Grained,burst_block,8,0,512,16000,16000,1300.680,1.3007,2026-10-14T01:57:30.231717
+164,Coarse-Grained,burst_block,8,0,512,16000,16000,1265.690,1.2657,2026-10-14T01:57:31.553066
+165,Coarse-Grained,burst_block,8,0,512,16000,16000,1258.890,1.2589,2026-10-14T01:57:32.870229
+166,Coarse-Grained,burst_block,8,0,512,16000,16000,1258.680,1.2587,2026-10-14T01:57:34.186990
+167,Coarse-Grained,burst_block,8,0,512,16000,16000,1347.900,1.3479,2026-10-14T01:57:35.592967
+168,Coarse-Grained,burst_block,8,0,512,16000,16000,1276.130,1.2761,2026-10-14T01:57:36.926842
+169,Coarse-Grained,burst_block,8,0,512,16000,16000,1200.290,1.2003,2026-10-14T01:57:38.184978
+170,Coarse-Grained,burst_block,8,0,512,16000,16000,1219.980,1.2200,2026-10-14T01:57:39.461473
+171,Coarse-Grained,burst_block,8,0,512,16000,16000,1332.610,1.3326,2026-10-14T01:57:40.851754
+172,Coarse-Grained,burst_block,8,0,512,16000,16000,1218.320,1.2183,2026-10-14T01:57:42.127821
+173,Coarse-Grained,burst_block,8,0,512,16000,16000,1265.020,1.2650,2026-10-14T01:57:43.450672
+174,Coarse-Grained,burst_block,8,0,512,16000,16000,1169.190,1.1692,2026-10-14T01:57:44.677901
+175,Coarse-Grained,burst_block,8,0,512,16000,16000,1314.550,1.3145,2026-10-14T01:57:46.050278
+176,Coarse-Grained,burst_block,8,0,512,16000,16000,1214.300,1.2143,2026-10-14T01:57:47.322416
+177,Coarse-Grained,burst_block,8,0,512,16000,16000,1273.270,1.2733,2026-10-14T01:57:48.653349
+178,Coarse-Grained,burst_block,8,0,512,16000,16000,1296.250,1.2962,2026-10-14T01:57:50.007483
+179,Coarse-Grained,burst_block,8,0,512,16000,16000,1378.820,1.3788,2026-10-14T01:57:51.444737
+180,Coarse-Grained,burst_block,8,0,512,16000,16000,1251.750,1.2517,2026-10-14T01:57:52.754105
+181,Coarse-Grained,burst_block,8,0,512,16000,16000,1236.830,1.2368,2026-10-14T01:57:54.048861
+182,Coarse-Grained,burst_block,8,0,512,16000,16000,1247.780,1.2478,2026-10-14T01:57:55.354531
+183,Coarse-Grained,burst_block,8,0,512,16000,16000,1327.360,1.3274,2026-10-14T01:57:56.738665
+184,Coarse-Grained,burst_block,8,0,512,16000,16000,1185.970,1.1860,2026-10-14T01:57:57.982525
+185,Coarse-Grained,burst_block,8,0,512,16000,16000,1274.920,1.2749,2026-10-14T01:57:59.315207
+186,Coarse-Grained,burst_block,8,0,512,16000,16000,1283.000,1.2830,2026-10-14T01:58:00.656102
+187,Coarse-Grained,burst_block,8,0,512,16000,16000,1271.760,1.2718,2026-10-14T01:58:01.984207
+188,Coarse-Grained,burst_block,8,0,512,16000,16000,1209.410,1.2094,2026-10-14T01:58:03.251218
+189,Coarse-Grained,burst_block,8,0,512,16000,16000,1292.450,1.2925,2026-10-14T01:58:04.602146
+190,Coarse-Grained,burst_block,8,0,512,16000,16000,1326.000,1.3260,2026-10-14T01:58:05.985107
+191,Coarse-Grained,burst_block,8,0,512,16000,16000,1247.670,1.2477,2026-10-14T01:58:07.289499
+192,Coarse-Grained,burst_block,8,0,512,16000,16000,1259.820,1.2598,2026-10-14T01:58:08.607140
+193,Coarse-Grained,burst_block,8,0,512,16000,16000,1217.810,1.2178,2026-10-14T01:58:09.882741
+194,Coarse-Grained,burst_block,8,0,512,16000,16000,1355.240,1.3552,2026-10-14T01:58:11.295625
+195,Coarse-Grained,burst_block,8,0,512,16000,16000,1250.940,1.2509,2026-10-14T01:58:12.603106
+196,Coarse-Grained,burst_block,8,0,512,16000,16000,1266.370,1.2664,2026-10-14T01:58:13.927245
+197,Coarse-Grained,burst_block,8,0,512,16000,16000,1239.670,1.2397,2026-10-14T01:58:15.224574
+198,Coarse-Grained,burst_block,8,0,512,16000,16000,1408.000,1.4080,2026-10-14T01:58:16.690561
+199,Coarse-Grained,burst_block,8,0,512,16000,16000,1226.700,1.2267,2026-10-14T01:58:17.975461
+200,Coarse-Grained,burst_block,8,0,512,16000,16000,1290.040,1.2900,2026-10-14T01:58:19.323119
+1,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,5198.780,5.1988,2026-10-14T01:58:24.580327
+2,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4862.110,4.8621,2026-10-14T01:58:29.499194
+3,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4785.810,4.7858,2026-10-14T01:58:34.343123
+4,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4883.520,4.8835,2026-10-14T01:58:39.284717
+5,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4854.620,4.8546,2026-10-14T01:58:44.196974
+6,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4635.990,4.6360,2026-10-14T01:58:48.890252
+7,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4607.340,4.6073,2026-10-14T01:58:53.554576
+8,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4587.740,4.5877,2026-10-14T01:58:58.198986
+9,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4516.180,4.5162,2026-10-14T01:59:02.772881
+10,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4533.490,4.5335,2026-10-14T01:59:07.364431
+11,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4484.890,4.4849,2026-10-14T01:59:11.907158
+12,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4537.300,4.5373,2026-10-14T01:59:16.500474
+13,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4793.120,4.7931,2026-10-14T01:59:21.351342
+14,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4595.910,4.5959,2026-10-14T01:59:26.005047
+15,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4551.610,4.5516,2026-10-14T01:59:30.614379
+16,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4478.420,4.4784,2026-10-14T01:59:35.150854
+17,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4477.630,4.4776,2026-10-14T01:59:39.686801
+18,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4614.840,4.6148,2026-10-14T01:59:44.359914
+19,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4654.910,4.6549,2026-10-14T01:59:49.072687
+20,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4529.660,4.5297,2026-10-14T01:59:53.660546
+21,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4554.420,4.5544,2026-10-14T01:59:58.272765
+22,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4760.680,4.7607,2026-10-14T02:00:03.091237
+23,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4403.000,4.4030,2026-10-14T02:00:07.549604
+24,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4432.970,4.4330,2026-10-14T02:00:12.038043
+25,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4440.520,4.4405,2026-10-14T02:00:16.536464
+26,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4635.330,4.6353,2026-10-14T02:00:21.229733
+27,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4717.320,4.7173,2026-10-14T02:00:26.004615
+28,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4712.000,4.7120,2026-10-14T02:00:30.774406
+29,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4417.040,4.4170,2026-10-14T02:00:35.249685
+30,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4451.590,4.4516,2026-10-14T02:00:39.759188
+31,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4451.110,4.4511,2026-10-14T02:00:44.267701
+32,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4463.140,4.4631,2026-10-14T02:00:48.788821
+33,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4425.610,4.4256,2026-10-14T02:00:53.272418
+34,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4474.190,4.4742,2026-10-14T02:00:57.802136
+35,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4473.370,4.4734,2026-10-14T02:01:02.334622
+36,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4433.870,4.4339,2026-10-14T02:01:06.826209
+37,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4428.160,4.4282,2026-10-14T02:01:11.312333
+38,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4451.070,4.4511,2026-10-14T02:01:15.821246
+39,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4751.180,4.7512,2026-10-14T02:01:20.629426
+40,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4430.850,4.4309,2026-10-14T02:01:25.118916
+41,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4491.790,4.4918,2026-10-14T02:01:29.668774
+42,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4698.830,4.6988,2026-10-14T02:01:34.425663
+43,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4410.190,4.4102,2026-10-14T02:01:38.891862
+44,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4430.310,4.4303,2026-10-14T02:01:43.379753
+45,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4434.790,4.4348,2026-10-14T02:01:47.872394
+46,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4444.350,4.4444,2026-10-14T02:01:52.374413
+47,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4622.850,4.6229,2026-10-14T02:01:57.056031
+48,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4440.410,4.4404,2026-10-14T02:02:01.554327
+49,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4533.720,4.5337,2026-10-14T02:02:06.146316
+50,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4468.190,4.4682,2026-10-14T02:02:10.672838
+51,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4495.020,4.4950,2026-10-14T02:02:15.226146
+52,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4467.940,4.4679,2026-10-14T02:02:19.749507
+53,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4452.460,4.4525,2026-10-14T02:02:24.259789
+54,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4478.620,4.4786,2026-10-14T02:02:28.796453
+55,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4455.250,4.4553,2026-10-14T02:02:33.309030
+56,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4497.040,4.4970,2026-10-14T02:02:37.864147
+57,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4458.060,4.4581,2026-10-14T02:02:42.379992
+58,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4419.890,4.4199,2026-10-14T02:02:46.857907
+59,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4593.580,4.5936,2026-10-14T02:02:51.508721
+60,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4413.640,4.4136,2026-10-14T02:02:55.979982
+61,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4435.870,4.4359,2026-10-14T02:03:00.471358
+62,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4740.200,4.7402,2026-10-14T02:03:05.270063
+63,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4447.140,4.4471,2026-10-14T02:03:09.775995
+64,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4484.880,4.4849,2026-10-14T02:03:14.318615
+65,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4479.270,4.4793,2026-10-14T02:03:18.854761
+66,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4451.030,4.4510,2026-10-14T02:03:23.363941
+67,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4457.060,4.4571,2026-10-14T02:03:27.878883
+68,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4399.790,4.3998,2026-10-14T02:03:32.336875
+69,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4389.980,4.3900,2026-10-14T02:03:36.784797
+70,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4386.520,4.3865,2026-10-14T02:03:41.229770
+71,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4534.080,4.5341,2026-10-14T02:03:45.822605
+72,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4441.590,4.4416,2026-10-14T02:03:50.321464
+73,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4408.990,4.4090,2026-10-14T02:03:54.788790
+74,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4477.100,4.4771,2026-10-14T02:03:59.323457
+75,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4633.430,4.6334,2026-10-14T02:04:04.014663
+76,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4433.890,4.4339,2026-10-14T02:04:08.506801
+77,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4399.540,4.3995,2026-10-14T02:04:12.964532
+78,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4417.450,4.4174,2026-10-14T02:04:17.439787
+79,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4361.490,4.3615,2026-10-14T02:04:21.859419
+80,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4638.920,4.6389,2026-10-14T02:04:26.556871
+81,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4476.730,4.4767,2026-10-14T02:04:31.091618
+82,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4549.600,4.5496,2026-10-14T02:04:35.700142
+83,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4420.530,4.4205,2026-10-14T02:04:40.178331
+84,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4432.380,4.4324,2026-10-14T02:04:44.668461
+85,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4442.610,4.4426,2026-10-14T02:04:49.169475
+86,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4450.810,4.4508,2026-10-14T02:04:53.676760
+87,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4446.240,4.4462,2026-10-14T02:04:58.180749
+88,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4369.400,4.3694,2026-10-14T02:05:02.608034
+89,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4524.760,4.5248,2026-10-14T02:05:07.191184
+90,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4459.440,4.4594,2026-10-14T02:05:11.708634
+91,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4447.420,4.4474,2026-10-14T02:05:16.214133
+92,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4395.030,4.3950,2026-10-14T02:05:20.667411
+93,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4447.520,4.4475,2026-10-14T02:05:25.173097
+94,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4393.500,4.3935,2026-10-14T02:05:29.624715
+95,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4441.880,4.4419,2026-10-14T02:05:34.125653
+96,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4418.020,4.4180,2026-10-14T02:05:38.601304
+97,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4421.050,4.4211,2026-10-14T02:05:43.078479
+98,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4409.450,4.4094,2026-10-14T02:05:47.546458
+99,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4422.510,4.4225,2026-10-14T02:05:52.027127
+100,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4351.760,4.3518,2026-10-14T02:05:56.437113
+101,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4663.780,4.6638,2026-10-14T02:06:01.158978
+102,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4637.310,4.6373,2026-10-14T02:06:05.854166
+103,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4600.430,4.6004,2026-10-14T02:06:10.512036
+104,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4489.020,4.4890,2026-10-14T02:06:15.058942
+105,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4358.110,4.3581,2026-10-14T02:06:19.475660
+106,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4373.500,4.3735,2026-10-14T02:06:23.907728
+107,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4454.430,4.4544,2026-10-14T02:06:28.419108
+108,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4564.890,4.5649,2026-10-14T02:06:33.041700
+109,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4383.660,4.3837,2026-10-14T02:06:37.483877
+110,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4384.170,4.3842,2026-10-14T02:06:41.925886
+111,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4534.780,4.5348,2026-10-14T02:06:46.518622
+112,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4544.660,4.5447,2026-10-14T02:06:51.121762
+113,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4390.000,4.3900,2026-10-14T02:06:55.570491
+114,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4398.960,4.3990,2026-10-14T02:07:00.027287
+115,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4359.950,4.3599,2026-10-14T02:07:04.444751
+116,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4478.080,4.4781,2026-10-14T02:07:08.981112
+117,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4373.790,4.3738,2026-10-14T02:07:13.413300
+118,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4403.140,4.4031,2026-10-14T02:07:17.874428
+119,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4403.420,4.4034,2026-10-14T02:07:22.335597
+120,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4393.890,4.3939,2026-10-14T02:07:26.787416
+121,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4388.150,4.3881,2026-10-14T02:07:31.234059
+122,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4506.190,4.5062,2026-10-14T02:07:35.798143
+123,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4606.750,4.6067,2026-10-14T02:07:40.462916
+124,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4389.040,4.3890,2026-10-14T02:07:44.907905
+125,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4406.180,4.4062,2026-10-14T02:07:49.372277
+126,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4585.890,4.5859,2026-10-14T02:07:54.015870
+127,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4410.250,4.4102,2026-10-14T02:07:58.484242
+128,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4400.630,4.4006,2026-10-14T02:08:02.942722
+129,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4502.380,4.5024,2026-10-14T02:08:07.502969
+130,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4390.120,4.3901,2026-10-14T02:08:11.951036
+131,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4396.910,4.3969,2026-10-14T02:08:16.405819
+132,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4386.250,4.3863,2026-10-14T02:08:20.849510
+133,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4640.310,4.6403,2026-10-14T02:08:25.547864
+134,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4666.110,4.6661,2026-10-14T02:08:30.272025
+135,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4638.010,4.6380,2026-10-14T02:08:34.968189
+136,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4386.760,4.3868,2026-10-14T02:08:39.413396
+137,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4402.780,4.4028,2026-10-14T02:08:43.874151
+138,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4407.140,4.4071,2026-10-14T02:08:48.338876
+139,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4456.310,4.4563,2026-10-14T02:08:52.853661
+140,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4659.620,4.6596,2026-10-14T02:08:57.571250
+141,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4674.140,4.6741,2026-10-14T02:09:02.303432
+142,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4434.250,4.4342,2026-10-14T02:09:06.794751
+143,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4364.420,4.3644,2026-10-14T02:09:11.214355
+144,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4403.560,4.4036,2026-10-14T02:09:15.676194
+145,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4401.960,4.4020,2026-10-14T02:09:20.136660
+146,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4399.350,4.3994,2026-10-14T02:09:24.594227
+147,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4512.190,4.5122,2026-10-14T02:09:29.164792
+148,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4409.220,4.4092,2026-10-14T02:09:33.631982
+149,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4455.040,4.4550,2026-10-14T02:09:38.145265
+150,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4454.000,4.4540,2026-10-14T02:09:42.653878
+151,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4383.680,4.3837,2026-10-14T02:09:47.096320
+152,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4650.520,4.6505,2026-10-14T02:09:51.804265
+153,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4340.740,4.3407,2026-10-14T02:09:56.203341
+154,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4362.160,4.3622,2026-10-14T02:10:00.623515
+155,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4392.260,4.3923,2026-10-14T02:10:05.071081
+156,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4398.370,4.3984,2026-10-14T02:10:09.527205
+157,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4478.460,4.4785,2026-10-14T02:10:14.064670
+158,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4472.820,4.4728,2026-10-14T02:10:18.595443
+159,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4362.660,4.3627,2026-10-14T02:10:23.016277
+160,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4361.310,4.3613,2026-10-14T02:10:27.434158
+161,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4580.000,4.5800,2026-10-14T02:10:32.073497
+162,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4407.870,4.4079,2026-10-14T02:10:36.539391
+163,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4584.940,4.5849,2026-10-14T02:10:41.182193
+164,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4416.710,4.4167,2026-10-14T02:10:45.656953
+165,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4388.780,4.3888,2026-10-14T02:10:50.104209
+166,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4417.890,4.4179,2026-10-14T02:10:54.580574
+167,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4412.640,4.4126,2026-10-14T02:10:59.051732
+168,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4337.390,4.3374,2026-10-14T02:11:03.447511
+169,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4422.680,4.4227,2026-10-14T02:11:07.926071
+170,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4663.490,4.6635,2026-10-14T02:11:12.647757
+171,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4383.050,4.3830,2026-10-14T02:11:17.089549
+172,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4369.230,4.3692,2026-10-14T02:11:21.516615
+173,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4427.420,4.4274,2026-10-14T02:11:26.002376
+174,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4447.850,4.4479,2026-10-14T02:11:30.508563
+175,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4379.070,4.3791,2026-10-14T02:11:34.945301
+176,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4576.030,4.5760,2026-10-14T02:11:39.579323
+177,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4592.910,4.5929,2026-10-14T02:11:44.229492
+178,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4388.660,4.3887,2026-10-14T02:11:48.673360
+179,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4390.320,4.3903,2026-10-14T02:11:53.121819
+180,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4371.480,4.3715,2026-10-14T02:11:57.551638
+181,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4472.530,4.4725,2026-10-14T02:12:02.082720
+182,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4392.910,4.3929,2026-10-14T02:12:06.534555
+183,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4400.330,4.4003,2026-10-14T02:12:10.993452
+184,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4410.290,4.4103,2026-10-14T02:12:15.462235
+185,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4385.020,4.3850,2026-10-14T02:12:19.905218
+186,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4383.400,4.3834,2026-10-14T02:12:24.344447
+187,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4386.930,4.3869,2026-10-14T02:12:28.789106
+188,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4383.010,4.3830,2026-10-14T02:12:33.229659
+189,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4574.100,4.5741,2026-10-14T02:12:37.861797
+190,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4391.080,4.3911,2026-10-14T02:12:42.311011
+191,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4382.670,4.3827,2026-10-14T02:12:46.752129
+192,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4603.420,4.6034,2026-10-14T02:12:51.413964
+193,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4445.400,4.4454,2026-10-14T02:12:55.917800
+194,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4385.210,4.3852,2026-10-14T02:13:00.361218
+195,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4390.000,4.3900,2026-10-14T02:13:04.808961
+196,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4403.050,4.4031,2026-10-14T02:13:09.269344
+197,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4404.950,4.4049,2026-10-14T02:13:13.732336
+198,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4636.500,4.6365,2026-10-14T02:13:18.426949
+199,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4401.850,4.4019,2026-10-14T02:13:22.886534
+200,Fine-Grained (Cooperativo),cooperative_quantum,8,1,512,16000,8160000,4433.440,4.4334,2026-10-14T02:13:27.378778
+1,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1421.930,1.4219,2026-10-14T02:13:28.858536
+2,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1414.410,1.4144,2026-10-14T02:13:30.330604
+3,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1551.790,1.5518,2026-10-14T02:13:31.940754
+4,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1438.980,1.4390,2026-10-14T02:13:33.437433
+5,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1418.210,1.4182,2026-10-14T02:13:34.912199
+6,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1472.270,1.4723,2026-10-14T02:13:36.441900
+7,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1415.090,1.4151,2026-10-14T02:13:37.912271
+8,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1432.990,1.4330,2026-10-14T02:13:39.402988
+9,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1391.360,1.3914,2026-10-14T02:13:40.852150
+10,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1539.270,1.5393,2026-10-14T02:13:42.449254
+11,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1450.870,1.4509,2026-10-14T02:13:43.957265
+12,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1425.300,1.4253,2026-10-14T02:13:45.440187
+13,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1515.410,1.5154,2026-10-14T02:13:47.013348
+14,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1445.890,1.4459,2026-10-14T02:13:48.517124
+15,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1399.110,1.3991,2026-10-14T02:13:49.974319
+16,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1486.060,1.4861,2026-10-14T02:13:51.517899
+17,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1490.380,1.4904,2026-10-14T02:13:53.063624
+18,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1472.810,1.4728,2026-10-14T02:13:54.593926
+19,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1483.740,1.4837,2026-10-14T02:13:56.135603
+20,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1564.600,1.5646,2026-10-14T02:13:57.757957
+21,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1427.800,1.4278,2026-10-14T02:13:59.243596
+22,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1430.370,1.4304,2026-10-14T02:14:00.731582
+23,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1528.460,1.5285,2026-10-14T02:14:02.317926
+24,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1470.440,1.4704,2026-10-14T02:14:03.846144
+25,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1418.610,1.4186,2026-10-14T02:14:05.322865
+26,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1479.660,1.4797,2026-10-14T02:14:06.859951
+27,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1563.830,1.5638,2026-10-14T02:14:08.479615
+28,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1490.740,1.4907,2026-10-14T02:14:10.028254
+29,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1508.440,1.5084,2026-10-14T02:14:11.594723
+30,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1584.200,1.5842,2026-10-14T02:14:13.237365
+31,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1506.750,1.5068,2026-10-14T02:14:14.801792
+32,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1462.490,1.4625,2026-10-14T02:14:16.322195
+33,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1642.510,1.6425,2026-10-14T02:14:18.022740
+34,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1504.870,1.5049,2026-10-14T02:14:19.585477
+35,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1514.570,1.5146,2026-10-14T02:14:21.157962
+36,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1601.270,1.6013,2026-10-14T02:14:22.817193
+37,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1521.070,1.5211,2026-10-14T02:14:24.396066
+38,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1514.140,1.5141,2026-10-14T02:14:25.967677
+39,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1634.170,1.6342,2026-10-14T02:14:27.660130
+40,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1574.740,1.5747,2026-10-14T02:14:29.292510
+41,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1562.780,1.5628,2026-10-14T02:14:30.913388
+42,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1577.960,1.5780,2026-10-14T02:14:32.549529
+43,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1510.820,1.5108,2026-10-14T02:14:34.115706
+44,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1508.830,1.5088,2026-10-14T02:14:35.683040
+45,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1499.350,1.4993,2026-10-14T02:14:37.240376
+46,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1623.060,1.6231,2026-10-14T02:14:38.919027
+47,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1467.930,1.4679,2026-10-14T02:14:40.444138
+48,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1455.770,1.4558,2026-10-14T02:14:41.958101
+49,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1623.450,1.6235,2026-10-14T02:14:43.639487
+50,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1514.220,1.5142,2026-10-14T02:14:45.211715
+51,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1475.950,1.4760,2026-10-14T02:14:46.744144
+52,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1626.570,1.6266,2026-10-14T02:14:48.428133
+53,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1500.420,1.5004,2026-10-14T02:14:49.986539
+54,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1465.710,1.4657,2026-10-14T02:14:51.510227
+55,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1629.580,1.6296,2026-10-14T02:14:53.197863
+56,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1540.560,1.5406,2026-10-14T02:14:54.793692
+57,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1536.830,1.5368,2026-10-14T02:14:56.387808
+58,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1575.330,1.5753,2026-10-14T02:14:58.021226
+59,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1550.260,1.5503,2026-10-14T02:14:59.627220
+60,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1543.810,1.5438,2026-10-14T02:15:01.227719
+61,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1493.130,1.4931,2026-10-14T02:15:02.778440
+62,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1617.260,1.6173,2026-10-14T02:15:04.451271
+63,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1538.850,1.5388,2026-10-14T02:15:06.047917
+64,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1553.790,1.5538,2026-10-14T02:15:07.659709
+65,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1651.350,1.6513,2026-10-14T02:15:09.368972
+66,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1583.630,1.5836,2026-10-14T02:15:11.010671
+67,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1484.810,1.4848,2026-10-14T02:15:12.553241
+68,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1670.840,1.6708,2026-10-14T02:15:14.281309
+69,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1558.810,1.5588,2026-10-14T02:15:15.897905
+70,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1513.020,1.5130,2026-10-14T02:15:17.468850
+71,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1669.370,1.6694,2026-10-14T02:15:19.196197
+72,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1576.350,1.5763,2026-10-14T02:15:20.830384
+73,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1519.440,1.5194,2026-10-14T02:15:22.408055
+74,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1676.540,1.6765,2026-10-14T02:15:24.142156
+75,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1493.140,1.4931,2026-10-14T02:15:25.692869
+76,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1523.580,1.5236,2026-10-14T02:15:27.274443
+77,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1652.500,1.6525,2026-10-14T02:15:28.984463
+78,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1555.800,1.5558,2026-10-14T02:15:30.598535
+79,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1475.220,1.4752,2026-10-14T02:15:32.131459
+80,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1662.260,1.6623,2026-10-14T02:15:33.851706
+81,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1567.460,1.5675,2026-10-14T02:15:35.476518
+82,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1500.290,1.5003,2026-10-14T02:15:37.034554
+83,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1619.180,1.6192,2026-10-14T02:15:38.712257
+84,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1499.890,1.4999,2026-10-14T02:15:40.268291
+85,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1504.410,1.5044,2026-10-14T02:15:41.830510
+86,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1506.280,1.5063,2026-10-14T02:15:43.394296
+87,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1647.920,1.6479,2026-10-14T02:15:45.100256
+88,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1501.190,1.5012,2026-10-14T02:15:46.659126
+89,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1529.880,1.5299,2026-10-14T02:15:48.246785
+90,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1695.910,1.6959,2026-10-14T02:15:49.999997
+91,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1537.060,1.5371,2026-10-14T02:15:51.595401
+92,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1560.350,1.5603,2026-10-14T02:15:53.213549
+93,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1692.680,1.6927,2026-10-14T02:15:54.962403
+94,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1516.210,1.5162,2026-10-14T02:15:56.536893
+95,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1495.710,1.4957,2026-10-14T02:15:58.090311
+96,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1703.380,1.7034,2026-10-14T02:15:59.851442
+97,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1533.410,1.5334,2026-10-14T02:16:01.442942
+98,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1515.730,1.5157,2026-10-14T02:16:03.016612
+99,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1658.130,1.6581,2026-10-14T02:16:04.732576
+100,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1530.720,1.5307,2026-10-14T02:16:06.321072
+101,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1537.510,1.5375,2026-10-14T02:16:07.916119
+102,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1701.380,1.7014,2026-10-14T02:16:09.675733
+103,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1509.870,1.5099,2026-10-14T02:16:11.243345
+104,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1539.570,1.5396,2026-10-14T02:16:12.840942
+105,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1695.220,1.6952,2026-10-14T02:16:14.594343
+106,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1555.230,1.5552,2026-10-14T02:16:16.207904
+107,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1486.670,1.4867,2026-10-14T02:16:17.752477
+108,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1620.180,1.6202,2026-10-14T02:16:19.430607
+109,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1582.940,1.5829,2026-10-14T02:16:21.069361
+110,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1517.840,1.5178,2026-10-14T02:16:22.644504
+111,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1566.220,1.5662,2026-10-14T02:16:24.268916
+112,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1630.250,1.6302,2026-10-14T02:16:25.982685
+113,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1561.420,1.5614,2026-10-14T02:16:27.601706
+114,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1574.780,1.5748,2026-10-14T02:16:29.234558
+115,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1671.320,1.6713,2026-10-14T02:16:30.960520
+116,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1534.450,1.5345,2026-10-14T02:16:32.552719
+117,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1589.200,1.5892,2026-10-14T02:16:34.199766
+118,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1666.370,1.6664,2026-10-14T02:16:35.923687
+119,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1584.600,1.5846,2026-10-14T02:16:37.566434
+120,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1590.100,1.5901,2026-10-14T02:16:39.214477
+121,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1754.350,1.7543,2026-10-14T02:16:41.023458
+122,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1526.800,1.5268,2026-10-14T02:16:42.607836
+123,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1501.640,1.5016,2026-10-14T02:16:44.167744
+124,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1671.910,1.6719,2026-10-14T02:16:45.897428
+125,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1540.940,1.5409,2026-10-14T02:16:47.496193
+126,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1556.300,1.5563,2026-10-14T02:16:49.109372
+127,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1638.460,1.6385,2026-10-14T02:16:50.806002
+128,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1543.150,1.5432,2026-10-14T02:16:52.406677
+129,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1559.150,1.5592,2026-10-14T02:16:54.023714
+130,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1669.870,1.6699,2026-10-14T02:16:55.751486
+131,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1530.520,1.5305,2026-10-14T02:16:57.340241
+132,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1558.090,1.5581,2026-10-14T02:16:58.956421
+133,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1670.490,1.6705,2026-10-14T02:17:00.684470
+134,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1541.920,1.5419,2026-10-14T02:17:02.283073
+135,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1559.390,1.5594,2026-10-14T02:17:03.899640
+136,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1732.930,1.7329,2026-10-14T02:17:05.689157
+137,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1578.110,1.5781,2026-10-14T02:17:07.325092
+138,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1544.040,1.5440,2026-10-14T02:17:08.926855
+139,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1660.800,1.6608,2026-10-14T02:17:10.646093
+140,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1532.420,1.5324,2026-10-14T02:17:12.236461
+141,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1557.130,1.5571,2026-10-14T02:17:13.851226
+142,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1597.750,1.5978,2026-10-14T02:17:15.507254
+143,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1578.550,1.5785,2026-10-14T02:17:17.141740
+144,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1572.690,1.5727,2026-10-14T02:17:18.772216
+145,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1607.680,1.6077,2026-10-14T02:17:20.437783
+146,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1606.980,1.6070,2026-10-14T02:17:22.100221
+147,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1529.230,1.5292,2026-10-14T02:17:23.687101
+148,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1552.000,1.5520,2026-10-14T02:17:25.296921
+149,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1700.150,1.7002,2026-10-14T02:17:27.053925
+150,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1604.850,1.6048,2026-10-14T02:17:28.716522
+151,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1543.790,1.5438,2026-10-14T02:17:30.318015
+152,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1682.280,1.6823,2026-10-14T02:17:32.057851
+153,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1580.680,1.5807,2026-10-14T02:17:33.696422
+154,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1577.570,1.5776,2026-10-14T02:17:35.332311
+155,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1711.420,1.7114,2026-10-14T02:17:37.102212
+156,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1631.120,1.6311,2026-10-14T02:17:38.790924
+157,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1539.750,1.5397,2026-10-14T02:17:40.388781
+158,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1705.130,1.7051,2026-10-14T02:17:42.151903
+159,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1611.730,1.6117,2026-10-14T02:17:43.821302
+160,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1539.740,1.5397,2026-10-14T02:17:45.418692
+161,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1683.300,1.6833,2026-10-14T02:17:47.159944
+162,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1604.640,1.6046,2026-10-14T02:17:48.822110
+163,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1563.780,1.5638,2026-10-14T02:17:50.443569
+164,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1687.590,1.6876,2026-10-14T02:17:52.188475
+165,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1641.140,1.6411,2026-10-14T02:17:53.887337
+166,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1596.480,1.5965,2026-10-14T02:17:55.541593
+167,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1705.850,1.7058,2026-10-14T02:17:57.305209
+168,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1566.520,1.5665,2026-10-14T02:17:58.929213
+169,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1534.710,1.5347,2026-10-14T02:18:00.521760
+170,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1705.830,1.7058,2026-10-14T02:18:02.285841
+171,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1589.570,1.5896,2026-10-14T02:18:03.933141
+172,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1575.050,1.5751,2026-10-14T02:18:05.566066
+173,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1656.690,1.6567,2026-10-14T02:18:07.280758
+174,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1593.670,1.5937,2026-10-14T02:18:08.933117
+175,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1618.160,1.6182,2026-10-14T02:18:10.608944
+176,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1660.140,1.6601,2026-10-14T02:18:12.327493
+177,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1614.620,1.6146,2026-10-14T02:18:14.000067
+178,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1537.200,1.5372,2026-10-14T02:18:15.595408
+179,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1707.430,1.7074,2026-10-14T02:18:17.359862
+180,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1545.810,1.5458,2026-10-14T02:18:18.962327
+181,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1551.600,1.5516,2026-10-14T02:18:20.572165
+182,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1676.600,1.6766,2026-10-14T02:18:22.307087
+183,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1527.450,1.5274,2026-10-14T02:18:23.892412
+184,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1524.150,1.5242,2026-10-14T02:18:25.474049
+185,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1664.930,1.6649,2026-10-14T02:18:27.196513
+186,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1570.370,1.5704,2026-10-14T02:18:28.824884
+187,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1509.520,1.5095,2026-10-14T02:18:30.392498
+188,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1662.970,1.6630,2026-10-14T02:18:32.113325
+189,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1570.020,1.5700,2026-10-14T02:18:33.741669
+190,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1576.830,1.5768,2026-10-14T02:18:35.376303
+191,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1708.810,1.7088,2026-10-14T02:18:37.143024
+192,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1583.020,1.5830,2026-10-14T02:18:38.784075
+193,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1634.300,1.6343,2026-10-14T02:18:40.475234
+194,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1689.400,1.6894,2026-10-14T02:18:42.222324
+195,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1571.710,1.5717,2026-10-14T02:18:43.851940
+196,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1516.440,1.5164,2026-10-14T02:18:45.426268
+197,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1647.320,1.6473,2026-10-14T02:18:47.131392
+198,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1642.550,1.6425,2026-10-14T02:18:48.829859
+199,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1543.220,1.5432,2026-10-14T02:18:50.430956
+200,Fine-Grained (Paralelo Cíclico),cyclic_threads,8,1,512,16000,8160000,1550.770,1.5508,2026-10-14T02:18:52.039422
