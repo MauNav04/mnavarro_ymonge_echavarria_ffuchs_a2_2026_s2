@@ -150,7 +150,7 @@ def graficar_strong_scaling_amdahl(datos_scaling, output_path):
 
     # 3. Curvas experimentales por modelo
     orden_plot = ["Secuencial", "CMP", "SMT (HW Real)", "Coarse-Grained", "Fine-Grained (Paralelo Cíclico)"]
-    puntos_p16 = []
+    puntos_por_hilo = {h: [] for h in todos_hilos}
 
     for mod_nom in orden_plot:
         if mod_nom not in datos_scaling:
@@ -163,30 +163,88 @@ def graficar_strong_scaling_amdahl(datos_scaling, output_path):
         c = PALETA_MODELOS.get(mod_nom, "#333333")
 
         if len(hilos) == 1 and hilos[0] == 1:
-            # Baseline secuencial (punto aislado)
             ax.plot(hilos, sps, marker=m, markersize=9, color=c, label=f"Medido: {mod_nom}")
-            ax.annotate(f"{sps[0]:.2f}x", xy=(hilos[0], sps[0]), xytext=(0, 7), textcoords="offset points",
-                        ha="center", fontsize=8.5, fontweight="bold")
+            puntos_por_hilo[1].append({"mod": mod_nom, "h": 1, "sp": sps[0], "color": c})
         else:
             ax.plot(hilos, sps, marker=m, markersize=8, linewidth=2.2, color=c, label=f"Medido: {mod_nom}")
             for h, sp in zip(hilos, sps):
-                if h == max_p:
-                    puntos_p16.append({"mod": mod_nom, "h": h, "sp": sp, "color": c})
-                else:
-                    ax.annotate(f"{sp:.2f}x", xy=(h, sp), xytext=(0, 6), textcoords="offset points",
-                                ha="center", fontsize=8.5, fontweight="bold")
+                puntos_por_hilo[h].append({"mod": mod_nom, "h": h, "sp": sp, "color": c})
 
-    # Resolver colisiones en el extremo p=16
-    if puntos_p16:
-        puntos_p16_sorted = sorted(puntos_p16, key=lambda x: x["sp"], reverse=True)
-        n_p16 = len(puntos_p16_sorted)
-        y_targets = [p["sp"] for p in puntos_p16_sorted]
+    # A. Para h = 1: Un único indicador limpio del baseline (evita superposición de 5 etiquetas)
+    ax.annotate(
+        "1.00x",
+        xy=(1, 1.0),
+        xytext=(0, 9),
+        textcoords="offset points",
+        ha="center",
+        va="bottom",
+        fontsize=8.5,
+        fontweight="bold",
+        color="#333333",
+        bbox=dict(boxstyle="round,pad=0.2", facecolor="white", edgecolor="#888888", alpha=0.9, linewidth=0.8)
+    )
+
+    # B. Para h intermedios (p = 2, 4, 8): Dispersión inteligente anti-colisiones
+    for h in [2, 4, 8]:
+        if h not in puntos_por_hilo or not puntos_por_hilo[h]:
+            continue
+        pts = sorted(puntos_por_hilo[h], key=lambda x: x["sp"])
+        n_pts = len(pts)
+
+        if h == 2:
+            # En p=2 el espacio a la izquierda es reducido. Dispersamos arriba, abajo y derecha
+            pos_h = [
+                {"offset": (0, -11), "ha": "center", "va": "top"},       # mínimo -> abajo
+                {"offset": (14, -5), "ha": "left",   "va": "center"},    # 2do -> derecha-abajo
+                {"offset": (14, 5),  "ha": "left",   "va": "center"},    # 3ro -> derecha-arriba
+                {"offset": (0, 9),   "ha": "center", "va": "bottom"}     # máximo -> arriba
+            ]
+        elif n_pts == 4:
+            # En p=4 y p=8 hay amplio espacio horizontal. Dispersión cardinal (N, S, W, E)
+            pos_h = [
+                {"offset": (0, -11), "ha": "center", "va": "top"},       # mínimo -> abajo
+                {"offset": (14, 0),  "ha": "left",   "va": "center"},    # 2do -> derecha
+                {"offset": (-14, 0), "ha": "right",  "va": "center"},    # 3ro -> izquierda
+                {"offset": (0, 9),   "ha": "center", "va": "bottom"}     # máximo -> arriba
+            ]
+        elif n_pts == 3:
+            pos_h = [
+                {"offset": (0, -11), "ha": "center", "va": "top"},
+                {"offset": (14, 0),  "ha": "left",   "va": "center"},
+                {"offset": (0, 9),   "ha": "center", "va": "bottom"}
+            ]
+        elif n_pts == 2:
+            pos_h = [
+                {"offset": (0, -11), "ha": "center", "va": "top"},
+                {"offset": (0, 9),   "ha": "center", "va": "bottom"}
+            ]
+        else:
+            pos_h = [{"offset": (0, 8), "ha": "center", "va": "bottom"}]
+
+        for pt, pos in zip(pts, pos_h):
+            ax.annotate(
+                f"{pt['sp']:.2f}x",
+                xy=(pt["h"], pt["sp"]),
+                xytext=pos["offset"],
+                textcoords="offset points",
+                ha=pos["ha"],
+                va=pos["va"],
+                fontsize=8.5,
+                fontweight="bold",
+                color=pt["color"],
+                bbox=dict(boxstyle="round,pad=0.18", facecolor="white", edgecolor=pt["color"], alpha=0.9, linewidth=0.8)
+            )
+
+    # C. Resolver colisiones en el extremo p=16 con badges destacados a la derecha
+    pts_16 = sorted(puntos_por_hilo.get(max_p, []), key=lambda x: x["sp"], reverse=True)
+    if pts_16:
+        n_p16 = len(pts_16)
+        y_pos = [p["sp"] for p in pts_16]
         min_gap = 0.55
-        y_pos = list(y_targets)
         for i in range(1, n_p16):
             if y_pos[i-1] - y_pos[i] < min_gap:
                 y_pos[i] = y_pos[i-1] - min_gap
-        for i, pt in enumerate(puntos_p16_sorted):
+        for i, pt in enumerate(pts_16):
             ax.annotate(
                 f"{pt['sp']:.2f}x",
                 xy=(pt["h"], pt["sp"]),
