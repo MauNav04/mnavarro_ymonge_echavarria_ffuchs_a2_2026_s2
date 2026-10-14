@@ -187,7 +187,7 @@ python3 benchmark.py --runs 10 --models "cmp" --append
   * `metricas/gray_scott_benchmark.csv`: Muestras crudas oficiales de tiempo y configuración para las corridas estadísticas.
   * `metricas/resumen_estadistico.csv`: Consolidado estadístico oficial con Media ($\mu$), Margen de Error ($\pm \text{ME}$ al 95%), Intervalo de Confianza al 95% ($[\text{IC}_{\text{inf}}, \text{IC}_{\text{sup}}]$), Desviación Estándar ($\sigma$), Mediana, Speedup ($S$) y Eficiencia ($E$).
 
-#### Tabla Consolidada de Benchmarking Oficial ($N = 200$ corridas por modelo, AMD Ryzen 7 5700G):
+#### Tabla Consolidada de Benchmarking Oficial ($N = 200$ corridas por modelo, AMD Ryzen 7 7730U):
 
 | Modelo | Modo | Hilos | Media $\mu$ (ms) | Margen Error $\pm \text{ME}$ (95%) | Intervalo Confianza 95% (ms) | Speedup $S$ | Eficiencia $E$ |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
