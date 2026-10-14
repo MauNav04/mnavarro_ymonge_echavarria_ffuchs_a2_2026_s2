@@ -2,57 +2,93 @@
 """
 ==============================================================================
 Estudio Experimental de Escalabilidad Fuerte (Strong Scaling) - Gray-Scott
+CE 4302 - Arquitectura de Computadores II (Semestre II - 2026)
+Instituto Tecnológico de Costa Rica (TEC)
 ==============================================================================
 
 Metodología:
-  - Fija el tamaño del problema: N=512x512, 16,000 pasos (carga constante).
-  - Realiza un barrido sistemático de hilos: p in {1, 2, 4, 8, 16}.
-  - Evalúa los 4 modelos de paralelismo:
+  - Carga constante: Grilla fija N=512x512, 16,000 pasos.
+  - Barrido sistemático de hilos: p in {1, 2, 4, 8, 16}.
+  - Evalúa los modelos paralelos:
       * CMP (Chip Multiprocessing con afinidad a núcleos físicos)
       * SMT (Simultaneous Multithreading en hardware real)
       * Coarse-Grained (Multihilo de grano grueso / ráfagas)
       * Fine-Grained (Multihilo de grano fino cíclico)
-  - Mide el baseline Secuencial para calcular Speedup empírico: S(p) = T_seq / T(p).
-  - Contrasta los resultados contra la Aceleración Lineal Ideal (S = p) y la
-    Ley de Amdahl (asumiendo f = 0.98 fracción paralelizable).
+  - Mide baseline Secuencial para calcular Speedup: S(p) = T_seq / T(p).
+  - Contrasta los resultados contra la Aceleración Lineal Ideal (S = p) y las
+    curvas teóricas de la Ley de Amdahl (90%, 95%, 98% paralelizable).
   - Exporta:
       * metricas/escalabilidad_hilos.csv (tabla resumen)
-      * metricas/escalabilidad_hilos_crudo.csv (todas las corridas)
-      * metricas/graficas/07_escalabilidad_hilos.png (gráfico 300 DPI)
+      * metricas/gray_scott_strong_scaling.csv (resumen compatible)
+      * metricas/graficas/04_escalabilidad_hilos.png (gráfico 300 DPI)
 ==============================================================================
 """
 
 import sys
 import os
+
+# Configurar directorio temporal de matplotlib
+os.environ["MPLCONFIGDIR"] = "/tmp/matplotlib_gray_scott"
+
 import subprocess
 import time
 import argparse
 import csv
 import statistics
 from pathlib import Path
-import pandas as pd
 import numpy as np
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-# Paleta cromática corporativa estándar del proyecto (CE 4302)
+# ==============================================================================
+# CONFIGURACIÓN ESTÉTICA
+# ==============================================================================
+plt.style.use("seaborn-v0_8-whitegrid" if "seaborn-v0_8-whitegrid" in plt.style.available else "default")
+plt.rcParams.update({
+    "font.family": "sans-serif",
+    "font.sans-serif": ["DejaVu Sans", "Helvetica", "Arial"],
+    "font.size": 11,
+    "axes.titlesize": 13,
+    "axes.titleweight": "bold",
+    "axes.labelsize": 11,
+    "axes.labelweight": "semibold",
+    "xtick.labelsize": 10,
+    "ytick.labelsize": 10,
+    "legend.fontsize": 9.5,
+    "figure.titlesize": 15,
+    "figure.titleweight": "bold",
+    "figure.dpi": 300,
+    "savefig.dpi": 300,
+    "savefig.bbox": "tight",
+    "axes.grid": True,
+    "grid.alpha": 0.35,
+    "grid.linestyle": "--",
+    "axes.axisbelow": True,
+})
+
 PALETA_MODELOS = {
-    "CMP": "#2563eb",                          # Azul eléctrico
-    "SMT (HW Real)": "#059669",                # Verde esmeralda
-    "Coarse-Grained": "#7c3aed",               # Morado
-    "Fine-Grained (Paralelo Cíclico)": "#0891b2" # Cian oscuro
+    "Secuencial": "#64748b",                          # Slate Gray
+    "CMP": "#1f77b4",                                 # Azul institucional
+    "SMT (HW Real)": "#059669",                       # Verde esmeralda
+    "SMT": "#059669",
+    "Coarse-Grained": "#7c3aed",                      # Púrpura
+    "Fine-Grained (Paralelo Cíclico)": "#0891b2",      # Teal / Cian
 }
 
 MARCADORES = {
+    "Secuencial": "s",
     "CMP": "o",
-    "SMT (HW Real)": "s",
-    "Coarse-Grained": "^",
-    "Fine-Grained (Paralelo Cíclico)": "D"
+    "SMT (HW Real)": "^",
+    "SMT": "^",
+    "Coarse-Grained": "D",
+    "Fine-Grained (Paralelo Cíclico)": "v",
 }
 
 
 def compilar_binarios(scripts_dir: Path):
     """Verifica y compila los binarios requeridos."""
-    print("--> [Compilación] Verificando binarios antes del barrido de escalabilidad...")
+    print("--> [Compilación] Verificando y compilando binarios con make all...")
     res = subprocess.run(["make", "all"], cwd=scripts_dir, capture_output=True, text=True)
     if res.returncode != 0:
         print(f"[ERROR] Falló compilación:\n{res.stderr}", file=sys.stderr)
@@ -70,7 +106,6 @@ def ejecutar_comando(cmd: list, cwd: Path) -> float:
     if not stderr_lines:
         raise RuntimeError(f"No se detectó salida en stderr:\nStdout:\n{proc.stdout}")
 
-    # Última línea de stderr es la salida CSV
     csv_line = stderr_lines[-1].strip()
     partes = csv_line.split(",")
     modelo_tag = partes[0]
@@ -86,220 +121,154 @@ def ejecutar_comando(cmd: list, cwd: Path) -> float:
     elif modelo_tag == "fine":
         return float(partes[8])
     else:
-        raise ValueError(f"Etiqueta de modelo desconocida: {modelo_tag}")
+        return float(partes[-1])
 
 
-def anotar_puntos_finales(ax, puntos, es_porcentaje=False):
+def graficar_strong_scaling_amdahl(datos_scaling, output_path):
     """
-    Anota los valores en el extremo derecho (p=16) resolviendo cualquier colisión o solapamiento.
-    Utiliza un algoritmo de relajación 1D en coordenadas de datos para asegurar una separación
-    vertical mínima absoluta entre cualquier par de etiquetas adyacentes, junto con líneas guía (leader lines).
+    Genera la figura científica de Strong Scaling vs Ley de Amdahl (300 DPI)
+    diseñada idéntica al estándar del proyecto.
     """
-    if not puntos:
-        return
+    fig, ax = plt.subplots(figsize=(11, 7))
 
-    # Ordenar puntos de mayor a menor según el valor de 'y'
-    pts_ordenados = sorted(puntos, key=lambda p: p["y"], reverse=True)
-    n = len(pts_ordenados)
-    
-    y_targets = [p["y"] for p in pts_ordenados]
-    # Separación vertical mínima generosa para evitar solapamiento entre cajas
-    min_gap = 7.0 if es_porcentaje else 0.90
-    
-    y_pos = list(y_targets)
-    # Pase hacia adelante: empujar hacia abajo si hay solapamiento
-    for i in range(1, n):
-        if y_pos[i-1] - y_pos[i] < min_gap:
-            y_pos[i] = y_pos[i-1] - min_gap
+    todos_hilos = sorted(list({h for m in datos_scaling.values() for h, _, _ in m}))
+    if not todos_hilos:
+        todos_hilos = [1, 2, 4, 8, 16]
 
-    # Pase hacia atrás para suavizar si el fondo fue empujado
-    for i in range(n - 2, -1, -1):
-        if y_pos[i] - y_pos[i+1] < min_gap:
-            y_pos[i] = y_pos[i+1] + min_gap
+    max_p = max(todos_hilos)
+    p_ideal = np.linspace(1, max_p, 100)
 
-    # Ajuste de centrado para minimizar el desplazamiento respecto a los puntos reales
-    shift = np.mean(y_targets) - np.mean(y_pos)
-    y_pos = [y + shift for y in y_pos]
+    # 1. Línea Ideal Lineal S(p) = p
+    ax.plot(p_ideal, p_ideal, "k--", linewidth=1.5, alpha=0.7, label="Ideal Lineal ($S(p) = p$)")
 
-    for i, pt in enumerate(pts_ordenados):
-        y_label = y_pos[i]
-        fmt_val = f"{pt['y']:.1f}%" if es_porcentaje else f"{pt['y']:.2f}x"
+    # 2. Curvas teóricas de Amdahl para diferentes fracciones paralelizadas
+    colores_amdahl = {0.90: "#1f77b4", 0.95: "#ff7f0e", 0.98: "#2ca02c"}
+    for p_frac in [0.90, 0.95, 0.98]:
+        s_amdahl = 1.0 / ((1.0 - p_frac) + (p_frac / p_ideal))
+        c_amd = colores_amdahl.get(p_frac, "#666666")
+        ax.plot(p_ideal, s_amdahl, ":", linewidth=1.4, alpha=0.85, color=c_amd, label=f"Amdahl ({int(p_frac*100)}% paralelo)")
 
-        ax.annotate(
-            fmt_val,
-            xy=(pt["x"], pt["y"]),
-            xytext=(pt["x"] + 0.65, y_label),
-            textcoords="data",
-            ha="left",
-            va="center",
-            fontweight="bold",
-            color=pt["color"],
-            fontsize=9.5,
-            bbox=dict(
-                boxstyle="round,pad=0.28",
-                facecolor="white",
-                edgecolor=pt["color"],
-                alpha=0.95,
-                linewidth=1.2
-            ),
-            arrowprops=dict(
-                arrowstyle="-",
+    # 3. Curvas experimentales por modelo
+    orden_plot = ["Secuencial", "CMP", "SMT (HW Real)", "Coarse-Grained", "Fine-Grained (Paralelo Cíclico)"]
+    puntos_p16 = []
+
+    for mod_nom in orden_plot:
+        if mod_nom not in datos_scaling:
+            continue
+        puntos = datos_scaling[mod_nom]
+        puntos_sorted = sorted(puntos, key=lambda x: x[0])
+        hilos = [p[0] for p in puntos_sorted]
+        sps = [p[1] for p in puntos_sorted]
+        m = MARCADORES.get(mod_nom, "o")
+        c = PALETA_MODELOS.get(mod_nom, "#333333")
+
+        if len(hilos) == 1 and hilos[0] == 1:
+            # Baseline secuencial (punto aislado)
+            ax.plot(hilos, sps, marker=m, markersize=9, color=c, label=f"Medido: {mod_nom}")
+            ax.annotate(f"{sps[0]:.2f}x", xy=(hilos[0], sps[0]), xytext=(0, 7), textcoords="offset points",
+                        ha="center", fontsize=8.5, fontweight="bold")
+        else:
+            ax.plot(hilos, sps, marker=m, markersize=8, linewidth=2.2, color=c, label=f"Medido: {mod_nom}")
+            for h, sp in zip(hilos, sps):
+                if h == max_p:
+                    puntos_p16.append({"mod": mod_nom, "h": h, "sp": sp, "color": c})
+                else:
+                    ax.annotate(f"{sp:.2f}x", xy=(h, sp), xytext=(0, 6), textcoords="offset points",
+                                ha="center", fontsize=8.5, fontweight="bold")
+
+    # Resolver colisiones en el extremo p=16
+    if puntos_p16:
+        puntos_p16_sorted = sorted(puntos_p16, key=lambda x: x["sp"], reverse=True)
+        n_p16 = len(puntos_p16_sorted)
+        y_targets = [p["sp"] for p in puntos_p16_sorted]
+        min_gap = 0.55
+        y_pos = list(y_targets)
+        for i in range(1, n_p16):
+            if y_pos[i-1] - y_pos[i] < min_gap:
+                y_pos[i] = y_pos[i-1] - min_gap
+        for i, pt in enumerate(puntos_p16_sorted):
+            ax.annotate(
+                f"{pt['sp']:.2f}x",
+                xy=(pt["h"], pt["sp"]),
+                xytext=(pt["h"] + 0.35, y_pos[i]),
+                textcoords="data",
+                ha="left",
+                va="center",
+                fontsize=8.5,
+                fontweight="bold",
                 color=pt["color"],
-                lw=1.1,
-                alpha=0.85,
-                shrinkA=3,
-                shrinkB=3
+                bbox=dict(boxstyle="round,pad=0.2", facecolor="white", edgecolor=pt["color"], alpha=0.9, linewidth=1.0),
+                arrowprops=dict(arrowstyle="-", color=pt["color"], lw=0.9, shrinkA=2, shrinkB=2)
             )
-        )
 
+    ax.set_xlabel("Número de Hilos Concurrentes ($p$)")
+    ax.set_ylabel("Speedup ($S_p$)")
+    ax.set_title("Escalabilidad Fuerte (Strong Scaling) vs Ley de Amdahl")
+    ax.set_xticks(todos_hilos)
+    ax.set_xlim(0.8, max_p + 1.8)
+    max_sp = max([sp for pts in datos_scaling.values() for _, sp, _ in pts] + [1.0])
+    ax.set_ylim(0.5, max(max_p * 1.08, max_sp * 1.15))
+    ax.legend(loc="upper left", framealpha=0.9)
 
-def graficar_escalabilidad(df_resumen: pd.DataFrame, t_seq_promedio: float, output_img: Path, f_amdahl: float = 0.98):
-    """Genera la figura de 2 paneles (Speedup vs Hilos y Eficiencia vs Hilos) en 300 DPI."""
-    print(f"--> [Gráficas] Generando visualización de escalabilidad: {output_img.name}...")
-
-    plt.style.use("seaborn-v0_8-whitegrid")
-    plt.rcParams.update({
-        "font.family": "sans-serif",
-        "font.sans-serif": ["DejaVu Sans", "Helvetica", "Arial"],
-        "font.size": 11,
-        "axes.labelsize": 12,
-        "axes.titlesize": 13,
-        "axes.titleweight": "bold",
-        "xtick.labelsize": 10,
-        "ytick.labelsize": 10,
-        "legend.fontsize": 10.0,
-        "figure.titlesize": 15,
-        "figure.titleweight": "bold",
-        "figure.dpi": 300,
-    })
-
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7))
-
-    hilos_unicos = sorted(df_resumen["threads"].unique())
-    x_hilos = np.array(hilos_unicos)
-
-    # -------------------------------------------------------------------------
-    # Panel 1: Curvas de Speedup S(p) vs Hilos
-    # -------------------------------------------------------------------------
-    # Referencia 1: Escalabilidad Lineal Ideal (S = p)
-    ax1.plot(x_hilos, x_hilos, linestyle=":", color="#64748b", linewidth=2.0, label="Aceleración Lineal Ideal (S = p)")
-
-    # Referencia 2: Ley de Amdahl teórica: S(p) = 1 / ((1 - f) + f / p)
-    s_amdahl = 1.0 / ((1.0 - f_amdahl) + (f_amdahl / x_hilos))
-    ax1.plot(x_hilos, s_amdahl, linestyle="--", color="#dc2626", linewidth=2.2, label=f"Ley de Amdahl (f = {f_amdahl*100:.0f}%)")
-
-    # Curvas experimentales por modelo
-    modelos_orden = ["CMP", "SMT (HW Real)", "Coarse-Grained", "Fine-Grained (Paralelo Cíclico)"]
-    puntos_1 = []
-    for modelo in modelos_orden:
-        df_mod = df_resumen[df_resumen["modelo"] == modelo].sort_values("threads")
-        if df_mod.empty:
-            continue
-        ult_fila = df_mod.iloc[-1]
-        lbl = f"{modelo} (16h: {ult_fila['speedup']:.2f}x)"
-        ax1.plot(
-            df_mod["threads"],
-            df_mod["speedup"],
-            marker=MARCADORES.get(modelo, "o"),
-            markersize=8,
-            linewidth=2.2,
-            color=PALETA_MODELOS.get(modelo, "#333333"),
-            label=lbl
-        )
-        puntos_1.append({
-            "modelo": modelo,
-            "x": ult_fila["threads"],
-            "y": ult_fila["speedup"],
-            "color": PALETA_MODELOS.get(modelo, "#333333")
-        })
-
-    # Anotar valores en p=16 evitando colisiones
-    anotar_puntos_finales(ax1, puntos_1, es_porcentaje=False)
-
-    # Marcador de límite de núcleos físicos (8 núcleos)
-    ax1.axvline(8, color="#2563eb", linestyle="-.", alpha=0.5, linewidth=1.2)
-    ax1.text(8.2, 0.8, "Límite 8 Cores Físicos", color="#1e40af", fontsize=9, fontstyle="italic")
-
-    ax1.set_title("A. Escalabilidad Fuerte: Speedup Relativo $S(p) = T_{seq} / T(p)$\n(Grilla fija 512x512, 16,000 pasos)")
-    ax1.set_xlabel("Número de Hilos de Ejecución ($p$)", fontweight="bold")
-    ax1.set_ylabel("Speedup Aceleración ($S$)", fontweight="bold")
-    ax1.set_xticks(hilos_unicos)
-    ax1.set_xlim(0.5, 19.2)
-    ax1.set_ylim(0, max(max(x_hilos), max(df_resumen["speedup"])) * 1.1)
-    ax1.legend(loc="upper left", frameon=True)
-
-    # -------------------------------------------------------------------------
-    # Panel 2: Eficiencia Paralela E(p) = S(p)/p * 100%
-    # -------------------------------------------------------------------------
-    ax2.axhline(100.0, linestyle=":", color="#16a34a", linewidth=1.8, label="Eficiencia Ideal (100%)")
-    
-    # Eficiencia de Amdahl
-    e_amdahl = (s_amdahl / x_hilos) * 100.0
-    ax2.plot(x_hilos, e_amdahl, linestyle="--", color="#dc2626", linewidth=2.0, label=f"Eficiencia Amdahl (f = {f_amdahl*100:.0f}%)")
-
-    puntos_2 = []
-    for modelo in modelos_orden:
-        df_mod = df_resumen[df_resumen["modelo"] == modelo].sort_values("threads")
-        if df_mod.empty:
-            continue
-        ult_fila = df_mod.iloc[-1]
-        lbl = f"{modelo} (16h: {ult_fila['eficiencia_pct']:.1f}%)"
-        ax2.plot(
-            df_mod["threads"],
-            df_mod["eficiencia_pct"],
-            marker=MARCADORES.get(modelo, "o"),
-            markersize=8,
-            linewidth=2.2,
-            color=PALETA_MODELOS.get(modelo, "#333333"),
-            label=lbl
-        )
-        puntos_2.append({
-            "modelo": modelo,
-            "x": ult_fila["threads"],
-            "y": ult_fila["eficiencia_pct"],
-            "color": PALETA_MODELOS.get(modelo, "#333333")
-        })
-
-    # Anotar valores en p=16 evitando colisiones
-    anotar_puntos_finales(ax2, puntos_2, es_porcentaje=True)
-
-    ax2.axvline(8, color="#2563eb", linestyle="-.", alpha=0.5, linewidth=1.2)
-    ax2.text(8.2, 15, "Límite 8 Cores Físicos", color="#1e40af", fontsize=9, fontstyle="italic")
-
-    ax2.set_title("B. Eficiencia Paralela $E(p) = \\frac{S(p)}{p} \\times 100\\%$\n(Pérdida por contención y barreras)")
-    ax2.set_xlabel("Número de Hilos de Ejecución ($p$)", fontweight="bold")
-    ax2.set_ylabel("Eficiencia Paralela (%)", fontweight="bold")
-    ax2.set_xticks(hilos_unicos)
-    ax2.set_xlim(0.5, 19.2)
-    ax2.set_ylim(0, 115)
-    ax2.legend(loc="upper right", frameon=True)
-
-    fig.suptitle("Estudio de Escalabilidad Fuerte y Ley de Amdahl — Gray-Scott", fontsize=16, fontweight="bold", y=0.99)
     plt.tight_layout()
-    output_img.parent.mkdir(parents=True, exist_ok=True)
-    plt.savefig(output_img)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(output_path)
     plt.close()
-    print(f"--> [Gráficas] Guardado exitoso: {output_img}\n")
+    print(f"  [+] Generado: {output_path.name}")
+
+
+def cargar_datos_csv_scaling(csv_path: Path):
+    """Carga los datos de escalabilidad desde CSV existente."""
+    datos_scaling = {}
+    with open(csv_path, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            mod = row["modelo"]
+            hilos = int(row["threads"] if "threads" in row else row["hilos"])
+            sp_str = row["speedup"].replace("x", "") if "speedup" in row else "1.0"
+            speedup = float(sp_str)
+            eff_str = row.get("eficiencia_pct", row.get("eficiencia", "100.0")).replace("%", "")
+            eficiencia = float(eff_str)
+            if mod not in datos_scaling:
+                datos_scaling[mod] = []
+            datos_scaling[mod].append((hilos, speedup, eficiencia))
+    return datos_scaling
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Estudio de Escalabilidad Fuerte variando hilos (CE 4302)")
-    parser.add_argument("--runs", type=int, default=5, help="Corridas por cada punto de prueba (defecto: 5)")
+    parser = argparse.ArgumentParser(description="Estudio de Escalabilidad Fuerte para Gray-Scott (CE 4302)")
+    parser.add_argument("--runs", type=int, default=5,
+                        help="Corridas por cada combinación de hilos (defecto: 5 para test rápido, 200 para campaña completa)")
     parser.add_argument("--size", type=int, default=512, help="Dimensión de la grilla (defecto: 512)")
-    parser.add_argument("--steps", type=int, default=16000, help="Pasos temporales (defecto: 16000)")
-    parser.add_argument("--threads", type=str, default="1,2,4,8,16", help="Lista de hilos a barrer (defecto: '1,2,4,8,16')")
-    parser.add_argument("--cooldown", type=float, default=0.2, help="Pausa en segundos entre corridas")
-    parser.add_argument("--output-csv", type=str, default="../metricas/escalabilidad_hilos.csv", help="CSV resumen")
-    parser.add_argument("--output-raw", type=str, default="../metricas/escalabilidad_hilos_crudo.csv", help="CSV crudo")
-    parser.add_argument("--output-img", type=str, default="../metricas/graficas/07_escalabilidad_hilos.png", help="Gráfica")
+    parser.add_argument("--steps", type=int, default=16000, help="Pasos de simulación (defecto: 16000)")
+    parser.add_argument("--threads", type=str, default="1,2,4,8,16", help="Lista de hilos a evaluar (defecto: '1,2,4,8,16')")
+    parser.add_argument("--cooldown", type=float, default=0.05, help="Pausa en segundos entre corridas")
+    parser.add_argument("--output-csv", type=str, default="../metricas/gray_scott_strong_scaling.csv", help="CSV de salida")
+    parser.add_argument("--output-img", type=str, default="../metricas/graficas/04_escalabilidad_hilos.png", help="Gráfica de salida")
+    parser.add_argument("--plot-only", action="store_true", help="Solo generar la gráfica 04 desde el CSV existente sin ejecutar binarios")
     args = parser.parse_args()
 
     scripts_dir = Path(__file__).resolve().parent
     base_dir = scripts_dir.parent
-    csv_resumen_path = (scripts_dir / args.output_csv).resolve()
-    csv_raw_path = (scripts_dir / args.output_raw).resolve()
-    img_path = (scripts_dir / args.output_img).resolve()
+    csv_output = (scripts_dir / args.output_csv).resolve()
+    img_output = (scripts_dir / args.output_img).resolve()
+    compat_csv = (scripts_dir / "../metricas/escalabilidad_hilos.csv").resolve()
 
+    # Modo solo graficar
+    if args.plot_only:
+        print("==============================================================================")
+        print("           GENERACIÓN DE GRÁFICA DE ESCALABILIDAD DESDE CSV                   ")
+        print("==============================================================================")
+        csv_target = csv_output if csv_output.exists() else compat_csv
+        if not csv_target.exists():
+            print(f"[ERROR] No existe archivo de escalabilidad ({csv_output} ni {compat_csv})", file=sys.stderr)
+            sys.exit(1)
+        datos = cargar_datos_csv_scaling(csv_target)
+        graficar_strong_scaling_amdahl(datos, img_output)
+        print("\n[OK] Gráfica 04_escalabilidad_hilos.png generada con éxito.")
+        sys.exit(0)
+
+    # Compilar primero
     compilar_binarios(scripts_dir)
 
     lista_hilos = [int(p.strip()) for p in args.threads.split(",") if p.strip()]
@@ -311,8 +280,8 @@ def main():
     print(f"Pasos Temporales   : {args.steps}")
     print(f"Corridas por Punto : {args.runs}")
     print(f"Barrido de Hilos   : {lista_hilos}")
-    print(f"CSV Resumen        : {csv_resumen_path}")
-    print(f"Gráfica Salida     : {img_path}")
+    print(f"Salida CSV         : {csv_output}")
+    print(f"Salida Gráfica     : {img_output}")
     print("==============================================================================\n")
 
     # 1. Medir Baseline Secuencial
@@ -321,13 +290,14 @@ def main():
     for r in range(1, args.runs + 1):
         t = ejecutar_comando(["./gray_scott_seq", "--size", str(args.size), "--steps", str(args.steps)], cwd=scripts_dir)
         tiempos_seq.append(t)
-        time.sleep(args.cooldown)
+        if args.cooldown > 0:
+            time.sleep(args.cooldown)
 
     t_seq_promedio = statistics.mean(tiempos_seq)
-    t_seq_mediana = statistics.median(tiempos_seq)
-    print(f"    Baseline Secuencial: Media = {t_seq_promedio:.2f} ms | Mediana = {t_seq_mediana:.2f} ms\n")
+    t_seq_std = statistics.stdev(tiempos_seq) if len(tiempos_seq) > 1 else 0.0
+    print(f"    Baseline Secuencial: Media = {t_seq_promedio:.2f} ms | StdDev = {t_seq_std:.2f} ms\n")
 
-    # 2. Configurar catálogo de modelos paralelos a evaluar en el barrido
+    # 2. Modelos paralelos a evaluar
     modelos = [
         {
             "nombre": "CMP",
@@ -347,86 +317,62 @@ def main():
         }
     ]
 
-    registros_raw = []
     resumen_filas = []
+    datos_scaling = {"Secuencial": [(1, 1.0, 100.0)]}
 
-    # Registrar el baseline secuencial en los resultados crudos
-    for idx, t in enumerate(tiempos_seq, 1):
-        registros_raw.append({
-            "modelo": "Secuencial",
-            "threads": 1,
-            "run_id": idx,
-            "tiempo_ms": t
-        })
-
-    total_configs = len(modelos) * len(lista_hilos)
-    progreso = 0
+    resumen_filas.append([
+        "Secuencial", 1, args.runs, f"{t_seq_promedio:.3f}", f"{t_seq_std:.3f}", "1.00x", "100.0%"
+    ])
 
     for mod in modelos:
         nombre = mod["nombre"]
+        datos_scaling[nombre] = []
         print(f">>> Evaluando Modelo: [{nombre}]")
 
         for p in lista_hilos:
-            progreso += 1
             cmd = mod["cmd_fn"](p)
             tiempos_p = []
-            print(f"    [{progreso}/{total_configs}] Hilos = {p:2d} | Ejecutando {args.runs} corridas...", end="", flush=True)
+            print(f"    Hilos = {p:2d} | Ejecutando {args.runs} corridas...", end="", flush=True)
 
             for r in range(1, args.runs + 1):
                 t = ejecutar_comando(cmd, cwd=scripts_dir)
                 tiempos_p.append(t)
-                registros_raw.append({
-                    "modelo": nombre,
-                    "threads": p,
-                    "run_id": r,
-                    "tiempo_ms": t
-                })
-                time.sleep(args.cooldown)
+                if args.cooldown > 0:
+                    time.sleep(args.cooldown)
 
             media = statistics.mean(tiempos_p)
-            mediana = statistics.median(tiempos_p)
             desv = statistics.stdev(tiempos_p) if len(tiempos_p) > 1 else 0.0
-            speedup = t_seq_promedio / media
-            eficiencia = (speedup / p) * 100.0
+            sp = t_seq_promedio / media
+            eff = (sp / p) * 100.0
 
-            # Ley de Amdahl teórica con f = 0.98
-            f_amdahl = 0.98
-            s_amdahl = 1.0 / ((1.0 - f_amdahl) + (f_amdahl / p))
-
-            print(f" Media: {media:7.2f} ms | Speedup: {speedup:5.2f}x | Efic: {eficiencia:5.1f}%")
-
-            resumen_filas.append({
-                "modelo": nombre,
-                "threads": p,
-                "corridas": args.runs,
-                "tiempo_medio_ms": round(media, 3),
-                "tiempo_mediana_ms": round(mediana, 3),
-                "std_dev_ms": round(desv, 3),
-                "speedup": round(speedup, 3),
-                "eficiencia_pct": round(eficiencia, 2),
-                "amdahl_teorico": round(s_amdahl, 3),
-                "lineal_ideal": p
-            })
+            datos_scaling[nombre].append((p, sp, eff))
+            resumen_filas.append([
+                nombre, p, args.runs, f"{media:.3f}", f"{desv:.3f}", f"{sp:.2f}x", f"{eff:.1f}%"
+            ])
+            print(f" Media: {media:7.2f} ms | Speedup: {sp:5.2f}x | Efic: {eff:5.1f}%")
 
         print()
 
-    # Guardar CSV Crudo
-    df_raw = pd.DataFrame(registros_raw)
-    csv_raw_path.parent.mkdir(parents=True, exist_ok=True)
-    df_raw.to_csv(csv_raw_path, index=False)
-    print(f"--> [CSV] Datos crudos guardados en: {csv_raw_path}")
+    # Guardar en CSV
+    headers = ["modelo", "hilos", "corridas", "media_ms", "std_dev_ms", "speedup", "eficiencia"]
+    csv_output.parent.mkdir(parents=True, exist_ok=True)
+    with open(csv_output, "w", newline="", encoding="utf-8") as f_out:
+        writer = csv.writer(f_out)
+        writer.writerow(headers)
+        writer.writerows(resumen_filas)
+    print(f"--> [CSV] Resumen de escalabilidad guardado en: {csv_output}")
 
-    # Guardar CSV Resumen
-    df_resumen = pd.DataFrame(resumen_filas)
-    df_resumen.to_csv(csv_resumen_path, index=False)
-    print(f"--> [CSV] Resumen de escalabilidad guardado en: {csv_resumen_path}")
+    # Guardar también formato compatibilidad
+    compat_headers = ["modelo", "threads", "corridas", "tiempo_medio_ms", "std_dev_ms", "speedup", "eficiencia_pct"]
+    with open(compat_csv, "w", newline="", encoding="utf-8") as f_comp:
+        writer = csv.writer(f_comp)
+        writer.writerow(compat_headers)
+        for r in resumen_filas:
+            writer.writerow([r[0], r[1], r[2], r[3], r[4], r[5].replace("x", ""), r[6].replace("%", "")])
 
-    # Generar Visualización 300 DPI
-    graficar_escalabilidad(df_resumen, t_seq_promedio, img_path, f_amdahl=0.98)
-
-    print("==============================================================================")
-    print("      ¡ESTUDIO DE ESCALABILIDAD FUERTE COMPLETADO EXITOSAMENTE!               ")
-    print("==============================================================================\n")
+    # Generar gráfica 04
+    graficar_strong_scaling_amdahl(datos_scaling, img_output)
+    print("\n[OK] Campaña de escalabilidad y generación de 04_escalabilidad_hilos.png finalizada.")
 
 
 if __name__ == "__main__":
