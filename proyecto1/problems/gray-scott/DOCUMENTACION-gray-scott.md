@@ -330,35 +330,14 @@ $$\text{IC}_{95\%} = \left[ \mu - ME_{95\%}, \; \mu + ME_{95\%} \right]$$
 
 ---
 
-#### Gráfica 4: Aislamiento de Fenómenos Microarquitectónicos (3 Paneles)
-![Comparativas Microarquitectónicas](metricas/graficas/04_comparativas_microarquitectonicas.png)
+#### Gráfica 8: Dashboard Científico Consolidado (2x2)
+![Dashboard Consolidado](metricas/graficas/08_dashboard_consolidado.png)
 
-Esta figura aísla experimentalmente las tres preguntas clave de la microarquitectura del procesador:
-
-1. **Panel A — Aislamiento SMT (Hardware Real vs. Sobre-suscripción por Software - 16 Hilos):**
-   * **SMT en Hardware Real:** $709.7\text{ ms}$.
-   * **SMT Sobre-suscripción por Software (SMT OFF en kernel Linux):** $869.0\text{ ms}$.
-   * **Conclusión:** La sobre-suscripción por software impone una **penalización del $+22.4\%$ ($+159.3\text{ ms}$)**. El planificador del sistema operativo debe expulsar hilos de los núcleos mediante interrupciones periódicas del temporizador (*timer ticks*), guardando y restaurando el estado arquitectónico (registros vectoriales AVX-512/AVX2, RIP, RSP) en memoria RAM, invalidando la TLB y vaciando el pipeline. Por el contrario, en SMT de hardware real, la alternancia se realiza en la etapa de decodificación y despacho a nivel de ciclo de reloj sin costo de software.
-
-2. **Panel B — Fine-Grained: Hardware Real vs. Emulación en Software (8 Hilos Lógicos / Q=1 fila):**
-   * **Fine-Grained Paralelo Cíclico (8 hilos en hardware):** $1045.0\text{ ms}$.
-   * **Fine-Grained Cooperativo (1 core físico, 8 corutinas, 8.16M switches):** $3949.3\text{ ms}$.
-   * **Conclusión:** La emulación puramente por software impone una **penalización masiva del $+277.9\%$ ($+2904.3\text{ ms}$)**. Este contraste demuestra la diferencia fundamental entre el entrelazado de grano fino implementado en hardware (donde múltiples contextos de ejecución avanzan concurrentemente en los pipelines) frente a la simulación cooperativa por software en un solo núcleo, donde la sobrecarga de saltos indirectos y guardado de contexto de corutinas anula cualquier beneficio de paralelismo.
-
-3. **Panel C — Efecto de la Localidad Espacial de Caché (Coarse vs. Fine Cíclico - Ambos con 8 Hilos HW):**
-   * Ambos modelos ejecutan exactamente 8 hilos en 8 núcleos de CPU.
-   * **Coarse-Grained (Bloques contiguos):** $863.2\text{ ms}$.
-   * **Fine-Grained (Intercalado cíclico fila a fila):** $1045.0\text{ ms}$.
-   * **Conclusión:** Fine-Grained experimenta una **penalización del $+21.1\%$ ($+181.8\text{ ms}$)**. En Coarse-Grained, cada núcleo procesa una franja contigua de 64 filas; el *hardware prefetcher* detecta el patrón secuencial lineal y pre-carga las líneas de caché L1/L2 antes de que las instrucciones las soliciten. En Fine-Grained, el hilo 0 procesa la fila 1, el hilo 1 la fila 2, etc. Al avanzar paso a paso, los hilos leen celdas halo de filas calculadas concurrentemente por hilos vecinos, provocando **invalidaciones de coherencia (MESI/MOESI)** en los bordes de líneas de caché de 64 bytes (*cache line bouncing*) y sobrecargando la interconexión del procesador.
-
----
-
-#### Gráfica 5: Dashboard Consolidado General (2x2)
-![Dashboard Consolidado](metricas/graficas/05_dashboard_consolidado.png)
-
-El tablero consolidado integra las métricas de rendimiento con la serie temporal completa de las 200 corridas (Panel D):
-* **Estabilidad Temporal:** Muestra que las mediciones se mantuvieron completamente planas a lo largo del tiempo, descartando efectos de *thermal throttling* acumulativo.
-* **Picos aislados en CMP y Fine:** En corridas puntuales (como la corrida #113 en CMP), se aprecian picos ocasionados por interrupciones del kernel del sistema operativo ajenas al proceso de simulación, lo que valida la necesidad metodológica de computar tanto la media como la mediana y la desviación estándar sobre $N = 200$ observaciones.
+El tablero consolidado integra las métricas de rendimiento en cuatro cuadrantes científicos:
+* **Panel A — Tiempo Medio de Cómputo (ms):** Tiempos con barras de error de Intervalos de Confianza al 95%.
+* **Panel B — Speedup Relativo a Secuencial ($S_p$):** Aceleración frente a la línea base secuencial (1.0x).
+* **Panel C — Eficiencia Paralela ($E = S_p / p$):** Eficiencia porcentual frente a la línea ideal (100%).
+* **Panel D — Coeficiente de Variación ($CV = \sigma / \mu$):** Evaluación rigurosa de jitter, dispersión e inestabilidad temporal entre corridas.
 
 ---
 
@@ -407,15 +386,23 @@ Mide los cambios de contexto del kernel (`context-switches`) y migraciones entre
 
 ### Visualización y Salidas de Perfilado
 
-#### Gráfica 6: Perfilado Microarquitectónico de Hardware (Linux perf)
-![Perfilado de Hardware con perf](metricas/graficas/06_perfilado_hardware_perf.png)
+#### Gráfica 5: Instrucciones por Ciclo de Reloj (IPC)
+![Instrucciones por Ciclo](metricas/graficas/05_perf_ipc_comparativo.png)
+
+#### Gráfica 6: Tasas de Fallos de Caché L1-D y LLC/L3
+![Tasas de Fallos de Caché](metricas/graficas/06_perf_cache_miss_rates.png)
+
+#### Gráfica 7: Sobrecarga del Sistema Operativo (Context Switches)
+![Cambios de Contexto](metricas/graficas/07_perf_context_switches.png)
 
 * **Archivo CSV generado:** `metricas/perf_hardware_counters.csv`
-* **Gráfica de alta resolución (300 DPI):** `metricas/graficas/06_perfilado_hardware_perf.png`
-* **Comando para re-ejecutar:**
+* **Figuras científicas (300 DPI):** `05_perf_ipc_comparativo.png`, `06_perf_cache_miss_rates.png`, `07_perf_context_switches.png`
+* **Comandos para re-ejecutar:**
   ```bash
   cd scripts/
-  make profile
+  make setup_perf     # Habilitar contadores PMU
+  make profile_perf   # Ejecutar perfilado de hardware
+  make profile_plot   # Regenerar figuras directamente desde CSV
   ```
 
 ---
@@ -491,15 +478,16 @@ Al incrementar a $p = 16$ hilos sobre una máquina de 8 núcleos físicos:
 
 ### Visualización y Salidas de Escalabilidad
 
-#### Gráfica 7: Estudio de Escalabilidad Fuerte y Ley de Amdahl (300 DPI)
-![Estudio de Escalabilidad Fuerte](metricas/graficas/07_escalabilidad_hilos.png)
+#### Gráfica 4: Estudio de Escalabilidad Fuerte y Ley de Amdahl (300 DPI)
+![Estudio de Escalabilidad Fuerte](metricas/graficas/04_escalabilidad_hilos.png)
 
-* **Resumen cuantitativo:** `metricas/escalabilidad_hilos.csv`
-* **Datos crudos por corrida:** `metricas/escalabilidad_hilos_crudo.csv`
-* **Comando para re-ejecutar:**
+* **Resumen cuantitativo:** `metricas/gray_scott_strong_scaling.csv` (compatible con `raytracing_strong_scaling.csv`)
+* **Comandos para re-ejecutar:**
   ```bash
   cd scripts/
-  make scalability
+  make scalability         # Campaña completa (200 corridas por hilo = 1,000 corridas)
+  make scalability_fast    # Prueba rápida (3 corridas por hilo)
+  make scalability_plot    # Regenerar gráfica 04 directamente desde CSV
   ```
 
 
