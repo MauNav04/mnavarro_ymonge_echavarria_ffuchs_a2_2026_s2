@@ -1,4 +1,4 @@
-#include "fractal/codec.hpp"
+#include "fractal/search.hpp"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -62,44 +62,52 @@ void validate(const Encoded& c) {
 // Busca exhaustivamente una regla afin R ~= s*D+b por range. Por canal:
 // N_R=(W/r)*(H/r), N_D=(floor((W-2*r)/stride)+1)*(floor((H-2*r)/stride)+1).
 // Costo de busqueda: O(N_R*N_D*8*r*r); RGB repite el trabajo en tres planos.
-Encoded encode(const Image& a, Config cfg) {
+EncodingProblem prepare_encoding(const Image& a, Config cfg) {
     checkImage(a); dimensions(a.width,a.height,cfg.range);
     if (cfg.stride<1 || cfg.stride>2*cfg.range) throw std::invalid_argument("Stride fuera de 1..2*range.");
-    const int r=cfg.range, n=r*r;
-    struct Domain { int x,y; std::vector<float> reduced; };
-    std::vector<Domain> domains;
-    // Precalcula dominios reducidos y conserva sus coordenadas originales.
-    // Pueden solaparse. El catalogo terminado se comparte solo para lectura
-    // entre los equipos que procesen ranges del mismo canal.
-    for (int y=0; y<=a.height-2*r; y+=cfg.stride)
-        for (int x=0; x<=a.width-2*r; x+=cfg.stride)
-            domains.push_back({x,y,reduce(a,x,y,r)});
-    Encoded result{a.width,a.height,r,{}};
-
-    // =========[Punto de paralelizacion 01]=========
-    // Cada range calcula una regla independiente.
-    // Lectura compartida: imagen a, dominios precalculados y configuracion.
-    // Privados por tarea: target, meanR, bestError, best y temporales de candidatos.
-
-    // En el reparto por equipos del README, target y meanR pertenecen al range
-    // y pueden compartirse para lectura dentro del equipo tras prepararlos.
-    // Cada hilo que explore dominios necesita su propio minimo local.
-    // ========================================
-    for (int ry=0; ry<a.height; ry+=r) for (int rx=0; rx<a.width; rx+=r) {
-        // Copia el destino y calcula su media una sola vez para todos los candidatos.
-        std::vector<float> target(n);
-        double meanR=0;
-        for (int y=0;y<r;++y) for(int x=0;x<r;++x) { target[y*r+x]=a.at(rx+x,ry+y); meanR+=target[y*r+x]; }
-        meanR/=n;
-        double bestError=std::numeric_limits<double>::infinity();
-        Rule best;
-        // =========[Punto de paralelizacion 02]=========
-        // Repartir dominios entre hilos del equipo y combinar minimos locales.
-        // block, meanD, variance, covariance, s, b, error y la pareja (bestError, best)
-        // deben ser privados por hilo. En empates, conservar el primer candidato en
-        // orden dominio/simetria, como hace el operador < en la busqueda secuencial.
-        // ========================================
-        for (const auto& d:domains) for(int sym=0;sym<8;++sym) {
+    EncodingProblem problem{a.width,a.height,cfg.range,{}};
+    // Catálogo compartido para lectura; mantiene el orden por filas del original.
+    for (int y=0; y<=a.height-2*cfg.range; y+=cfg.stride)
+        for (int x=0; x<=a.width-2*cfg.range; x+=cfg.stride)
+            problem.domains.push_back({x,y,reduce(a,x,y,cfg.range)});
+    return problem;
+}
+std::size_t EncodingProblem::range_count() const {
+    return static_cast<std::size_t>(width/range)*(height/range);
+}
+RangeTarget prepare_range(const Image& a, const EncodingProblem& problem, std::size_t index) {
+    if (a.width!=problem.width || a.height!=problem.height ||
+        a.pixels.size()!=static_cast<std::size_t>(a.width)*a.height || index>=problem.range_count())
+        throw std::invalid_argument("Imagen o indice de range incompatible.");
+    const int r=problem.range, n=r*r;
+    const int rx=static_cast<int>(index % (a.width/r))*r;
+    const int ry=static_cast<int>(index / (a.width/r))*r;
+    RangeTarget target{std::vector<float>(n),0};
+    for (int y=0;y<r;++y) for(int x=0;x<r;++x) {
+        target.pixels[y*r+x]=a.at(rx+x,ry+y);
+        target.mean+=target.pixels[y*r+x];
+    }
+    target.mean/=n;
+    return target;
+}
+Candidate best_candidate(const Candidate& a, const Candidate& b) {
+    // Un orden global hace que la reducción de mínimos no dependa del hilo que termine primero.
+    if (b.error<a.error || (b.error==a.error && b.order<a.order)) return b;
+    return a;
+}
+Candidate search_domains(const EncodingProblem& problem, const RangeTarget& range,
+                         std::size_t begin, std::size_t end) {
+    const int r=problem.range, n=r*r;
+    if (begin>end || end>problem.domains.size() || range.pixels.size()!=static_cast<std::size_t>(n))
+        throw std::invalid_argument("Intervalo de dominios o range invalido.");
+    const auto& target=range.pixels;
+    const double meanR=range.mean;
+    Candidate best;
+    // Cada futuro hilo recibe [begin,end), evalúa sus ocho simetrías y conserva un mínimo privado.
+    // Los cálculos y su orden de operaciones son los de la implementación secuencial original.
+    for (std::size_t domainIndex=begin; domainIndex<end; ++domainIndex) {
+        const auto& d=problem.domains[domainIndex];
+        for(int sym=0;sym<8;++sym) {
             auto block=transform(d.reduced,r,sym);
             double meanD=0;
             for(float v:block) meanD+=v;
@@ -115,18 +123,23 @@ Encoded encode(const Image& a, Config cfg) {
             // todos los bloques tienen n muestras. decode si recorta la salida.
             double error=0;
             for(int i=0;i<n;++i) { double e=target[i]-(s*block[i]+b); error+=e*e; }
-            if(error<bestError) { bestError=error; best={static_cast<std::uint32_t>(d.x),static_cast<std::uint32_t>(d.y),static_cast<std::uint8_t>(sym),s,b}; }
+            if(error<best.error) {
+                best.error=error;
+                best.order=domainIndex*8+static_cast<std::size_t>(sym);
+                best.rule={static_cast<std::uint32_t>(d.x),static_cast<std::uint32_t>(d.y),static_cast<std::uint8_t>(sym),s,b};
+            }
         }
-
-        // =========[Punto de paralelizacion 03]=========
-        // push_back no debe ejecutarse concurrentemente sobre el mismo vector.
-        // Propuesta: resize(N_R) antes de iniciar hilos y escribir rules[rangeIndex].
-        // rangeIndex = (ry / r) * (a.width / r) + (rx / r).
-
-        // reserve no crea elementos: se requiere resize para asignar por indice.
-        // Cada equipo publicaria una regla tras reducir sus minimos locales.
-        // ========================================
-        result.rules.push_back(best);
+    }
+    return best;
+}
+Encoded encode(const Image& a, Config cfg) {
+    const auto problem=prepare_encoding(a,cfg);
+    Encoded result{a.width,a.height,cfg.range,{}};
+    // Un índice exclusivo por range conserva el orden del archivo, independientemente del reparto.
+    result.rules.resize(problem.range_count());
+    for (std::size_t index=0; index<result.rules.size(); ++index) {
+        const auto target=prepare_range(a,problem,index);
+        result.rules[index]=search_domains(problem,target,0,problem.domains.size()).rule;
     }
     return result;
 }

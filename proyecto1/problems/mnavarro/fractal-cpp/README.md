@@ -1,187 +1,318 @@
-# Compresión Fractal RGB
+# Framework Experimental de Modelos Multithreading
 
-**Avance 2**  
-**CE 4302 — Arquitectura de Computadores II**  
-**Instituto Tecnológico de Costa Rica (TEC)**  
-**II Semestre — 2026**
+Este README es la **única fuente de verdad del progreso, arquitectura y validaciones**.
+[README_Cod.md](README_Cod.md) conserva los criterios originales. Las reglas permanentes
+están en [AGENTS.md](AGENTS.md) y la guía académica de la versión base en
+[sequential/README.md](sequential/README.md).
 
----
+Alcance autorizado: **etapa 1**, con equipos de hilos por range como diseño aprobado.
+Las etapas 2–8 continúan pendientes y requieren solicitud explícita.
 
-## Resumen de navegación para la Demostración 2
+## 1. Descripción del proyecto
 
-Este proyecto implementa un compresor fractal de imágenes en C++17. La versión base procesa imágenes RGB mediante tres búsquedas independientes, conserva el modo de escala de grises y permite reconstruir imágenes a partir de archivos de reglas. El objetivo de la siguiente etapa es paralelizar la búsqueda para aprovechar un procesador multinúcleo de memoria compartida.
+Proyecto de Arquitectura de Computadores II (CE4302) del Instituto Tecnológico de Costa Rica.
 
-| # | Requerimiento de evaluación tomado de la referencia | Ubicación | Alcance de esta entrega |
-|---|---|---|---|
-| 1 | Identificación de variables y puntos de paralelización | Sección 1 de esta guía; [src/codec.cpp](src/codec.cpp) y [src/color.cpp](src/color.cpp) | Se identifican funciones, bucles y datos. Se incluyen comentarios sugeridos para insertar en el código. |
-| 2 | Diagrama arquitectónico preliminar secuencial frente a paralelo | [Sección 2](#2-diagrama-arquitectónico-preliminar) de esta guía | Diagramas Mermaid integrados, sin depender de imágenes externas. |
-| 3 | Dos propuestas comparadas por criterios | [docs/Propuestas.md](docs/Propuestas.md) | Asignación estática de ranges frente a asignación dinámica de grupos de ranges. |
+El objetivo es implementar y evaluar experimentalmente cuatro modelos de ejecución concurrente aplicados a la compresión fractal de imágenes:
 
----
+- Fine-Grained Multithreading
+- Coarse-Grained Multithreading
+- Chip Multiprocessing (CMP)
+- Simultaneous Multithreading (SMT)
 
-## 1. Identificación de variables y puntos de paralelización
+El proyecto parte de una implementación secuencial existente, utilizada como referencia para medir el rendimiento de las versiones concurrentes.
 
-### A. Variables críticas del problema
+Considera que yo no tengo una computadora con LINUX, así que la versión de SMT y Linux perf no se va a poder probar de la manera en que lo pide el profesor. Implementa esto adaptando lo que existen en la carpeta ../../echavarria/RayTracing/SMT, ../../echavarria/RayTracing/scripts/Makefile y ../../echavarria/RayTracing/scripts/profile_perf.py .
 
-| Variable o estructura | Ubicación | Función e impacto |
-|---|---|---|
-| `Image::width`, `Image::height` | `include/fractal/codec.hpp` | Determinan la cantidad de píxeles, ranges y dominios candidatos. |
-| `Config::range` | `include/fractal/codec.hpp` | Lado del range; el dominio tiene lado `2*range`. Determina el tamaño de cada comparación y la cantidad de reglas. |
-| `Config::stride` | `include/fractal/codec.hpp` | Desplazamiento entre dominios. Un paso menor aumenta los candidatos y el trabajo de búsqueda. |
-| `MultiImage::planes` | `include/fractal/color.hpp` | Contiene un plano gris o tres planos en orden R, G y B. |
-| `domains` | `encode(const Image&, Config)`, `src/codec.cpp` | Catálogo de dominios reducidos. Puede compartirse para lectura durante la búsqueda de un canal. |
-| `target`, `meanR`, `bestError`, `best` | `encode(const Image&, Config)` | Datos de un range y su mejor coincidencia; deben ser privados para cada tarea. |
-| `block`, `meanD`, `variance`, `covariance`, `s`, `b`, `error` | Búsqueda de candidatos en `src/codec.cpp` | Temporales del ajuste y la comparación; deben ser privados. |
-| `Encoded::rules` | `include/fractal/codec.hpp` | Resultado de la codificación: una regla por range, en orden por filas. |
-| `iterations`, `current`, `next` | `decode`, `src/codec.cpp` | Controlan la reconstrucción iterativa con dos buffers. |
+## 2. Tecnologías y entorno
 
-Para ancho W, alto H, lado del range B y stride S:
+- **Lenguaje principal:** C++
+- **Concurrencia:** POSIX Threads (pthreads)
+- **Compilación:** CMake
+- **Automatización:** Makefile y Python
+- **Profiling:** Linux Perf
+- **Sistema operativo:** Linux
+- **Hardware de referencia:** Intel Core i5-1335U, 12 procesadores lógicos reportados por `lscpu`
 
-- Ranges por canal: `N_R = (W/B)*(H/B)`.
-- Dominios por canal: `N_D = (floor((W-2B)/S)+1)*(floor((H-2B)/S)+1)`.
-- Ocho simetrías por dominio.
-- Tres canales en RGB.
-- Costo aproximado de búsqueda: `O(3*N_R*N_D*8*B²)`.
+La topología real de núcleos físicos, P-cores, E-cores e hilos SMT debe verificarse antes de configurar afinidad y realizar benchmarks.
 
-Ejemplo de conteo, no de rendimiento medido: para 128×128, B=8 y S=8, existen 256 ranges y 225 dominios por canal. Se evalúan `3*256*225*8 = 1 382 400` combinaciones range–dominio–simetría.
+## 3. Arquitectura del proyecto
 
-### B. Bucles paralelizables y cuello de botella esperado
+Estructura vigente tras la extracción de la etapa 1:
 
-1. **Canales:** el recorrido de `planes` en `encode(const MultiImage&, Config)`, dentro de `src/color.cpp`, procesa R, G y B independientemente. Es un punto sencillo de paralelización, pero usar solo este nivel limita el número de tareas a tres.
-2. **Rangos:** los bucles `ry` y `rx` de `encode(const Image&, Config)`, dentro de `src/codec.cpp`, calculan reglas independientes. Este es el nivel principal propuesto. Además, los ranges se distribuirán entre equipos de hilos, permitiendo procesar varios bloques simultáneamente. La cantidad de equipos será configurable para comparar distintas distribuciones del trabajo.
-3. **Dominios y simetrías:** los bucles sobre `domains` y `sym` también admiten descomposición. Dentro de cada equipo, los hilos se repartirán los dominios candidatos de un mismo range y evaluarán sus respectivas simetrías. Cada hilo conservará su mejor candidato y, al finalizar, se combinarán los mínimos locales para seleccionar una única regla. Así, cada range seguirá evaluándose contra todos los dominios, aunque la búsqueda esté distribuida.
-4. **Decodificación:** dentro de una iteración, los ranges pueden calcularse en paralelo leyendo `current` y escribiendo regiones disjuntas de `next`. Las iteraciones consecutivas dependen entre sí y requieren una barrera antes de intercambiar los buffers.
+- `sequential/`: punto de entrada secuencial (nombre actualizado por solicitud del usuario).
+- `app/`: entrada/salida compartida y serialización FRC1/FRC2.
+- `tests/`: pruebas del núcleo, ejecución y entrada/salida.
+- `fine-grained/`: simulación de planificación de grano fino.
+- `coarse-grained/`: implementación de grano grueso.
+- `CMP/`: ejecución paralela sobre múltiples núcleos.
+- `SMT/`: ejecución utilizando hilos lógicos y comparación de configuraciones de hardware.
+- `src/`: implementación compartida de compresión fractal.
+- `include/`: interfaces y declaraciones compartidas.
+- `scripts/`: automatización de compilación, pruebas, benchmarks, métricas y profiling.
+- `metrics/`: resultados experimentales y gráficas.
+- `docs/`: documentación técnica complementaria.
 
-El **cuello de botella esperado** es la búsqueda exhaustiva del codificador: reducción precalculada, transformación, ajuste y evaluación de candidatos. La transformación crea temporales repetidamente, lo que también puede afectar el rendimiento. Esta hipótesis debe verificarse con mediciones; no se atribuye el cuello de botella a la consola ni se reporta un perfil de ejecución inexistente.
+**Diseño aprobado:** equipos de hilos por range, reparto de dominios entre sus miembros y reducción de mínimos para publicar una regla. Ejemplo: 10 hilos = 5 equipos × 2 hilos.
 
-### Ejemplo de distribución rangos / dominios esperada
-| Equipo | Rangos asignados | Primer hilo | Segundo hilo |
-|---|---|---|---|
-| 0 | 0–19 | Dominios 0–99 | Dominios 100–199 |
-| 1 | 20–39 | Dominios 0–99 | Dominios 100–199 |
-| 2 | 40–59 | Dominios 0–99 | Dominios 100–199 |
-| 3 | 60–79 | Dominios 0–99 | Dominios 100–199 |
-| 4 | 80–99 | Dominios 0–99 | Dominios 100–199 |
+**Principio arquitectónico:** Todos los modelos deben reutilizar el mismo algoritmo de compresión y diferenciarse principalmente por su política de ejecución y distribución de trabajo.
 
----
+## 4. Roadmap y seguimiento
 
-## 2. Diagrama arquitectónico preliminar
+Estados permitidos para las tareas:
 
-### Sistema secuencial actual
+- `[ ]` Pendiente o en desarrollo.
+- `[x]` Implementada y validada.
 
-```mermaid
-flowchart TD
-    A["Controlador: argumentos y lectura con OpenCV"] --> B["Matrices R, G y B"]
-    B --> C["Procesar canales en orden"]
-    C --> D["Precalcular dominios del canal"]
-    D --> E["Procesar ranges en orden"]
-    E --> F["Buscar dominio y simetría; ajustar contraste y brillo"]
-    F --> G["Agregar mejor regla"]
-    G --> H{"¿Quedan ranges?"}
-    H -->|Sí| E
-    H -->|No| I{"¿Quedan canales?"}
-    I -->|Sí| C
-    I -->|No| J["Controlador: guardar FRC2"]
-```
+Una etapa se considera completa únicamente cuando se cumplen sus criterios de aceptación.
 
-### Sistema paralelo propuesto
+### Etapa 1 — Arquitectura y punto de entrada
 
-```mermaid
-flowchart TD
-    A["Canal actual y dominios de solo lectura"] --> B["Dimensionar vector de reglas"]
-    B --> C["Repartir ranges entre equipos de hilos"]
-    C --> D["Equipo 0: Divide en dos dominios (Hilos). Y realiza búsqueda y mínimo privados"]
-    C --> E["Equipo 1: Divide en dos dominios (Hilos). Y realiza búsqueda y mínimo privados"]
-    C --> F["Equipo 2: Divide en dos dominios (Hilos). Y realiza búsqueda y mínimo privados"]
-    D --> G["Define mínimo global del equipo"]
-    E --> H["Define mínimo global del equipo"]
-    F --> I["Define mínimo global del equipo"]
-    G --> J["Escribir rules en índices exclusivos"]
-    H --> J
-    I --> J
-    J --> K["Barrera o join"]
-    K --> L{"¿Quedan canales?"}
-    L -->|Sí| A
-    L -->|No| M["Guardar FRC2 desde el controlador"]
-```
+- [x] Analizar la implementación secuencial existente.
+- [x] Identificar operaciones paralelizables.
+- [x] Extraer la lógica compartida a `src/` e `include/`.
+- [x] Establecer una interfaz común de ejecución.
+- [x] Implementar el punto de entrada y sus parámetros.
+- [x] Validar que la versión secuencial mantiene su funcionalidad.
 
-El cambio principal es reemplazar el crecimiento secuencial de `rules` por un vector dimensionado antes del trabajo paralelo. `reserve` por sí solo no basta para escribir por índice: debe establecerse el tamaño mediante `resize`.
+**Aceptación cumplida:** núcleo único reutilizable y ejecución secuencial validada.
+Pruebas y equivalencia registradas en el historial; no se implementaron las etapas 2–8.
 
-El formato y el orden de las reglas se conservan. La serialización ocurre después de reunir a los equipos. Los dos mecanismos de reparto se detallan en [Propuestas.md](docs/Propuestas.md).
+### Etapa 2 — Fine-Grained
 
----
+- [ ] Implementar ejecución mediante pthreads.
+- [ ] Implementar planificación cooperativa Round-Robin.
+- [ ] Definir cuantums mínimos de trabajo.
+- [ ] Implementar sincronización entre trabajadores.
+- [ ] Verificar la alternancia de ejecución.
+- [ ] Validar resultados contra la versión secuencial.
 
-## 3. Compilación y ejecución del sistema base
+**Aceptación:** Simulación funcional de alternancia por cuantums, con comportamiento verificable y resultados correctos.
 
-### Dependencias y compilación
+### Etapa 3 — Coarse-Grained
 
-Desde la raíz del proyecto, en Ubuntu, Linux Mint o Ubuntu dentro de WSL:
+- [ ] Implementar ejecución mediante pthreads.
+- [ ] Definir eventos de bloqueo o estancamiento.
+- [ ] Implementar la política de cambio ante estos eventos.
+- [ ] Evitar cambios periódicos incondicionales de Fine-Grained.
+- [ ] Validar resultados contra la versión secuencial.
+
+**Aceptación:** Política de ejecución documentada, comprobable y diferenciada de Fine-Grained.
+
+### Etapa 4 — CMP
+
+- [ ] Implementar distribución paralela de trabajo.
+- [ ] Ejecutar trabajadores sobre núcleos físicos.
+- [ ] Implementar afinidad de CPU.
+- [ ] Evitar condiciones de carrera.
+- [ ] Verificar escalabilidad con diferentes cantidades de trabajadores.
+
+**Aceptación:** Paralelismo real sobre múltiples núcleos y resultados correctos.
+
+### Etapa 5 — SMT
+
+- [ ] Detectar topología de hilos lógicos y núcleos físicos.
+- [ ] Implementar configuración de afinidad para SMT.
+- [ ] Preparar ejecución con SMT habilitado y deshabilitado.
+- [ ] Registrar y comparar ambas configuraciones.
+- [ ] Validar resultados contra la versión secuencial.
+
+**Aceptación:** Comparación reproducible de ambas configuraciones de hardware, con mediciones verificadas.
+
+### Etapa 6 — Integración y pruebas
+
+- [ ] Configurar CMake para todos los ejecutables.
+- [ ] Integrar Makefile para automatización.
+- [ ] Implementar `test_models.py`.
+- [ ] Validar resultados para diferentes cantidades de trabajadores.
+- [ ] Comprobar errores, sincronización y ausencia de bloqueos.
+
+**Aceptación:** Todos los modelos compilan, ejecutan y superan sus pruebas funcionales.
+
+### Etapa 7 — Benchmarking y métricas
+
+- [ ] Implementar `benchmark.py`.
+- [ ] Ejecutar al menos 200 repeticiones por configuración experimental.
+- [ ] Guardar resultados individuales en CSV.
+- [ ] Calcular tiempo, speedup, eficiencia y escalabilidad.
+- [ ] Calcular media, desviación estándar e intervalos de confianza del 95 %.
+- [ ] Implementar `metrics.py` para generar gráficas automáticamente.
+- [ ] Generar boxplots y analizar convergencia.
+
+**Aceptación:** Resultados estadísticos y gráficas reproducibles desde los CSV.
+
+### Etapa 8 — Profiling
+
+- [ ] Implementar `profile.py` utilizando Linux Perf.
+- [ ] Recolectar contadores de hardware disponibles.
+- [ ] Analizar ciclos, instrucciones, fallos de caché y cambios de contexto.
+- [ ] Comparar el comportamiento de los modelos.
+- [ ] Analizar el impacto de SMT habilitado/deshabilitado.
+
+**Aceptación:** Resultados de profiling organizados y comparables.
+
+## 5. Metodología experimental
+
+Todas las implementaciones deben utilizar entradas y condiciones de trabajo equivalentes.
+
+Métricas principales:
+
+- Tiempo total de ejecución.
+- Speedup respecto a la versión secuencial.
+- Eficiencia paralela.
+- Escalabilidad según cantidad de trabajadores.
+
+Los benchmarks deben registrar modelo, cantidad de trabajadores, parámetros de entrada, afinidad, estado SMT, tiempo y configuración del hardware.
+
+Las mediciones principales deben ejecutarse sobre hardware físico, no en máquinas virtuales o contenedores.
+
+Los experimentos deben distinguir entre tiempo total y tiempo exclusivo de cómputo cuando se midan ambos.
+
+## 6. Compilación y ejecución
+
+Documentar los comandos reales y verificados para:
+
+- Compilar mediante CMake.
+- Ejecutar cada modelo.
+- Ejecutar pruebas funcionales.
+- Generar benchmarks.
+- Generar gráficas.
+- Ejecutar Linux Perf.
+
+Desde `proyecto1/problems/mnavarro/fractal-cpp/`:
 
 ```bash
-sudo apt update
-sudo apt install build-essential cmake libopencv-dev
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_APP=ON
 cmake --build build -j2
 ctest --test-dir build --output-on-failure
+./build/fractal --help
+./build/fractal compress sequential/examples/color128.png sequential/examples/results/color.frc --model sequential --teams 1 --threads-per-team 1 --range 8 --stride 8
+./build/fractal decompress sequential/examples/results/color.frc sequential/examples/results/color.png --iterations 80
+./build/fractal compare sequential/examples/color128.png sequential/examples/results/color.png
 ```
 
-`-j2` acelera la construcción con dos trabajos; no paraleliza el algoritmo. CMake genera la construcción y CTest ejecuta las pruebas registradas. Se mantiene C++17 y OpenCV con componentes `core` e `imgcodecs`.
+Se conservan los argumentos posicionales originales (`compress entrada salida 8 8` y
+`decompress entrada salida 80`), el modo gris (`compress-gray`, `compare-gray`) y el alias
+`--model sequential`. Las opciones no se pueden repetir ni duplicar con argumentos posicionales.
 
-### Demostración RGB
+`--teams` y `--threads-per-team` describen la configuración común. En etapa 1 deben valer 1.
+Fine-Grained, Coarse-Grained, CMP y SMT se reconocen pero se rechazan como no implementados.
+No se aceptan opciones de ejecución en `compare` ni parámetros de compresión en `decompress`.
 
-```bash
-./build/fractal compress examples/color.png prueba_color.frc 8 8
-./build/fractal decompress prueba_color.frc reconstruida_color.png 80
-./build/fractal compare examples/color.png reconstruida_color.png
-```
+También se puede construir desde `sequential/` con `cmake -S sequential -B build`.
+`-DBUILD_APP=OFF` permite construir la biblioteca y pruebas sin OpenCV.
+CTest registra la prueba `cli_tests` cuando Python3 está disponible; no es dependencia de
+la biblioteca C++. Las pruebas del núcleo no requieren OpenCV ni Python.
+Los comandos de benchmarking y profiling se documentarán en sus etapas.
 
-- Los dos últimos argumentos de `compress` son range y stride; el dominio tiene el doble del lado del range.
-- `80` indica iteraciones de reconstrucción por canal; por defecto son 40.
-- `compare` informa MSE y PSNR globales y por canal.
-- Para una imagen propia, se sustituye la ruta por el nombre completo, incluida su extensión.
+## 7. Decisiones técnicas
 
-### Demostración en gris y compatibilidad
+Registrar únicamente decisiones relevantes y aprobadas.
 
-```bash
-./build/fractal compress-gray examples/color.png prueba_gris.frc 8 8
-./build/fractal decompress prueba_gris.frc reconstruida_gris.png 80
-./build/fractal compare-gray examples/color.png reconstruida_gris.png
-```
+Cada decisión debe incluir:
 
-RGB usa `FRC2`; gris conserva `FRC1`. El decodificador nuevo reconoce ambos formatos. La extensión es `.frc` en los dos casos. OpenCV convierte su representación BGR a los planos RGB propios, y revierte ese orden al guardar.
+- Decisión tomada.
+- Justificación.
+- Alternativas consideradas cuando corresponda.
+- Consecuencias o limitaciones.
 
-### Salidas y evidencia
+**Decisión aprobada por el usuario — 2026-10-13:**
 
-El programa informa canales, reglas por canal, bytes del archivo y relación contra píxeles sin comprimir. Mide codificación o decodificación sin E/S y tiempo total con E/S. La comparación contra píxeles no equivale a una comparación contra el tamaño del PNG/JPEG de entrada.
+- Equipos de hilos por range: cada miembro examina distintos dominios candidatos,
+  prueba sus ocho simetrías y entrega su mejor candidato. El equipo reduce mínimos
+  antes de publicar una única regla. Se descarta la interpretación de un range completo
+  independiente por hilo como diseño principal. Ver [docs/Propuestas.md](docs/Propuestas.md).
+- En empates se conserva el primer dominio/simetría del orden secuencial; el candidato
+  incluye su índice global para hacer la reducción independiente del orden de finalización.
+- La etapa 1 ofrece las operaciones reutilizables y ejecuta solo el modelo secuencial.
+  Cuantum, eventos de stall y afinidad pertenecen a etapas futuras.
 
-Se pueden ver benchmarks en [docs/images](docs/images) además de un ejemplo de la imagen original y la imagen descomprimida por el algoritmo.
+**Decisiones iniciales:**
 
-### Restricciones actuales
+- C++ como lenguaje de implementación.
+- pthreads para concurrencia.
+- Reutilización del núcleo de compresión fractal.
+- Implementación incremental de los modelos.
+- CMake para compilación y Python/Makefile para automatización.
 
-Imágenes de 8 bits por canal al cargar; sin conservación de alfa ni metadatos. Los lados deben ser múltiplos del range, al menos dos veces ese lado y no superar 4096. Range admitido: 2 a 64. Se recomienda comenzar con 128×128; el límite de dimensiones no garantiza tiempos prácticos. La compresión es con pérdida y no garantiza archivos menores que PNG o JPEG.
+## 8. Pendientes y validaciones
 
----
+Registrar problemas conocidos, tareas bloqueadas y validaciones que requieren intervención manual.
 
-## 4. Estructura del proyecto
+**Pendientes:**
 
-| Ruta | Responsabilidad |
-|---|---|
-| `CMakeLists.txt` | Construcción de biblioteca, aplicación y pruebas. |
-| `README.md` | Esta guía de evaluación. |
-| `include/fractal/codec.hpp` | Datos y funciones para un canal. |
-| `include/fractal/color.hpp` | Contenedores y operaciones multicanal. |
-| `src/codec.cpp` | Reducción, simetrías, ajuste, búsqueda y reconstrucción. |
-| `src/color.cpp` | Coordinación de canales RGB o gris. |
-| `app/main.cpp` | Argumentos, llamadas y mediciones. |
-| `app/image_io.hpp`, `app/image_io.cpp` | Adaptación de imágenes OpenCV. |
-| `app/file_io.hpp`, `app/file_io.cpp` | Serialización gris FRC1. |
-| `app/color_io.hpp`, `app/color_io.cpp` | Serialización multicanal y lectura FRC1/FRC2. |
-| `tests/test_codec.cpp` | Pruebas del núcleo gris. |
-| `tests/test_color.cpp` | Pruebas RGB y compatibilidad de archivos. |
-| `tests/test_image_io.cpp` | Verificación del orden de canales con OpenCV. |
-| `examples/` | Imágenes y códigos de referencia. |
-| `docs/Propuestas.md` | Diseños de paralelización y comparación. |
+- Implementar equipos reales y sincronización en las etapas concurrentes autorizadas.
+- Confirmar cuantums para Fine-Grained y eventos de stall para Coarse-Grained antes
+  de sus respectivas implementaciones; no bloquean la etapa 1.
+- La configuración secuencial rechaza varios equipos/hilos para evitar informar
+  paralelismo inexistente. `10 hilos = 5 equipos × 2` describe el diseño futuro.
 
-## 5. Próxima etapa
 
-Incorporar las marcas en código, implementar primero el reparto estático, verificar equivalencia con la versión secuencial y medir aceleración. Implementar después el reparto dinámico como alternativa experimental. El protocolo y la selección preliminar están en [docs/Propuestas.md](docs/Propuestas.md).
+- Confirmar topología física y lógica de la CPU.
+- Definir el tamaño de cuantum de Fine-Grained.
+- Definir cómo se modelarán los stalls de Coarse-Grained.
+- Establecer configuraciones equivalentes de comparación.
+- Verificar los requisitos académicos adicionales de la especificación.
+
+## 9. Historial de progreso
+
+Registrar actualizaciones relevantes con el siguiente formato:
+
+**Fecha — Etapa — Resumen**
+
+- Cambios implementados.
+- Pruebas ejecutadas y resultados.
+- Tareas pendientes.
+- Próximo paso.
+
+Mantener este historial breve. Git conserva el historial detallado de modificaciones.
+
+
+### 2026-10-13 — Etapa 1 — Arquitectura y punto de entrada completados
+
+- Extraído el núcleo único a `src/` e `include/` y la E/S compartida a `app/`.
+  `sequential/main.cpp` conserva el controlador base; ejemplos permanecen en `sequential/examples/`.
+- `include/fractal/search.hpp` permite preparar dominios y ranges, buscar un intervalo
+  de dominios y combinar mínimos con desempate determinista. Se conserva la aritmética
+  original y el formato/orden de reglas FRC1/FRC2. `rules` se dimensiona por adelantado.
+- `include/fractal/execution.hpp` define la configuración de modelos/equipos/hilos y
+  ejecución común mono/RGB. Solo `sequential` (1×1) está implementado en esta etapa.
+- CLI compatible con argumentos originales y opciones explícitas, con validación previa
+  a E/S, ayuda y rechazo de modelos pendientes. Se actualizó la propuesta al diseño de
+  equipos por range aprobado por el usuario; no quedan decisiones que bloqueen la etapa 1.
+- Validación funcional en WSL2, GNU C++ 13.3.0, OpenCV 4.6.0 y Python3:
+
+  | Construcción Release | Configuración | Resultado CTest |
+  |---|---|---|
+  | Raíz: `/tmp/fractal-stage1-release` | `BUILD_APP=ON` | 5/5 aprobadas |
+  | Independiente: `/tmp/fractal-stage1-direct-fixed` | `-S sequential`, `BUILD_APP=ON` | 5/5 aprobadas |
+  | Solo núcleo: `/tmp/fractal-stage1-core` | `BUILD_APP=OFF` | 3/3 aprobadas |
+
+  Se usaron `cmake -S <fuente> -B <construcción> -DCMAKE_BUILD_TYPE=Release -DBUILD_APP=<ON/OFF>`,
+  `cmake --build <construcción> -j2` y `ctest --test-dir <construcción> --output-on-failure`.
+- Pruebas existentes conservadas: gris, RGB, FRC1/FRC2, convergencia e intercambio RGB/BGR.
+  `execution_tests` verifica particiones 1/2/5/23 sobre 18 dominios, intervalos vacíos,
+  reducción en orden inverso, empates en imágenes constantes y ejecución mono/RGB.
+  `cli_tests` verifica compatibilidad posicional/opciones, ayuda y **26 casos inválidos**
+  sin alterar la entrada ni una salida existente.
+- Comparación contra el binario anterior (`/tmp/fractal-stage1-baseline/fractal`): **22 casos**
+  de compresión/reconstrucción RGB y gris, imágenes 16×24 constantes/gradientes/patrones con
+  `(range,stride)=(2,1),(4,3),(8,16)` y `color128.png` con `(8,8),(16,16)`, 80 iteraciones.
+  Todos los FRC y PNG coinciden **byte por byte**. Artefactos temporales:
+  `/tmp/fractal-stage1-equivalence-yx94efje/`.
+- Revisados enlaces locales de documentación y `git diff --check`.
+  Se corrigió una recursión en la construcción independiente de CMake antes de validar
+  satisfactoriamente esa configuración. No se efectuaron benchmarks de hardware.
+- README: seis tareas de etapa 1 completadas; etapas 2–8 pendientes.
+  Próximo paso, solo bajo solicitud explícita: etapa 2 y definición de su cuantum cooperativo.
+
+### 2026-10-14 — Renombre de la carpeta secuencial
+
+- Renombrada `secuencial/` a `sequential/` mediante `git mv -k`; se omitieron las rutas
+  ya ausentes por la extracción anterior. Git registra 10 renombres de archivos versionados,
+  sin duplicar imágenes ni ejemplos. El punto de entrada aún no versionado también se trasladó.
+- Actualizadas referencias en CMake, documentación y reglas; se conserva el alias CLI
+  `--model secuencial`. El algoritmo y los estados del roadmap permanecen sin cambios.
+- Configuración Release con `BUILD_APP=ON`, construcción `-j2` y CTest desde la raíz
+  (`/tmp/fractal-rename-root-20261014`) y desde `sequential/`
+  (`/tmp/fractal-rename-direct-20261014`): **5/5 pruebas aprobadas en ambas construcciones**.
+  Enlaces locales y `git diff --check` correctos. Sin nuevos pendientes por este renombre.

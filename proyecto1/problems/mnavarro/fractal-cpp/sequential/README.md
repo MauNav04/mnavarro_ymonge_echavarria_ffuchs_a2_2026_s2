@@ -16,9 +16,9 @@ Este proyecto implementa un compresor fractal de imágenes en C++17. La versión
 
 | # | Requerimiento de evaluación tomado de la referencia | Ubicación | Alcance de esta entrega |
 |---|---|---|---|
-| 1 | Identificación de variables y puntos de paralelización | Sección 1 de esta guía; [src/codec.cpp](src/codec.cpp) y [src/color.cpp](src/color.cpp) | Se identifican funciones, bucles y datos. Se incluyen comentarios sugeridos para insertar en el código. |
+| 1 | Identificación de variables y puntos de paralelización | Sección 1 de esta guía; [src/codec.cpp](../src/codec.cpp) y [src/color.cpp](../src/color.cpp) | Se identifican funciones, bucles y datos. Se incluyen comentarios sugeridos para insertar en el código. |
 | 2 | Diagrama arquitectónico preliminar secuencial frente a paralelo | [Sección 2](#2-diagrama-arquitectónico-preliminar) de esta guía | Diagramas Mermaid integrados, sin depender de imágenes externas. |
-| 3 | Dos propuestas comparadas por criterios | [docs/Propuestas.md](docs/Propuestas.md) | Asignación estática de ranges frente a asignación dinámica de grupos de ranges. |
+| 3 | Dos propuestas comparadas por criterios | [docs/Propuestas.md](../docs/Propuestas.md) | Asignación estática de ranges frente a asignación dinámica de grupos de ranges. |
 
 ---
 
@@ -28,15 +28,15 @@ Este proyecto implementa un compresor fractal de imágenes en C++17. La versión
 
 | Variable o estructura | Ubicación | Función e impacto |
 |---|---|---|
-| `Image::width`, `Image::height` | `include/fractal/codec.hpp` | Determinan la cantidad de píxeles, ranges y dominios candidatos. |
-| `Config::range` | `include/fractal/codec.hpp` | Lado del range; el dominio tiene lado `2*range`. Determina el tamaño de cada comparación y la cantidad de reglas. |
-| `Config::stride` | `include/fractal/codec.hpp` | Desplazamiento entre dominios. Un paso menor aumenta los candidatos y el trabajo de búsqueda. |
-| `MultiImage::planes` | `include/fractal/color.hpp` | Contiene un plano gris o tres planos en orden R, G y B. |
-| `domains` | `encode(const Image&, Config)`, `src/codec.cpp` | Catálogo de dominios reducidos. Puede compartirse para lectura durante la búsqueda de un canal. |
+| `Image::width`, `Image::height` | `../include/fractal/codec.hpp` | Determinan la cantidad de píxeles, ranges y dominios candidatos. |
+| `Config::range` | `../include/fractal/codec.hpp` | Lado del range; el dominio tiene lado `2*range`. Determina el tamaño de cada comparación y la cantidad de reglas. |
+| `Config::stride` | `../include/fractal/codec.hpp` | Desplazamiento entre dominios. Un paso menor aumenta los candidatos y el trabajo de búsqueda. |
+| `MultiImage::planes` | `../include/fractal/color.hpp` | Contiene un plano gris o tres planos en orden R, G y B. |
+| `domains` | `encode(const Image&, Config)`, `../src/codec.cpp` | Catálogo de dominios reducidos. Puede compartirse para lectura durante la búsqueda de un canal. |
 | `target`, `meanR`, `bestError`, `best` | `encode(const Image&, Config)` | Datos de un range y su mejor coincidencia; deben ser privados para cada tarea. |
-| `block`, `meanD`, `variance`, `covariance`, `s`, `b`, `error` | Búsqueda de candidatos en `src/codec.cpp` | Temporales del ajuste y la comparación; deben ser privados. |
-| `Encoded::rules` | `include/fractal/codec.hpp` | Resultado de la codificación: una regla por range, en orden por filas. |
-| `iterations`, `current`, `next` | `decode`, `src/codec.cpp` | Controlan la reconstrucción iterativa con dos buffers. |
+| `block`, `meanD`, `variance`, `covariance`, `s`, `b`, `error` | Búsqueda de candidatos en `../src/codec.cpp` | Temporales del ajuste y la comparación; deben ser privados. |
+| `Encoded::rules` | `../include/fractal/codec.hpp` | Resultado de la codificación: una regla por range, en orden por filas. |
+| `iterations`, `current`, `next` | `decode`, `../src/codec.cpp` | Controlan la reconstrucción iterativa con dos buffers. |
 
 Para ancho W, alto H, lado del range B y stride S:
 
@@ -50,8 +50,8 @@ Ejemplo de conteo, no de rendimiento medido: para 128×128, B=8 y S=8, existen 2
 
 ### B. Bucles paralelizables y cuello de botella esperado
 
-1. **Canales:** el recorrido de `planes` en `encode(const MultiImage&, Config)`, dentro de `src/color.cpp`, procesa R, G y B independientemente. Es un punto sencillo de paralelización, pero usar solo este nivel limita el número de tareas a tres.
-2. **Rangos:** los bucles `ry` y `rx` de `encode(const Image&, Config)`, dentro de `src/codec.cpp`, calculan reglas independientes. Este es el nivel principal propuesto. Además, los ranges se distribuirán entre equipos de hilos, permitiendo procesar varios bloques simultáneamente. La cantidad de equipos será configurable para comparar distintas distribuciones del trabajo.
+1. **Canales:** el recorrido de `planes` en `encode(const MultiImage&, Config)`, dentro de `../src/color.cpp`, procesa R, G y B independientemente. Es un punto sencillo de paralelización, pero usar solo este nivel limita el número de tareas a tres.
+2. **Rangos:** los bucles `ry` y `rx` de `encode(const Image&, Config)`, dentro de `../src/codec.cpp`, calculan reglas independientes. Este es el nivel principal propuesto. Además, los ranges se distribuirán entre equipos de hilos, permitiendo procesar varios bloques simultáneamente. La cantidad de equipos será configurable para comparar distintas distribuciones del trabajo.
 3. **Dominios y simetrías:** los bucles sobre `domains` y `sym` también admiten descomposición. Dentro de cada equipo, los hilos se repartirán los dominios candidatos de un mismo range y evaluarán sus respectivas simetrías. Cada hilo conservará su mejor candidato y, al finalizar, se combinarán los mínimos locales para seleccionar una única regla. Así, cada range seguirá evaluándose contra todos los dominios, aunque la búsqueda esté distribuida.
 4. **Decodificación:** dentro de una iteración, los ranges pueden calcularse en paralelo leyendo `current` y escribiendo regiones disjuntas de `next`. Las iteraciones consecutivas dependen entre sí y requieren una barrera antes de intercambiar los buffers.
 
@@ -110,7 +110,7 @@ flowchart TD
 
 El cambio principal es reemplazar el crecimiento secuencial de `rules` por un vector dimensionado antes del trabajo paralelo. `reserve` por sí solo no basta para escribir por índice: debe establecerse el tamaño mediante `resize`.
 
-El formato y el orden de las reglas se conservan. La serialización ocurre después de reunir a los equipos. Los dos mecanismos de reparto se detallan en [Propuestas.md](docs/Propuestas.md).
+El formato y el orden de las reglas se conservan. La serialización ocurre después de reunir a los equipos. Los dos mecanismos de reparto se detallan en [Propuestas.md](../docs/Propuestas.md).
 
 ---
 
@@ -118,7 +118,7 @@ El formato y el orden de las reglas se conservan. La serialización ocurre despu
 
 ### Dependencias y compilación
 
-Desde `fractal-cpp/secuencial/`, en Ubuntu, Linux Mint o Ubuntu dentro de WSL:
+Desde `fractal-cpp/sequential/`, en Ubuntu, Linux Mint o Ubuntu dentro de WSL:
 
 ```bash
 sudo apt update
@@ -171,20 +171,20 @@ Imágenes de 8 bits por canal al cargar; sin conservación de alfa ni metadatos.
 |---|---|
 | `CMakeLists.txt` | Construcción de biblioteca, aplicación y pruebas. |
 | `README.md` | Esta guía de evaluación. |
-| `include/fractal/codec.hpp` | Datos y funciones para un canal. |
-| `include/fractal/color.hpp` | Contenedores y operaciones multicanal. |
-| `src/codec.cpp` | Reducción, simetrías, ajuste, búsqueda y reconstrucción. |
-| `src/color.cpp` | Coordinación de canales RGB o gris. |
-| `app/main.cpp` | Argumentos, llamadas y mediciones. |
-| `app/image_io.hpp`, `app/image_io.cpp` | Adaptación de imágenes OpenCV. |
-| `app/file_io.hpp`, `app/file_io.cpp` | Serialización gris FRC1. |
-| `app/color_io.hpp`, `app/color_io.cpp` | Serialización multicanal y lectura FRC1/FRC2. |
-| `tests/test_codec.cpp` | Pruebas del núcleo gris. |
-| `tests/test_color.cpp` | Pruebas RGB y compatibilidad de archivos. |
-| `tests/test_image_io.cpp` | Verificación del orden de canales con OpenCV. |
+| `../include/fractal/codec.hpp` | Datos y funciones para un canal. |
+| `../include/fractal/color.hpp` | Contenedores y operaciones multicanal. |
+| `../src/codec.cpp` | Reducción, simetrías, ajuste, búsqueda y reconstrucción. |
+| `../src/color.cpp` | Coordinación de canales RGB o gris. |
+| `main.cpp` | Argumentos, llamadas y mediciones. |
+| `../app/image_io.hpp`, `../app/image_io.cpp` | Adaptación de imágenes OpenCV. |
+| `../app/file_io.hpp`, `../app/file_io.cpp` | Serialización gris FRC1. |
+| `../app/color_io.hpp`, `../app/color_io.cpp` | Serialización multicanal y lectura FRC1/FRC2. |
+| `../tests/test_codec.cpp` | Pruebas del núcleo gris. |
+| `../tests/test_color.cpp` | Pruebas RGB y compatibilidad de archivos. |
+| `../tests/test_image_io.cpp` | Verificación del orden de canales con OpenCV. |
 | `examples/` | Imágenes y códigos de referencia. |
-| `docs/Propuestas.md` | Diseños de paralelización y comparación. |
+| `../docs/Propuestas.md` | Diseños de paralelización y comparación. |
 
 ## 5. Próxima etapa
 
-Incorporar las marcas en código, implementar primero el reparto estático, verificar equivalencia con la versión secuencial y medir aceleración. Implementar después el reparto dinámico como alternativa experimental. El protocolo y la selección preliminar están en [docs/Propuestas.md](docs/Propuestas.md).
+La etapa 1 extrae el núcleo compartido y el punto de entrada. Las etapas concurrentes utilizarán equipos por range y reducción de mínimos; solo se implementan cuando el usuario las solicite. El protocolo y la selección preliminar están en [docs/Propuestas.md](../docs/Propuestas.md).
