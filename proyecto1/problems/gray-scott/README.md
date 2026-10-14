@@ -185,19 +185,19 @@ python3 benchmark.py --runs 10 --models "cmp" --append
 
 * **Archivos generados:**
   * `metricas/gray_scott_benchmark.csv`: Muestras crudas oficiales de tiempo y configuración para las corridas estadísticas.
-  * `metricas/resumen_estadistico.csv`: Consolidado estadístico oficial con Media ($\mu$), Margen de Error ($ME_{95\%}$), Intervalo de Confianza al 95% ($[\text{IC}_{inf}, \text{IC}_{sup}]$), Desviación Estándar ($\sigma$), Mediana, Speedup ($S$) y Eficiencia ($E$).
+  * `metricas/resumen_estadistico.csv`: Consolidado estadístico oficial con Media ($\mu$), Margen de Error ($\pm \text{ME}$ al 95%), Intervalo de Confianza al 95% ($[\text{IC}_{\text{inf}}, \text{IC}_{\text{sup}}]$), Desviación Estándar ($\sigma$), Mediana, Speedup ($S$) y Eficiencia ($E$).
 
 #### Tabla Consolidada de Benchmarking Oficial ($N = 200$ corridas por modelo, AMD Ryzen 7 5700G):
 
-| Modelo | Modo | Hilos | Media $\mu$ (ms) | Margen Error $\pm ME_{95\%}$ | Intervalo Confianza 95% (ms) | Speedup $S$ | Eficiencia $E$ |
+| Modelo | Modo | Hilos | Media $\mu$ (ms) | Margen Error $\pm \text{ME}$ (95%) | Intervalo Confianza 95% (ms) | Speedup $S$ | Eficiencia $E$ |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **SMT (HW Real)** | `hardware_smt` | 16 | **709.74** | $\pm 3.28$ | **[706.46, 713.02]** | **5.54x** | 34.6% |
-| **CMP** | `dedicated_cores` | 8 | **734.47** | $\pm 11.16$ | **[723.31, 745.62]** | **5.35x** | **66.9%** |
-| **Coarse-Grained** | `burst_block` | 8 | **863.16** | $\pm 3.94$ | **[859.23, 867.10]** | **4.55x** | 56.9% |
-| **SMT (Sobre-suscripción SW)** | `software_oversubscription` | 16 | **869.02** | $\pm 2.24$ | **[866.78, 871.26]** | **4.52x** | 28.3% |
-| **Fine-Grained (Paralelo Cíclico)** | `cyclic_threads` | 8 | **1044.98** | $\pm 7.93$ | **[1037.05, 1052.92]** | **3.76x** | 47.0% |
-| **Secuencial (Baseline)** | `baseline` | 1 | **3929.68** | $\pm 32.01$ | **[3897.67, 3961.68]** | **1.00x** | 100.0% |
-| **Fine-Grained (Cooperativo)** | `cooperative_quantum` | 8 | **3949.26** | $\pm 18.54$ | **[3930.71, 3967.80]** | **1.00x** | 12.4% |
+| **CMP** | `dedicated_cores` | 8 | **1061.94** | $\pm 6.69$ | **[1055.25, 1068.63]** | **4.09x** | **51.1%** |
+| **SMT (HW Real)** | `hardware_smt` | 16 | **1102.88** | $\pm 18.03$ | **[1084.85, 1120.91]** | **3.94x** | 24.6% |
+| **Coarse-Grained** | `burst_block` | 8 | **1269.43** | $\pm 8.07$ | **[1261.36, 1277.50]** | **3.42x** | 42.8% |
+| **SMT (Sobre-suscripción SW)** | `software_oversubscription` | 16 | **1443.01** | $\pm 42.97$ | **[1400.04, 1485.99]** | **3.01x** | 18.8% |
+| **Fine-Grained (Paralelo Cíclico)** | `cyclic_threads` | 8 | **1565.56** | $\pm 10.63$ | **[1554.93, 1576.18]** | **2.77x** | 34.7% |
+| **Secuencial (Baseline)** | `baseline` | 1 | **4344.25** | $\pm 14.41$ | **[4329.84, 4358.66]** | **1.00x** | 100.0% |
+| **Fine-Grained (Cooperativo)** | `cooperative_quantum` | 8 | **4482.44** | $\pm 16.81$ | **[4465.63, 4499.26]** | **0.97x** | 12.1% |
 
 ---
 
@@ -214,8 +214,8 @@ make graficas
 
 * **Visualizaciones exportadas en `metricas/graficas/`:**
   1. **`01_tiempos_ejecucion_boxplot.png`**: Distribución de tiempos y diagramas de caja (Tukey boxplots) de las 200 corridas por modelo con medianas y medias indicadas.
-  2. **`02_speedup_comparativo.png`**: Aceleración relativa ($S = T_{sec}/T_{par}$) con barras de error de Intervalos de Confianza al 95% ($\text{IC}_{95\%}$) y línea base secuencial (1.0x).
-  3. **`03_eficiencia_paralela.png`**: Eficiencia porcentual ($E = S_p/p \times 100\%$) con línea ideal (100%) y umbral típico (50%).
+  2. **`02_speedup_comparativo.png`**: Aceleración relativa ($S = T_{\text{sec}}/T_{\text{par}}$) con barras de error de Intervalos de Confianza al 95% ($\text{IC}_{95}$) y línea base secuencial (1.0x).
+  3. **`03_eficiencia_paralela.png`**: Eficiencia porcentual ($E = \frac{S_p}{p} \times 100$\%) con línea ideal (100%) y umbral típico (50%).
   4. **`04_escalabilidad_hilos.png`**: Curvas de escalabilidad fuerte ($p \in \{1, 2, 4, 8, 16\}$ hilos) contrastadas con aceleración lineal ideal ($S(p) = p$) y curvas teóricas de la Ley de Amdahl (90%, 95%, 98%), con etiquetas anti-colisión en $p=16$.
   5. **`05_perf_ipc_comparativo.png`**: Instrucciones retiradas por ciclo de reloj (IPC) de hardware medido con `perf stat` (promedio de 3 corridas).
   6. **`06_perf_cache_miss_rates.png`**: Análisis de la jerarquía de memoria en dos paneles: Tasa de fallos en L1 Data Cache (%) y en Last-Level Cache (L3/LLC %).
@@ -300,7 +300,7 @@ make campaign_200
 ```
 
 * **Modelos evaluados:** CMP, SMT (HW Real), Coarse-Grained y Fine-Grained (Paralelo Cíclico).
-* **Contraste teórico:** Aceleración Lineal Ideal ($S = p$) y Ley de Amdahl ($S(p) = \frac{1}{(1-f) + f/p}$) con fracciones paralelizable estimadas ($90\%, 95\%, 98\%$).
+* **Contraste teórico:** Aceleración Lineal Ideal ($S = p$) y Ley de Amdahl ($S(p) = \frac{1}{(1-f) + f/p}$) con fracciones paralelizable estimadas (90%, 95%, 98%).
 * **Archivos generados:**
   * `metricas/gray_scott_strong_scaling.csv`: Resumen cuantitativo de escalabilidad (compatible con `raytracing_strong_scaling.csv`).
   * `metricas/graficas/04_escalabilidad_hilos.png`: Visualización con curvas de Amdahl y etiquetas anti-colisión en $p=16$.

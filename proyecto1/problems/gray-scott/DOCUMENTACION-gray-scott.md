@@ -13,8 +13,7 @@ Todo el proyecto se construye sobre un núcleo común desacoplado (`include/gray
 ### A. Estructuras de Datos
 * **`Grid2D` (`include/grid.hpp`):**
   Representa el dominio bidimensional de la placa de Petri. Contiene dos vectores continuos en memoria (`std::vector<float> u` y `std::vector<float> v`).
-  * **Formato *Row-Major*:** El acceso espacial se realiza linealmente mediante la fórmula:
-    $$\text{índice}(x, y) = y \times \text{width} + x$$
+  * **Formato *Row-Major*:** El acceso espacial se realiza linealmente mediante la fórmula $\text{index}(x, y) = y \cdot W + x$.
   * **Beneficio Arquitectónico:** El recorrido secuencial de celdas adyacentes aprovecha las líneas de caché L1/L2 de 64 bytes y activa el *Hardware Prefetcher* del procesador.
 * **`GrayScottParams` (`include/gray_scott_core.hpp`):**
   Encapsula las tasas físicas de difusión y reacción:
@@ -28,10 +27,13 @@ Todo el proyecto se construye sobre un núcleo común desacoplado (`include/gray
 * **`init_simulation(Grid2D& grid)`:**  
   Establece el estado inicial: satura el dominio completo con nutriente $U = 1.0, V = 0.0$ e inocula un área cuadrada central de $20 \times 20$ celdas con $U = 0.5, V = 1.0$ como semilla de proliferación bacteriana.
 * **`step_simulation_slice(const Grid2D& current, Grid2D& next, int start_y, int end_y, const GrayScottParams& params)`:**  
-  **Motor unificado de cálculo del stencil.** Evalúa el esquema de diferencias finitas en el tiempo (FTCS) y el operador Laplaciano de 5 puntos exclusivamente sobre la franja de filas $[start\_y, end\_y)$:
-  $$\nabla^2 A_{x,y} \approx A_{x+1,y} + A_{x-1,y} + A_{x,y+1} + A_{x,y-1} - 4A_{x,y}$$
-  $$\text{Reacción: } R = u \cdot v^2$$
-  $$\frac{\Delta u}{\Delta t} = D_u \nabla^2 u - R + F(1 - u), \quad \frac{\Delta v}{\Delta t} = D_v \nabla^2 v + R - (F + K)v$$
+  **Motor unificado de cálculo del stencil.** Evalúa el esquema de diferencias finitas en el tiempo (FTCS) y el operador Laplaciano de 5 puntos exclusivamente sobre la franja de filas $[y_{\text{start}}, y_{\text{end}})$:
+  * **Operador Laplaciano (stencil de 5 puntos):**  
+    $\nabla^2 A_{x,y} \approx A_{x+1,y} + A_{x-1,y} + A_{x,y+1} + A_{x,y-1} - 4A_{x,y}$
+  * **Reacción autocatalítica:**  
+    $R = u \cdot v^2$
+  * **Ecuaciones cinéticas acopladas de Gray-Scott:**  
+    $\frac{\Delta u}{\Delta t} = D_u \nabla^2 u - R + F(1 - u), \quad \frac{\Delta v}{\Delta t} = D_v \nabla^2 v + R - (F + K)v$
   * Las lecturas se realizan de forma segura y concurrente sobre `current` (solo lectura durante el paso $t$).
   * Las escrituras se realizan de forma disjunta sobre `next`.
 * **`export_frame_ppm(const Grid2D& grid, int frame_id, const std::string& output_dir)`:**  
@@ -61,10 +63,13 @@ Constituye la **línea base absoluta ($T_{\text{sec}}$)** y el patrón oro de ex
 Implementa **paralelismo real sobre múltiples núcleos físicos independientes**, aislando la ejecución de cualquier interferencia o contención microarquitectónica por hilos lógicos (SMT).
 
 ### Cómo utiliza el Núcleo (`core`)
-1. **Descomposición de Dominio 1D por Filas:**
-   La grilla de $(H - 2)$ filas interiores se divide en franjas continuas horizontales asignadas a cada hilo:
-   $$\text{start\_y} = 1 + id \times \text{filas\_base} + \min(id, \text{residuo})$$
-   $$\text{end\_y} = \text{start\_y} + \text{filas\_base} + (id < \text{residuo} ? 1 : 0)$$
+1. **Descomposición de Dominio 1D por Filas:**  
+   La grilla de $(H - 2)$ filas interiores se divide en franjas continuas horizontales asignadas a cada hilo de trabajo $\text{id}$ ($0 \le \text{id} < P$):
+   * **Fila inicial:** $y_{\text{start}} = 1 + \text{id} \cdot \text{filas}_{\text{base}} + \min(\text{id}, \text{residuo})$
+   * **Fila final:** $y_{\text{end}} = y_{\text{start}} + \text{filas}_{\text{base}} + (\text{id} < \text{residuo} \ ? \ 1 : 0)$
+   
+   donde $\text{filas}_{\text{base}} = \lfloor (H - 2) / P \rfloor$ y $\text{residuo} = (H - 2) \pmod P$.
+
 2. **Cómputo en Paralelo:** Cada hilo trabajador ejecuta de forma aislada e independiente:
    ```cpp
    step_simulation_slice(cur, nxt, ctx->start_y, ctx->end_y, *(ctx->params));
@@ -73,7 +78,7 @@ Implementa **paralelismo real sobre múltiples núcleos físicos independientes*
 
 ### Métodos y Mecanismos Clave
 * **Detección Dinámica de Núcleos (`obtener_cpus_fisicos()`):**  
-  Lee `/sys/devices/system/cpu/cpu*/topology/core_id` para obtener la lista ordenada de CPUs que corresponden a núcleos físicos distintos (CPUs $0$ a $7$ en procesadores AMD Zen 3 como Ryzen 7 5700G y 7730U), evitando asignar dos hilos CMP al mismo núcleo físico.
+  Lee `/sys/devices/system/cpu/cpu*/topology/core_id` para obtener la lista ordenada de CPUs que corresponden a núcleos físicos distintos (CPUs $0$ a $7$ en procesadores AMD Zen 3 como Ryzen 7 7730U), evitando asignar dos hilos CMP al mismo núcleo físico.
 * **Afinidad por Hardware (`pthread_setaffinity_np`):**  
   Fija cada hilo de ejecución del sistema operativo al núcleo físico que le corresponde.
 * **Hilos Persistentes de Larga Duración:**  
@@ -100,10 +105,10 @@ Evaluar el comportamiento microarquitectónico de 16 hilos de trabajo compitiend
 2. **Sobre-suscripción por Software (`SMT OFF`):** Con SMT apagado en el kernel, solo existen 8 núcleos disponibles, forzando al planificador del sistema operativo a alternar los 16 hilos mediante conmutaciones de contexto por software (*time-slicing*).
 
 ### Cómo utiliza el Núcleo (`core`)
-1. **Descomposición 1D en 16 Franjas:**
+1. **Descomposición 1D en 16 Franjas:**  
    Divide las $(H - 2)$ filas interiores entre los 16 hilos lógicos en franjas horizontales continuas:
-   $$\text{start\_y} = 1 + id \times \text{filas\_base} + \min(id, \text{residuo})$$
-   $$\text{end\_y} = \text{start\_y} + \text{filas\_base} + (id < \text{residuo} ? 1 : 0)$$
+   * **Fila inicial:** $y_{\text{start}} = 1 + \text{id} \cdot \text{filas}_{\text{base}} + \min(\text{id}, \text{residuo})$
+   * **Fila final:** $y_{\text{end}} = y_{\text{start}} + \text{filas}_{\text{base}} + (\text{id} < \text{residuo} \ ? \ 1 : 0)$
 2. **Invocación Unificada:**
    Cada hilo ejecuta independientemente:
    ```cpp
@@ -134,7 +139,7 @@ Implementar el modelo arquitectónico de multihilo de grano grueso (*Coarse-Grai
 
 ### Cómo utiliza el Núcleo (`core`)
 1. **Ráfagas Ininterrumpidas de Cómputo (32,640 celdas por ráfaga/hilo):**
-   Cada hilo tradicional recibe un bloque contiguo de filas $[start\_y, end\_y)$ (típicamente $64$ filas en una grilla de $512 \times 512$). El hilo invoca:
+   Cada hilo tradicional recibe un bloque contiguo de filas $[y_{\text{start}}, y_{\text{end}})$ (típicamente $64$ filas en una grilla de $512 \times 512$). El hilo invoca:
    ```cpp
    step_simulation_slice(cur, nxt, ctx->start_y, ctx->end_y, *(ctx->params));
    ```
@@ -188,8 +193,8 @@ En cumplimiento con la especificación del curso (Sección 4.1.a y Nota 4.1.5 qu
 
 ### Métodos y Mecanismos Clave
 * **Cuantificación Masiva de Conmutaciones:**  
-  Para una grilla de $512 \times 512$ con 510 filas interiores y $16{,}000$ pasos temporales:
-  $$\text{Conmutaciones} = 510 \times 16{,}000 = 8{,}160{,}000 \text{ cambios de contexto}$$
+  Para una grilla de $512 \times 512$ con 510 filas interiores y $16{,}000$ pasos temporales:  
+  $\text{Conmutaciones} = 510 \times 16{,}000 = 8{,}160{,}000\text{ cambios de contexto}$.
 * **Degradación Teórica en Arquitecturas Modernas de Escritorio:**  
   Los procesadores x86-64 modernos carecen de pipelines de conmutación de registros a nivel de ciclo (como los que tenía el Tera MTA). Por tanto, la alternancia forzada de grano fino evidencia:
   * En modo cooperativo: Desempeño cercano a 1x con sobrecarga de control.
@@ -255,14 +260,14 @@ proyecto1/problems/gray-scott/
 | Modelo | Unidad de Trabajo en Core | Sincronización Inter-paso | Asignación de CPU / Afinidad | Evento de Conmutación |
 | :--- | :--- | :--- | :--- | :--- |
 | **Secuencial** | Dominio completo $[1, H-1)$ | Ninguna | 1 solo hilo (SO por defecto) | Ninguno |
-| **CMP** | Franja 1D contigua $[start\_y, end\_y)$ | `pthread_barrier_t` | 1 hilo por núcleo físico (CPUs 0 a 7) | No hay conmutación (hilos dedicados) |
+| **CMP** | Franja 1D contigua `[start_y, end_y)` | `pthread_barrier_t` | 1 hilo por núcleo físico (CPUs 0 a 7) | No hay conmutación (hilos dedicados) |
 | **SMT** | Franja 1D contigua (16 divisiones) | `pthread_barrier_t` | 2 hilos por core (HW) / Sobre-suscripción (SW) | Concurrente en pipeline (HW) o Time-slice (SW) |
 | **Coarse-Grained** | Ráfagas continuas de grandes bloques | `pthread_barrier_t` | Hilos tradicionales (8 por defecto) | **Únicamente** ante evento de bloqueo (*stall* / barrera) |
 | **Fine-Grained** | Cuantum mínimo ($Q = 1$ fila) | Cooperativo / `pthread_barrier_t` | Hilos virtuales / Cíclico en cores | **Incondicional** en cada cuantum (Round-Robin) |
 
 ---
 
-## 8. Resultados Experimentales y Análisis de Rendimiento (Campaña de 1,400 Corridas en procesador ryzen 7 5700G)
+## 8. Resultados Experimentales y Análisis de Rendimiento (Campaña de 1,400 Corridas en procesador ryzen 7 7730U)
 
 ### Metodología Experimental
 Para garantizar significancia estadística rigurosa, se ejecutó una campaña automatizada de **200 corridas independientes por modelo** (1,400 ejecuciones totales, tiempo acumulado de cómputo: **41 minutos y 36 segundos**) sobre una grilla estándar de $512 \times 512$ ($262{,}144$ celdas) durante $16{,}000$ pasos temporales ($4.19 \times 10^9$ actualizaciones de stencil).
@@ -271,30 +276,38 @@ Las pruebas se ejecutaron en un procesador **AMD Ryzen** (8 núcleos físicos / 
 
 ### Formulación Formal de Intervalos de Confianza al 95% ($N = 200$)
 
-Para cada modelo de ejecución, habiendo recolectado $N = 200$ observaciones independientes bajo condiciones idénticas de grilla ($512 \times 512$) y pasos ($16{,}000$), se calcula el estimador puntual de la media muestral $\bar{X}$ y la cuasivarianza muestral $s^2$. Dado que $N = 200 \gg 30$, por el **Teorema del Límite Central** la distribución muestral de la media converge a una normal estándar $\mathcal{N}(0, 1)$, permitiendo estimar el margen de error ($ME$) para un nivel de confianza del $95\%$ ($\alpha = 0.05$, $z_{\alpha/2} = 1.95996$):
+Para cada modelo de ejecución, habiendo recolectado $N = 200$ observaciones independientes bajo condiciones idénticas de grilla ($512 \times 512$) y pasos ($16{,}000$), se calcula el estimador puntual de la media muestral $\bar{X}$ y la cuasivarianza muestral $s^2$. Dado que $N = 200 \gg 30$, por el **Teorema del Límite Central** la distribución muestral de la media converge a una normal estándar $\mathcal{N}(0, 1)$, permitiendo estimar el margen de error ($\text{ME}$) para un nivel de confianza del 95% ($\alpha = 0.05$, $z_{\alpha/2} = 1.95996$):
 
-$$SE = \frac{s}{\sqrt{N}} = \frac{\sigma}{\sqrt{200}}$$
+$$
+\text{SE} = \frac{s}{\sqrt{N}} = \frac{\sigma}{\sqrt{200}}
+$$
 
-$$ME_{95\%} = z_{0.975} \cdot \frac{\sigma}{\sqrt{N}} = 1.95996 \cdot \frac{\sigma}{\sqrt{200}}$$
+$$
+\text{ME}_{95} = z_{0.975} \cdot \frac{\sigma}{\sqrt{N}} = 1.95996 \cdot \frac{\sigma}{\sqrt{200}}
+$$
 
-$$\text{IC}_{95\%} = \left[ \mu - ME_{95\%}, \; \mu + ME_{95\%} \right]$$
+$$
+\text{IC}_{95} = \left[ \mu - \text{ME}_{95}, \; \mu + \text{ME}_{95} \right]
+$$
 
 ### Tabla Consolidada de Resultados Estadísticos con Intervalos de Confianza al 95% ($N = 200$)
 
-| Modelo de Ejecución | Modo Evaluado | Hilos | Media $\mu$ (ms) | Margen Error $\pm ME_{95\%}$ | Intervalo de Confianza 95% (ms) | Desv. Estándar $\sigma$ (ms) | Mediana (ms) | Speedup $S$ | Eficiencia $E$ |
+| Modelo de Ejecución | Modo Evaluado | Hilos | Media $\mu$ (ms) | Margen Error $\pm \text{ME}$ (95%) | Intervalo de Confianza 95% (ms) | Desv. Estándar $\sigma$ (ms) | Mediana (ms) | Speedup $S$ | Eficiencia $E$ |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **SMT (HW Real)** | `hardware_smt` | 16 | **709.74** | $\pm 3.28$ | **[706.46, 713.02]** | 23.66 | 704.88 | **5.54x** | 34.6% |
-| **CMP** | `dedicated_cores` | 8 | **734.47** | $\pm 11.16$ | **[723.31, 745.62]** | 80.49 | 722.72 | **5.35x** | **66.9%** |
-| **Coarse-Grained** | `burst_block` | 8 | **863.16** | $\pm 3.94$ | **[859.23, 867.10]** | 28.40 | 863.32 | **4.55x** | 56.9% |
-| **SMT (Sobre-suscripción SW)** | `software_oversubscription` | 16 | **869.02** | $\pm 2.24$ | **[866.78, 871.26]** | 16.16 | 863.34 | **4.52x** | 28.3% |
-| **Fine-Grained (Paralelo Cíclico)** | `cyclic_threads` | 8 | **1044.98** | $\pm 7.93$ | **[1037.05, 1052.92]** | 57.24 | 1040.44 | **3.76x** | 47.0% |
-| **Secuencial (Baseline)** | `baseline` | 1 | **3929.68** | $\pm 32.01$ | **[3897.67, 3961.68]** | 230.94 | 3886.76 | **1.00x** | 100.0% |
-| **Fine-Grained (Cooperativo)** | `cooperative_quantum` | 8 | **3949.26** | $\pm 18.54$ | **[3930.71, 3967.80]** | 133.80 | 3917.60 | **1.00x** | 12.4% |
+| **CMP** | `dedicated_cores` | 8 | **1061.94** | $\pm 6.69$ | **[1055.25, 1068.63]** | 48.27 | 1058.83 | **4.09x** | **51.1%** |
+| **SMT (HW Real)** | `hardware_smt` | 16 | **1102.88** | $\pm 18.03$ | **[1084.85, 1120.91]** | 130.09 | 1034.49 | **3.94x** | 24.6% |
+| **Coarse-Grained** | `burst_block` | 8 | **1269.43** | $\pm 8.07$ | **[1261.36, 1277.50]** | 58.24 | 1262.78 | **3.42x** | 42.8% |
+| **SMT (Sobre-suscripción SW)** | `software_oversubscription` | 16 | **1443.01** | $\pm 42.97$ | **[1400.04, 1485.99]** | 310.06 | 1380.42 | **3.01x** | 18.8% |
+| **Fine-Grained (Paralelo Cíclico)** | `cyclic_threads` | 8 | **1565.56** | $\pm 10.63$ | **[1554.93, 1576.18]** | 76.67 | 1557.61 | **2.77x** | 34.7% |
+| **Secuencial (Baseline)** | `baseline` | 1 | **4344.25** | $\pm 14.41$ | **[4329.84, 4358.66]** | 103.99 | 4313.97 | **1.00x** | 100.0% |
+| **Fine-Grained (Cooperativo)** | `cooperative_quantum` | 8 | **4482.44** | $\pm 16.81$ | **[4465.63, 4499.26]** | 121.32 | 4443.48 | **0.97x** | 12.1% |
 
 #### Análisis de Significancia Estadística
-* **Disyunción entre SMT HW y CMP:** El límite superior de SMT HW ($713.02\text{ ms}$) es estrictamente menor que el límite inferior de CMP ($723.31\text{ ms}$). Al no existir solapamiento entre sus intervalos al 95%, se concluye con significancia estadística ($p < 0.05$) que el aprovechamiento de los 16 contextos de hardware en SMT aventaja al paralelismo CMP puro en este kernel de cómputo.
-* **Separación de Coarse-Grained vs Fine-Grained Cíclico:** Los intervalos $[859.23, 867.10]\text{ ms}$ y $[1037.05, 1052.92]\text{ ms}$ están distanciados por más de $170\text{ ms}$, confirmando de manera irrebatible la ventaja del particionamiento por bloques contiguos frente al particionamiento intercalado cíclico afectado por *false sharing*.
-* **Solapamiento entre Secuencial y Fine-Grained Cooperativo:** Los intervalos $[3897.67, 3961.68]\text{ ms}$ y $[3930.71, 3967.80]\text{ ms}$ se intersectan ampliamente, demostrando que la emulación por corutinas en un solo núcleo no introduce ninguna ganancia de velocidad y equivale formalmente al tiempo secuencial puro más el overhead de yield.
+* **Liderazgo de CMP y Determinismo Temporal:** CMP alcanza el menor tiempo medio ($1061.94\text{ ms}$, IC 95%: $[1055.25, 1068.63]\text{ ms}$) y el mayor speedup de la campaña ($4.09\text{x}$, eficiencia del 51.1%). Además, presenta una dispersión sumamente reducida ($\sigma = 48.27\text{ ms}$) frente a SMT HW ($\sigma = 130.09\text{ ms}$), demostrando que asignar 1 hilo dedicado por núcleo físico sin contención en el pipeline microarquitectónico proporciona mayor estabilidad temporal.
+* **SMT en Hardware Real vs CMP:** SMT HW registra una mediana muy competitiva ($1034.49\text{ ms}$ vs $1058.83\text{ ms}$ de CMP); sin embargo, la competencia entre los 2 hilos lógicos que comparten recursos de ejecución en cada núcleo físico introduce mayor variabilidad en los tiempos de cómputo ($\sigma = 130.09\text{ ms}$, IC 95%: $[1084.85, 1120.91]\text{ ms}$).
+* **Separación de Coarse-Grained vs Fine-Grained Cíclico:** Los intervalos $[1261.36, 1277.50]\text{ ms}$ y $[1554.93, 1576.18]\text{ ms}$ se encuentran completamente separados por casi $300\text{ ms}$, confirmando de manera irrebatible la ventaja del particionamiento por bloques contiguos frente al particionamiento intercalado cíclico afectado por *false sharing* e invalidación de líneas de caché.
+* **Penalización por Sobre-suscripción (SMT OFF):** Al desactivar SMT en el kernel, la alternancia por software de los 16 hilos sobre 8 núcleos eleva la media a $1443.01\text{ ms}$ y dispara la desviación estándar a $\sigma = 310.06\text{ ms}$ ($\pm 42.97\text{ ms}$ de margen de error), evidenciando el severo impacto del *scheduling overhead* del sistema operativo.
+* **Fine-Grained Cooperativo vs Secuencial:** El modelo cooperativo ($4482.44\text{ ms}$, IC 95%: $[4465.63, 4499.26]\text{ ms}$) no aporta ganancia sobre el secuencial ($4344.25\text{ ms}$), ya que la alternancia por corutinas en un solo procesador físico añade la sobrecarga de 8.16 millones de conmutaciones sin paralelismo real en hardware.
 
 ---
 
@@ -303,19 +316,19 @@ $$\text{IC}_{95\%} = \left[ \mu - ME_{95\%}, \; \mu + ME_{95\%} \right]$$
 #### Gráfica 1: Distribución y Dispersión de Tiempos de Cómputo e Intervalos de Confianza al 95%
 ![Distribución de Tiempos de Ejecución](metricas/graficas/01_tiempos_ejecucion_boxplot.png)
 
-* **Intervalos de Confianza al 95% Visibles en Badges:** Cada caja del boxplot incluye su badge flotante que detalla explícitamente la media muestral $\mu$, el intervalo formal al 95% ($\text{IC}_{95\%} = [\mu - ME, \mu + ME]$), el margen de error $ME = \pm 1.96 \cdot (\sigma/\sqrt{200})$ y la desviación estándar $\sigma$. Se corrobora visualmente que el intervalo de SMT HW ($[706.5, 713.0]\text{ ms}$) y el de CMP ($[723.3, 745.6]\text{ ms}$) no se solapan.
-* **Observación Clave:** Los modelos paralelos (SMT HW, CMP, Coarse y SMT SW) se agrupan firmemente en la franja sub-segundo ($700 - 870\text{ ms}$), con una dispersión intercuartílica sumamente angosta.
-* **Estabilidad:** La desviación estándar de SMT HW ($\sigma = 23.7\text{ ms}$) y SMT SW ($\sigma = 16.2\text{ ms}$) demuestra la altísima predictibilidad temporal del procesador cuando no hay contención externa.
-* **Degradación del Modelo Cooperativo:** Fine-Grained cooperativo registra una media de $3949.3\text{ ms}$, virtualmente idéntica al secuencial puro ($3929.7\text{ ms}$), confirmando experimentalmente que la sobrecarga de simulación por software y los $8.16 \times 10^6$ cambios de contexto consumen el tiempo que teóricamente se esperaría ahorrar en una máquina de un solo hilo de hardware.
+* **Intervalos de Confianza al 95% Visibles en Badges:** Cada caja del boxplot incluye su badge flotante que detalla explícitamente la media muestral $\mu$, el intervalo formal al 95% ($\text{IC}_{95} = [\mu - \text{ME}, \mu + \text{ME}]$), el margen de error $\text{ME} = \pm 1.96 \cdot (\sigma/\sqrt{200})$ y la desviación estándar $\sigma$. Se corrobora visualmente la estrechez de los intervalos en los modelos paralelos.
+* **Observación Clave:** Los modelos paralelos de alto rendimiento (CMP, SMT HW y Coarse) se agrupan firmemente en la franja de $1.0 - 1.3\text{ s}$, con una dispersión intercuartílica angosta.
+* **Estabilidad:** La desviación estándar de CMP ($\sigma = 48.3\text{ ms}$) y Coarse ($\sigma = 58.2\text{ ms}$) demuestra la altísima predictibilidad temporal del procesador cuando no hay contención entre hilos lógicos en el mismo núcleo.
+* **Degradación del Modelo Cooperativo:** Fine-Grained cooperativo registra una media de $4482.4\text{ ms}$, ligeramente superior al secuencial puro ($4344.2\text{ ms}$), confirmando experimentalmente que la sobrecarga de simulación por software y los $8.16 \times 10^6$ cambios de contexto consumen tiempo sin aportar paralelismo.
 
 ---
 
 #### Gráfica 2: Aceleración Relativa (Speedup) vs. Secuencial
 ![Speedup Comparativo](metricas/graficas/02_speedup_comparativo.png)
 
-* **SMT en Hardware Real logra el mayor Speedup absoluto (5.54x):** Al disponer de 16 contextos de registros simultáneos, el procesador satura las unidades de ejecución de punto flotante de los 8 núcleos de cómputo.
-* **CMP (5.35x):** Alcanza un desempeño prácticamente equivalente al SMT HW utilizando únicamente 8 hilos dedicados (1 por core físico), lo que evita la contención en el planificador interno de instrucciones del núcleo.
-* **Coarse-Grained (4.55x) vs Fine-Grained Paralelo (3.76x):** Ambos modelos ejecutan exactamente 8 hilos en 8 núcleos de cómputo; sin embargo, la estrategia de particionamiento continuo en ráfagas de Coarse-Grained aventaja a Fine-Grained por casi **0.8x de speedup**, debido a factores de microarquitectura de memoria.
+* **CMP logra el mayor Speedup absoluto (4.09x):** Al disponer de 8 hilos dedicados sobre 8 núcleos físicos sin interferencia mutua, el procesador maximiza el throughput del pipeline.
+* **SMT en Hardware Real (3.94x):** Satura los 16 contextos de hardware alcanzando un rendimiento muy cercano a CMP ($1102.88\text{ ms}$ vs $1061.94\text{ ms}$).
+* **Coarse-Grained (3.42x) vs Fine-Grained Paralelo (2.77x):** Ambos modelos ejecutan exactamente 8 hilos en 8 núcleos de cómputo; sin embargo, la estrategia de particionamiento continuo en ráfagas de Coarse-Grained aventaja a Fine-Grained por **0.65x de speedup**, debido a factores de microarquitectura de memoria.
 
 ---
 
@@ -323,10 +336,10 @@ $$\text{IC}_{95\%} = \left[ \mu - ME_{95\%}, \; \mu + ME_{95\%} \right]$$
 ![Eficiencia Paralela](metricas/graficas/03_eficiencia_paralela.png)
 
 * **¿Por qué el modelo Secuencial tiene 100% por definición ($p=1$)?** 
-  La métrica de eficiencia paralela se define como $E = \frac{S}{p} \times 100\% = \frac{T_{sec}}{p \times T_{par}} \times 100\%$. Para el modelo secuencial ($p=1$ núcleo, $S=1.0$), no existen costos de sincronización, barreras ni contención de bus; por tanto, matemáticamente su eficiencia es $100\%$. Sin embargo, graficarlo junto a los sistemas paralelos suele generar confusión visual (parece indicar erróneamente que el secuencial "es superior", a pesar de tardar casi 4 segundos vs 700 ms). Por esta razón, la gráfica enfoca exclusivamente los **modelos concurrentes ($p \ge 8$)**.
-* **CMP es el modelo más eficiente de la arquitectura (66.9%):** Al mapear exactamente 1 hilo por núcleo físico, cada unidad de cómputo opera al máximo de su capacidad sin competir por registros de renombramiento, colas de carga/almacenamiento (*Load/Store Queues*) o cachés L1/L2 privadas.
-* **La paradoja de eficiencia en SMT:** A pesar de que SMT HW entrega el menor tiempo absoluto ($709.7\text{ ms}$), su eficiencia nominal por hilo es del **34.6%** ($5.54 / 16$). Esto ilustra que los 16 hilos lógicos no corresponden a 16 núcleos físicos independientes, sino a 8 núcleos compartiendo el ancho de banda del pipeline. La duplicación de hilos aportó un $3.5\%$ de reducción temporal sobre CMP a cambio de duplicar los recursos lógicos gestionados.
-* **Fine-Grained Cooperativo (12.4%):** Al repartir el trabajo en 8 tareas lógicas pero ejecutarse secuencialmente en un único procesador, el speedup es 1.0x, lo que divide su aprovechamiento por 8 hilos resultando en un magro 12.4%.
+  La métrica de eficiencia paralela se define como $E = \frac{S}{p} \times 100 = \frac{T_{\text{sec}}}{p \times T_{\text{par}}} \times 100$\%. Para el modelo secuencial ($p=1$ núcleo, $S=1.0$), no existen costos de sincronización, barreras ni contención de bus; por tanto, matemáticamente su eficiencia es del 100%. Sin embargo, graficarlo junto a los sistemas paralelos suele generar confusión visual (parece indicar erróneamente que el secuencial "es superior", a pesar de tardar más de 4.3 segundos vs 1.06 segundos). Por esta razón, la gráfica enfoca exclusivamente los **modelos concurrentes ($p \ge 8$)**.
+* **CMP es el modelo más eficiente de la arquitectura (51.1%):** Al mapear exactamente 1 hilo por núcleo físico, cada unidad de cómputo opera al máximo de su capacidad sin competir por colas de ejecución o cachés privadas L1/L2.
+* **La paradoja de eficiencia en SMT:** A pesar de que SMT HW entrega un tiempo comparable al de CMP ($1102.88\text{ ms}$), su eficiencia nominal por hilo es del **24.6%** ($3.94 / 16$). Esto ilustra que los 16 hilos lógicos no corresponden a 16 núcleos físicos independientes, sino a 8 núcleos compartiendo el ancho de banda del pipeline.
+* **Fine-Grained Cooperativo (12.1%):** Al repartir el trabajo en 8 tareas lógicas pero ejecutarse secuencialmente en un único procesador, el speedup es ~1.0x, lo que divide su aprovechamiento por 8 tareas resultando en un magro 12.1%.
 
 ---
 
@@ -350,21 +363,27 @@ El objetivo es aislar y contrastar los fenómenos de bajo nivel entre los modelo
 
 #### 1. Instrucciones por Ciclo (IPC)
 
-$$\text{IPC} = \frac{\text{Instrucciones Retiradas}}{\text{Ciclos Totales}}$$
+$$
+\text{IPC} = \frac{\text{Instrucciones Retiradas}}{\text{Ciclos Totales}}
+$$
 
 Mide la eficiencia con la que el procesador mantiene llenos sus puertos de ejecución (*Execution Ports*) superescalares y evita paradas (*stalls*). En SMT, la duplicación de hilos por núcleo físico permite rellenar las burbujas del pipeline cuando un hilo espera datos de memoria, incrementando el rendimiento global por núcleo físico frente al secuencial.
 
 #### 2. Nivel de Concurrencia y Saturación de CPU
 
-$$\text{CPUs Efectivas} = \frac{\text{task-clock (ms)}}{\text{tiempo real transcurrido (ms)}}$$
+$$
+\text{CPUs Efectivas} = \frac{\text{task-clock (ms)}}{\text{tiempo real transcurrido (ms)}}
+$$
 
-Cuantifica cuántos núcleos o hilos lógicos de hardware estuvieron trabajando en paralelo de forma simultánea. Mientras el modelo Secuencial y Fine Cooperativo registran $\approx 1.0$ CPU activa (ejecución puramente serializada), CMP escala a $\approx 6.0$ núcleos físicos y SMT satura hasta $\approx 9.8$ contextos lógicos de hardware.
+Cuantifica cuántos núcleos o hilos lógicos de hardware estuvieron trabajando en paralelo de forma simultánea. Mientras el modelo Secuencial y Fine Cooperativo registran $\approx 1.0$ CPU activa (ejecución puramente serializada), CMP escala a $\approx 5.9$ núcleos físicos y SMT satura hasta $\approx 9.6$ contextos lógicos de hardware.
 
 #### 3. Comportamiento de la Jerarquía de Caché
 
-$$\text{Tasa de Fallos de Caché} = \left( \frac{\text{cache-misses}}{\text{cache-references}} \right) \times 100\%$$
+$$
+\text{Tasa de Fallos de Caché} = \left( \frac{\text{cache-misses}}{\text{cache-references}} \right) \times 100
+$$
 
-Explica empíricamente la disparidad de rendimiento observada entre **Coarse-Grained** y **Fine-Grained Cíclico**: ambos ejecutan 8 hilos en 8 núcleos, pero el acceso intercalado fila por fila de Fine-Grained fragmenta el trabajo del *hardware prefetcher* y desata invalidaciones de coherencia en los protocolos MESI/MOESI en los límites de cada línea de caché de 64 bytes (*false sharing / halo bouncing*). En las mediciones de hardware, la tasa de fallos de caché se dispara al **$22.75\%$** en Fine-Grained Cíclico frente a solo **$5.48\%$** en Coarse-Grained.
+Explica empíricamente la disparidad de rendimiento observada entre **Coarse-Grained** y **Fine-Grained Cíclico**: ambos ejecutan 8 hilos en 8 núcleos, pero el acceso intercalado fila por fila de Fine-Grained fragmenta el trabajo del *hardware prefetcher* y desata invalidaciones de coherencia en los protocolos MESI/MOESI en los límites de cada línea de caché de 64 bytes (*false sharing / halo bouncing*). En las mediciones de hardware, la tasa de fallos de caché se dispara al **22.75%** en Fine-Grained Cíclico frente a solo **5.48%** en Coarse-Grained.
 
 #### 4. Sobrecarga de Sistema Operativo y Conmutaciones
 Mide los cambios de contexto del kernel (`context-switches`) y migraciones entre núcleos (`cpu-migrations`), contrastando el entrelazado por hardware de SMT (conmutación en silicio a cero ciclos de software) frente a las barreras de sincronización inter-paso.
@@ -373,14 +392,15 @@ Mide los cambios de contexto del kernel (`context-switches`) y migraciones entre
 
 ### Resultados Empíricos de Contadores de Hardware (PMU)
 
-| Modelo de Ejecución | Tiempo Real (s) | Giga-Ciclos | IPC | CPUs Efectivas | Cache Miss Rate (%) | Cambios de Contexto |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Secuencial** | 4.03 | 18.47 G | **2.64** | 1.0 | **1.45%** | 61 |
-| **CMP (8 Cores)** | **0.85** | 21.14 G | 2.36 | 6.0 | 4.58% | 111,111 |
-| **SMT (HW Real - 16 Hilos)** | 1.00 | 35.82 G | 1.43 | **9.8** | 7.29% | 237,339 |
-| **Coarse-Grained (8 Hilos)** | 1.08 | 25.28 G | 1.98 | 5.7 | 5.48% | 111,689 |
-| **Fine-Grained (Cooperativo)** | 4.08 | 18.68 G | 2.65 | 1.0 | 1.97% | 121 |
-| **Fine-Grained (Paralelo Cíclico)** | 1.45 | 34.08 G | 1.51 | 6.1 | **22.75%** | 109,746 |
+| Modelo de Ejecución | Modo | Hilos | Giga-Ciclos | IPC | Fallos L1-D (%) | Fallos LLC/L3 (%) | Cambios de Contexto |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Secuencial** | `baseline` | 1 | 18.19 G | **2.68** | 6.22% | **1.31%** | 64 |
+| **CMP (8 Cores)** | `dedicated_cores` | 8 | 20.77 G | 2.40 | 6.50% | 4.17% | 111,163 |
+| **SMT (HW Real - 16 Hilos)** | `hardware_smt` | 16 | 35.55 G | 1.44 | 9.77% | 7.01% | 237,235 |
+| **SMT (Sobre-suscripción SW)** | `software_oversubscription` | 16 | 35.67 G | 1.43 | 9.78% | 7.69% | 237,284 |
+| **Coarse-Grained (8 Hilos)** | `burst_block` | 8 | 23.51 G | 2.12 | 6.95% | 4.59% | 111,724 |
+| **Fine-Grained (Paralelo Cíclico)** | `cyclic_threads` | 8 | 30.75 G | 1.68 | 15.86% | **22.35%** | 105,698 |
+| **Fine-Grained (Cooperativo)** | `cooperative_quantum` | 8 | 18.24 G | 2.72 | 6.18% | 1.51% | 41 |
 
 ---
 
@@ -414,65 +434,82 @@ En cumplimiento con la **Métrica (d) de la Página 3** del enunciado oficial (*
 
 En la **escalabilidad fuerte (*Strong Scaling*)**, el tamaño global del problema computacional se mantiene estrictamente fijo ($N = 512 \times 512$, $16{,}000$ pasos temporales) mientras se incrementa la cantidad de hilos de cómputo:
 
-$$p \in \{1, 2, 4, 8, 16\}$$
+$$
+p \in \{1, 2, 4, 8, 16\}
+$$
 
-El objetivo es cuantificar la ganancia de velocidad $S(p) = \frac{T_{seq}}{T(p)}$ y la pérdida progresiva de eficiencia $E(p) = \frac{S(p)}{p} \times 100\%$ al contrastarlo contra dos modelos de referencia:
+El objetivo es cuantificar la ganancia de velocidad $S(p) = \frac{T_{\text{seq}}}{T(p)}$ y la pérdida progresiva de eficiencia $E(p) = \frac{S(p)}{p} \times 100$\% al contrastarlo contra dos modelos de referencia:
 
 #### 1. Aceleración Lineal Ideal
-$$S_{ideal}(p) = p$$
+
+$$
+S_{\text{ideal}}(p) = p
+$$
+
 Representa el límite superior teórico donde no existe sobrecarga de comunicación, contención de memoria ni serialización.
 
 #### 2. Ley de Amdahl
-$$S_{Amdahl}(p) = \frac{1}{(1 - f) + \frac{f}{p}}$$
+
+$$
+S_{\text{Amdahl}}(p) = \frac{1}{(1 - f) + \frac{f}{p}}
+$$
+
 donde $f \approx 0.98$ representa la fracción paralelizable del núcleo matemático de reacción-difusión en 2D, y $(1 - f) \approx 0.02$ modela la fracción inherentemente secuencial (inicialización de memoria, cálculo de bordes constantes y barreras globales de sincronización).
 
 ---
 
-### Resultados Empíricos de Escalabilidad Fuerte
+### Resultados Empíricos de Escalabilidad Fuerte ($N = 200$ corridas por punto experimental)
 
-A continuación se presentan los resultados obtenidos promediando las corridas para cada configuración sobre el procesador AMD Ryzen (8 núcleos físicos / 16 hilos lógicos):
+A continuación se presentan los resultados consolidados de la campaña de escalabilidad fuerte sobre el procesador AMD Ryzen (8 núcleos físicos / 16 hilos lógicos), idénticos a los representados en la figura científica `04_escalabilidad_hilos.png`:
 
-| Modelo | Hilos ($p$) | Tiempo Medio (ms) | Mediana (ms) | StdDev (ms) | Speedup $S(p)$ | Eficiencia $E(p)$ | Amdahl Teórico ($f=98\%$) | Lineal Ideal |
+| Modelo | Hilos ($p$) | Corridas | Tiempo Medio (ms) | StdDev (ms) | Speedup $S(p)$ | Eficiencia $E(p)$ | Amdahl Teórico ($f = 0.98$) | Lineal Ideal |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **CMP** | 1 | 3910.68 | 3887.73 | 75.02 | **1.00x** | 99.5% | 1.00x | 1x |
-| **CMP** | 2 | 2119.47 | 2065.81 | 98.34 | **1.84x** | 91.8% | 1.96x | 2x |
-| **CMP** | 4 | 1271.96 | 1231.03 | 61.76 | **3.06x** | 76.5% | 3.77x | 4x |
-| **CMP** | 8 | 739.74 | 730.78 | 32.81 | **5.26x** | **65.8%** | 7.02x | 8x |
-| **CMP** | 16 | 862.40 | 777.49 | 189.17 | 4.51x | 28.2% | 12.31x | 16x |
-| **SMT (HW Real)** | 1 | 3884.47 | 3898.20 | 40.38 | **1.00x** | 100.2% | 1.00x | 1x |
-| **SMT (HW Real)** | 2 | 2072.16 | 2066.17 | 50.62 | **1.88x** | 93.9% | 1.96x | 2x |
-| **SMT (HW Real)** | 4 | 1234.35 | 1222.97 | 18.73 | **3.15x** | 78.8% | 3.77x | 4x |
-| **SMT (HW Real)** | 8 | 1045.01 | 1009.32 | 186.30 | **3.72x** | 46.5% | 7.02x | 8x |
-| **SMT (HW Real)** | 16 | 846.28 | 772.87 | 256.96 | 4.60x | 28.7% | 12.31x | 16x |
-| **Coarse-Grained** | 1 | 3909.50 | 3888.79 | 42.42 | **1.00x** | 99.5% | 1.00x | 1x |
-| **Coarse-Grained** | 2 | 2026.33 | 2008.27 | 42.30 | **1.92x** | 96.0% | 1.96x | 2x |
-| **Coarse-Grained** | 4 | 1310.75 | 1318.40 | 20.50 | **2.97x** | 74.2% | 3.77x | 4x |
-| **Coarse-Grained** | 8 | 863.25 | 855.21 | 26.20 | **4.51x** | 56.4% | 7.02x | 8x |
-| **Coarse-Grained** | 16 | 722.48 | 718.42 | 17.38 | **5.39x** | 33.7% | 12.31x | 16x |
-| **Fine-Grained (Cíclico)** | 1 | 3946.44 | 3948.35 | 12.88 | **0.99x** | 98.6% | 1.00x | 1x |
-| **Fine-Grained (Cíclico)** | 2 | 2533.82 | 2516.73 | 43.26 | **1.54x** | 76.8% | 1.96x | 2x |
-| **Fine-Grained (Cíclico)** | 4 | 1567.42 | 1568.18 | 7.50 | **2.48x** | 62.1% | 3.77x | 4x |
-| **Fine-Grained (Cíclico)** | 8 | 1155.83 | 1120.77 | 54.69 | **3.37x** | 42.1% | 7.02x | 8x |
-| **Fine-Grained (Cíclico)** | 16 | 951.27 | 946.43 | 8.53 | **4.09x** | 25.6% | 12.31x | 16x |
+| **Secuencial (Baseline)** | 1 | 200 | 4627.55 | 133.21 | **1.00x** | 100.0% | 1.00x | 1x |
+| **CMP** | 1 | 200 | 4442.38 | 78.52 | **1.04x** | 104.2% | 1.00x | 1x |
+| **CMP** | 2 | 200 | 2472.78 | 46.94 | **1.87x** | 93.6% | 1.96x | 2x |
+| **CMP** | 4 | 200 | 1678.72 | 26.43 | **2.76x** | 68.9% | 3.77x | 4x |
+| **CMP** | 8 | 200 | 1069.16 | 16.21 | **4.33x** | **54.1%** | 7.02x | 8x |
+| **CMP** | 16 | 200 | 1032.05 | 15.35 | **4.48x** | 28.0% | 12.31x | 16x |
+| **SMT (HW Real)** | 1 | 200 | 4538.24 | 118.39 | **1.02x** | 102.0% | 1.00x | 1x |
+| **SMT (HW Real)** | 2 | 200 | 3880.36 | 40.97 | **1.19x** | 59.6% | 1.96x | 2x |
+| **SMT (HW Real)** | 4 | 200 | 2256.43 | 26.20 | **2.05x** | 51.3% | 3.77x | 4x |
+| **SMT (HW Real)** | 8 | 200 | 1441.62 | 23.80 | **3.21x** | 40.1% | 7.02x | 8x |
+| **SMT (HW Real)** | 16 | 200 | 952.08 | 21.93 | **4.86x** | 30.4% | 12.31x | 16x |
+| **Coarse-Grained** | 1 | 200 | 4283.26 | 125.86 | **1.08x** | 108.0% | 1.00x | 1x |
+| **Coarse-Grained** | 2 | 200 | 2328.62 | 69.14 | **1.99x** | 99.4% | 1.96x | 2x |
+| **Coarse-Grained** | 4 | 200 | 1550.67 | 37.80 | **2.98x** | 74.6% | 3.77x | 4x |
+| **Coarse-Grained** | 8 | 200 | 1102.20 | 35.25 | **4.20x** | 52.5% | 7.02x | 8x |
+| **Coarse-Grained** | 16 | 200 | 985.14 | 18.50 | **4.70x** | 29.4% | 12.31x | 16x |
+| **Fine-Grained (Cíclico)** | 1 | 200 | 4104.33 | 55.86 | **1.13x** | 112.7% | 1.00x | 1x |
+| **Fine-Grained (Cíclico)** | 2 | 200 | 2818.64 | 54.03 | **1.64x** | 82.1% | 1.96x | 2x |
+| **Fine-Grained (Cíclico)** | 4 | 200 | 1918.63 | 48.41 | **2.41x** | 60.3% | 3.77x | 4x |
+| **Fine-Grained (Cíclico)** | 8 | 200 | 1402.08 | 30.75 | **3.30x** | 41.3% | 7.02x | 8x |
+| **Fine-Grained (Cíclico)** | 16 | 200 | 1384.16 | 22.95 | **3.34x** | 20.9% | 12.31x | 16x |
 
 ---
 
-### Análisis Microarquitectónico de las Curvas
+### Análisis Microarquitectónico de las Curvas de Escalabilidad
 
-#### 1. Régimen de Alta Eficiencia ($p = 1 \to 4$)
-En la transición de $1$ a $4$ hilos, tanto CMP como SMT y Coarse-Grained escalan de forma casi perfecta siguiendo la curva teórica de Amdahl:
-* A $p = 2$ hilos, la aceleración es de $\approx 1.95\text{x} - 1.98\text{x}$ con eficiencias superiores al $97\%$.
-* A $p = 4$ hilos, la aceleración alcanza $\approx 3.31\text{x}$ con una eficiencia del $82.8\%$. En este régimen, los canales de memoria del procesador pueden suplir el tráfico de datos sin saturación severa.
+#### 1. Régimen de Escalabilidad Casi Lineal ($p = 1 \to 2$)
+En la transición de $1$ a $2$ hilos:
+* **Coarse-Grained:** Logra una aceleración casi perfecta de $\mathbf{1.99x}$ (eficiencia del 99.4%), escalando prácticamente sobre la línea de Amdahl ($1.96\text{x}$).
+* **CMP:** Alcanza $\mathbf{1.87x}$ de speedup con una eficiencia del 93.6%.
+* En este régimen inicial con solo 2 hilos activos, el bus de memoria y el bus Infinity Fabric manejan el tráfico de lectura y escritura del stencil sin saturación, permitiendo que la paralelización sea sumamente eficiente.
 
-#### 2. Punto de Inflexión en $p = 8$ (Límite Físico del Procesador)
-A $p = 8$ hilos, CMP y SMT alcanzan su máximo rendimiento práctico con un speedup de $\mathbf{5.46x}$ y $\mathbf{5.53x}$ respectivamente:
-* La brecha entre el speedup real ($5.5\text{x}$) y el speedup ideal ($8\text{x}$) ilustra la naturaleza limitada por memoria (*memory-bound*) del stencil en 2D: al tener 8 núcleos computando simultáneamente, la contención en el bus Infinity Fabric y el ancho de banda a la memoria principal imponen un techo de rendimiento antes de agotar la capacidad computacional de las ALUs.
+#### 2. Régimen Intermedio y Contención de Memoria ($p = 4 \to 8$)
+Al pasar a $4$ y luego a $8$ hilos:
+* A $p = 4$, Coarse-Grained ($2.98\text{x}$, ef. 74.6%) y CMP ($2.76\text{x}$, ef. 68.9%) lideran, pero la curva empieza a despegarse del límite lineal ($4\text{x}$) debido al fenómeno *memory-bound* inherente al stencil en 2D.
+* A $p = 8$ hilos (saturación de todos los núcleos físicos del Ryzen):
+  * **CMP:** Alcanza $\mathbf{4.33x}$ de speedup ($1069.16\text{ ms}$, eficiencia del 54.1%), aprovechando al máximo la asignación dedicada de 1 hilo por núcleo.
+  * **Coarse-Grained:** Muy cercano con $\mathbf{4.20x}$ ($1102.20\text{ ms}$, eficiencia del 52.5%).
+  * **Fine-Grained Cíclico:** Alcanza solo $\mathbf{3.30x}$ ($1402.08\text{ ms}$, ef. 41.3%), rezagándose debido al salto intercalado entre filas que fragmenta el *streaming* del prefetcher de hardware.
 
-#### 3. Comportamiento en Sobre-suscripción ($p = 16$ hilos)
-Al incrementar a $p = 16$ hilos sobre una máquina de 8 núcleos físicos:
-* **CMP:** El speedup se reduce ligeramente de $5.46\text{x}$ a $4.99\text{x}$ (la eficiencia cae a $31.2\%$), evidenciando que sobre-suscribir núcleos físicos con hilos de afinidad forzada genera latencia adicional por conmutaciones de contexto del planificador del sistema operativo.
-* **SMT:** Logra mantener un tiempo cercano al óptimo ($778.5\text{ ms}$, mediana $699.9\text{ ms}$), demostrando que la conmutación a nivel de pipeline de hardware minimiza las paradas causadas por lecturas de memoria diferidas.
-* **Fine-Grained Cíclico:** Muestra consistentemente la peor curva de escalabilidad de todos los modelos en todos los valores de $p$ (apenas $3.99\text{x}$ en 16 hilos y $24.9\%$ de eficiencia), validando el impacto destructivo del *false sharing* y la alta tasa de fallos de caché ($22.75\%$) documentada en la sección de perfilado con `perf`.
+#### 3. Comportamiento en Saturación y SMT Máximo ($p = 16$ hilos)
+Al desplegar los 16 hilos sobre el sistema:
+* **SMT (HW Real):** Se posiciona como el modelo más rápido con $\mathbf{4.86x}$ de speedup y una media de apenas $\mathbf{952.08\text{ ms}}$ (eficiencia del 30.4%). Disponer de 2 hilos lógicos por núcleo físico permite ocultar las latencias de lectura en memoria cuando un hilo se bloquea en la espera de datos del stencil.
+* **Coarse-Grained:** Continúa escalando hasta $\mathbf{4.70x}$ ($985.14\text{ ms}$).
+* **CMP:** Se estabiliza en $\mathbf{4.48x}$ ($1032.05\text{ ms}$).
+* **Fine-Grained Cíclico:** Se estanca por completo en $\mathbf{3.34x}$ ($1384.16\text{ ms}$), con una ganancia insignificante entre 8 y 16 hilos ($3.30\text{x} \to 3.34\text{x}$), confirmando que las invalidaciones continuas en las líneas de caché de 64 bytes (*false sharing*) impiden que este modelo aproveche los núcleos adicionales.
 
 ---
 
