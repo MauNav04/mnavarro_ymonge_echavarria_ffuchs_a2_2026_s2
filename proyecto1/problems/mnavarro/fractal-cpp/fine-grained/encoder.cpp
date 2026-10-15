@@ -32,7 +32,8 @@ class Scheduler {
     std::vector<Team> teams;
     std::vector<Worker> workers;
     pthread_mutex_t mutex;
-    pthread_cond_t changed;
+    // Tamaño fijo: una condición por trabajador; nunca se copian ni se redimensionan.
+    std::vector<pthread_cond_t> turn_conditions;
     bool started=false, stopped=false;
     std::size_t turn=0;
     std::exception_ptr failure;
@@ -57,6 +58,16 @@ class Scheduler {
             if(workers[next].ready) {turn=next; return true;}
         }
         return false;
+    }
+    void wake_all() noexcept {
+        // Solo para terminar/cancelar: liberar incluso a trabajadores inactivos antes de join.
+        for(auto& condition:turn_conditions) pthread_cond_signal(&condition);
+    }
+    void notify_turn(std::size_t current) {
+        if(stopped) wake_all();
+        else if(turn!=current)
+            check(pthread_cond_signal(&turn_conditions[turn]),"pthread_cond_signal");
+        // Si el turno continúa en este hilo, ya está ejecutándose: no hace falta despertarlo.
     }
     void quantum(std::size_t id) {
         auto& worker=workers[id];
@@ -92,15 +103,15 @@ class Scheduler {
         try {
             while(!scheduler.stopped) {
                 while(!scheduler.stopped && (!scheduler.started || scheduler.turn!=context.id))
-                    check(pthread_cond_wait(&scheduler.changed,&scheduler.mutex),"pthread_cond_wait");
+                    check(pthread_cond_wait(&scheduler.turn_conditions[context.id],&scheduler.mutex),"pthread_cond_wait");
                 if(scheduler.stopped) break;
                 scheduler.quantum(context.id);
-                check(pthread_cond_broadcast(&scheduler.changed),"pthread_cond_broadcast");
+                scheduler.notify_turn(context.id);
             }
         } catch(...) {
             scheduler.failure=std::current_exception();
             scheduler.stopped=true;
-            pthread_cond_broadcast(&scheduler.changed);
+            scheduler.wake_all();
         }
         if(pthread_mutex_unlock(&scheduler.mutex)!=0) std::terminate();
         return nullptr;
@@ -109,7 +120,7 @@ public:
     Scheduler(const Image& a, Config config, const ExecutionConfig& e, std::size_t c)
         : image(a), problem(prepare_encoding(a,config)), execution(e), channel(c),
           result{a.width,a.height,config.range,{}}, teams(e.teams),
-          workers(e.teams*e.threads_per_team) {
+          workers(e.teams*e.threads_per_team), turn_conditions(workers.size()) {
         result.rules.resize(problem.range_count());
         for(std::size_t team=0;team<e.teams;++team) {
             teams[team]={boundary(team,problem.range_count(),e.teams),
@@ -123,10 +134,20 @@ public:
             reset_team(team);
         }
         check(pthread_mutex_init(&mutex,nullptr),"pthread_mutex_init");
-        const int status=pthread_cond_init(&changed,nullptr);
-        if(status) {pthread_mutex_destroy(&mutex); check(status,"pthread_cond_init");}
+        for(std::size_t id=0;id<turn_conditions.size();++id) {
+            const int status=pthread_cond_init(&turn_conditions[id],nullptr);
+            if(status) {
+                for(std::size_t initialized=0;initialized<id;++initialized)
+                    pthread_cond_destroy(&turn_conditions[initialized]);
+                pthread_mutex_destroy(&mutex);
+                check(status,"pthread_cond_init");
+            }
+        }
     }
-    ~Scheduler() {pthread_cond_destroy(&changed); pthread_mutex_destroy(&mutex);}
+    ~Scheduler() {
+        for(auto& condition:turn_conditions) pthread_cond_destroy(&condition);
+        pthread_mutex_destroy(&mutex);
+    }
     Scheduler(const Scheduler&)=delete;
     Scheduler& operator=(const Scheduler&)=delete;
     Encoded run() {
@@ -144,7 +165,14 @@ public:
         if(pthread_mutex_lock(&mutex)!=0) std::terminate();
         started=true;
         stopped=creation_error!=0 || !select_next(workers.size()-1);
-        pthread_cond_broadcast(&changed);
+        try {
+            // El predicado bajo mutex evita perder el turno si el elegido aún no esperaba.
+            notify_turn(workers.size());
+        } catch(...) {
+            failure=std::current_exception();
+            stopped=true;
+            wake_all();
+        }
         if(pthread_mutex_unlock(&mutex)!=0) std::terminate();
         for(std::size_t id=0;id<created;++id) {
             // Con hilos joinables propios y una única reunión, un error es una invariante rota.

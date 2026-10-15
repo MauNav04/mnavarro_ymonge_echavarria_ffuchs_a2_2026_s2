@@ -29,7 +29,14 @@ la compresión, las reglas, los formatos FRC1/FRC2 o el orden de desempate secue
 
 El mutex protege estados de equipos, turno, resultados y traza y se mantiene durante el
 cuantum: **solo un trabajador realiza búsqueda a la vez**. `pthread_cond_wait` libera el
-mutex y bloquea, sin espera activa. La barrera del equipo se expresa mediante su contador
+mutex y bloquea, sin espera activa. Cada trabajador tiene una condición propia: después
+de elegir el siguiente turno se utiliza `pthread_cond_signal` únicamente sobre esa condición.
+Si continúa el mismo trabajador, no se envía una señal. La apertura inicial también avisa
+solo al elegido; el predicado bajo mutex evita perder un turno si el hilo todavía no esperaba.
+Al finalizar o ante un error se señalan todas las condiciones para permitir los joins,
+incluidos miembros sin dominios y equipos terminados. Las condiciones se inicializan antes
+de crear hilos y se destruyen después de reunirlos; la inicialización parcial libera sus recursos.
+La barrera del equipo se expresa mediante su contador
 de miembros pendientes; no se usa una barrera bloqueante que pudiera retener el turno.
 Los canales se procesan en orden, con un planificador por canal.
 
@@ -75,7 +82,7 @@ La reconstrucción permanece secuencial: usar `fractal_seq decompress`.
 Reproduce el protocolo desde la traza para comprobar orden circular, cobertura sin huecos,
 cuantums acotados y finalización de cada equipo antes de cambiar de range. Incluye constantes
 con empates, patrones rectangulares, particiones desiguales, intervalos vacíos, más equipos que
-ranges, 1×1, 1×3, 5×2 y 7×4 trabajadores, Q=1/2/100 y tres canales.
+ranges, 1×1, 1×3, 5×2, 6×4 y 7×4 trabajadores, Q=1/2/100 y tres canales.
 
 `cli_tests` compara FRC de gris/RGB para 5×2 trabajadores y Q=1/3/100, comprueba las trazas,
 reconstrucción y rechazo de cuantums inválidos y rutas de traza que colisionen con entrada/salida.

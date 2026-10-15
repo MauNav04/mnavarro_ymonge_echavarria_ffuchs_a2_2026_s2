@@ -162,6 +162,11 @@ Pruebas y equivalencia registradas en el historial.
 
 **Aceptación:** Resultados de profiling organizados y comparables.
 
+### Backlog
+
+- [ ] Se quiere crear versiones de cada modelo para descomprimir.
+- [ ] 
+
 ## 5. Metodología experimental
 
 Todas las implementaciones deben utilizar entradas y condiciones de trabajo equivalentes.
@@ -202,6 +207,10 @@ mkdir -p sequential/examples/results
 ./build/fractal_seq compress sequential/examples/color128.png sequential/examples/results/color.frc --teams 1 --threads-per-team 1 --range 8 --stride 8
 ./build/fractal_seq decompress sequential/examples/results/color.frc sequential/examples/results/color.png --iterations 80
 ./build/fractal_seq compare sequential/examples/color128.png sequential/examples/results/color.png
+```
+Rebuild de un directirio/modo específico.
+```
+cmake --build build --target fractal_fine -j2
 ```
 
 Fine-Grained, con 10 trabajadores organizados en 5 equipos de 2:
@@ -269,6 +278,12 @@ Cada decisión debe incluir:
 - Se conserva el diseño de equipos por range y se reducen los mínimos antes de publicar.
   Decodificación secuencial; las trazas registran turnos de software, no ciclos de hardware
   ni cambios de contexto del SO. Ver [docs/fine_grained.md](docs/fine_grained.md).
+
+**Mejora autorizada — 2026-10-15:**
+
+- Fine-Grained emplea una condición por trabajador y notifica únicamente al próximo turno.
+  Solo al finalizar o cancelar se señalan todas las condiciones para reunir los hilos.
+  Se mantiene el Round-Robin global, los cuantums y la reducción de mínimos por equipo.
 
 **Decisiones iniciales:**
 
@@ -417,3 +432,36 @@ Mantener este historial breve. Git conserva el historial detallado de modificaci
   Artefactos: `/tmp/fractal-split-check-frop1mgw/`.
 - Actualizados comandos actuales y reglas; se conservan los registros históricos.
   Etapas 1 y 2 completas; etapas 3–8 y la comprobación adicional con TSan siguen pendientes.
+
+### 2026-10-15 — Fine-Grained — Despertar únicamente al próximo trabajador
+
+- Completado: condición propia por trabajador y `pthread_cond_signal` dirigido al turno
+  seleccionado, tanto al iniciar como al ceder. Si el turno permanece en el mismo hilo,
+  no se envía señal. Se elimina `pthread_cond_broadcast` del planificador.
+- Finalización y errores: se señalan todas las condiciones para permitir los joins de
+  trabajadores activos, inactivos y todavía no bloqueados. Inicialización parcial y
+  destrucción de condiciones con liberación de los recursos correspondientes.
+- Se conservan el Round-Robin global, la búsqueda, los cuantums y los mínimos por equipo.
+  La prueba incorpora 6×4 trabajadores: 60 configuraciones mono y un caso RGB, incluidos
+  un solo trabajador, dominios vacíos y equipos sin ranges.
+- Validación: `cmake -S . -B /tmp/fractal-wakeup-after-20261015 -DCMAKE_BUILD_TYPE=Release -DBUILD_APP=ON`,
+  `cmake --build /tmp/fractal-wakeup-after-20261015 -j2` y
+  `ctest --test-dir /tmp/fractal-wakeup-after-20261015 --output-on-failure`: **6/6 aprobadas**.
+- Diagnóstico puntual local en WSL2, una ejecución por variante, sin traza: `color128.png`,
+  range=8, stride=8, 6 equipos × 4 hilos, Q=2. Tiempo de codificación sin E/S:
+
+  | Variante | Segundos |
+  |---|---:|
+  | Fine-Grained anterior (broadcast) | 35.7465 |
+  | Fine-Grained con señal dirigida | 5.12334 |
+  | Secuencial | 0.593602 |
+
+  Los tres FRC coinciden byte por byte (13080 bytes). Es una comprobación de la mejora,
+  no el benchmark estadístico de la etapa 7 ni una medición de multihilo por hardware.
+  Antes: `/tmp/fractal-wakeup-before-20261015`; después: `/tmp/fractal-wakeup-after-20261015`.
+- Traza antes/después idéntica en una imagen RGB 16×24, range=4, stride=3, 6×4 y Q=2.
+  Fallo de `pthread_create` inducido con `RLIMIT_AS=128 MiB` en el subproceso de prueba:
+  error propagado y proceso finalizado sin bloqueo dentro de un timeout de 15 segundos.
+  Artefactos: `/tmp/fractal-targeted-wakeup-rspz92do/`.
+- README y documentación actualizados. Pendientes: etapas 3–8 y comprobación adicional
+  con ThreadSanitizer ya registrada; no se implementó ninguna otra etapa.

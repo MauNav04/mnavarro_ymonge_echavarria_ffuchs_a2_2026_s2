@@ -71,7 +71,7 @@ int main() {
             for(fractal::Config codec: {fractal::Config{4,3},fractal::Config{8,16}}) {
                 const auto reference=fractal::encode(image,codec);
                 const auto problem=fractal::prepare_encoding(image,codec);
-                for(auto layout: {std::pair<std::size_t,std::size_t>{1,1},{1,3},{5,2},{7,4}}) {
+                for(auto layout: {std::pair<std::size_t,std::size_t>{1,1},{1,3},{5,2},{6,4},{7,4}}) {
                     for(std::size_t quantum: {1,2,100}) {
                         std::vector<fractal::ScheduleEvent> trace;
                         fractal::ExecutionConfig execution{fractal::Model::FineGrained,layout.first,layout.second,quantum,&trace};
