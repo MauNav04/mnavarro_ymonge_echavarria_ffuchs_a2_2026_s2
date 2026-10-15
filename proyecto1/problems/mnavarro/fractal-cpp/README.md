@@ -5,8 +5,8 @@ Este README es la **única fuente de verdad del progreso, arquitectura y validac
 están en [AGENTS.md](AGENTS.md) y la guía académica de la versión base en
 [sequential/README.md](sequential/README.md).
 
-Alcance autorizado: **etapa 2**, con equipos de hilos por range como diseño aprobado.
-Las etapas 3–8 continúan pendientes y requieren solicitud explícita.
+Alcance autorizado: **etapa 3**, con equipos de hilos por range como diseño aprobado.
+Las etapas 4–8 continúan pendientes y requieren solicitud explícita.
 
 ## 1. Descripción del proyecto
 
@@ -60,7 +60,7 @@ su modelo; el núcleo continúa compartido en `fractal_codec`.
 |---|---|---|
 | Secuencial | `sequential/main.cpp` | `fractal_seq` |
 | Fine-Grained | `fine-grained/main.cpp` | `fractal_fine` |
-| Coarse-Grained (pendiente) | `coarse-grained/main.cpp` | `fractal_coarse` |
+| Coarse-Grained | `coarse-grained/main.cpp` | `fractal_coarse` |
 | CMP (pendiente) | `CMP/main.cpp` | `fractal_cmp` |
 | SMT (pendiente) | `SMT/main.cpp` | `fractal_smt` |
 
@@ -102,13 +102,13 @@ Pruebas y equivalencia registradas en el historial.
 
 ### Etapa 3 — Coarse-Grained
 
-- [ ] Implementar ejecución mediante pthreads.
-- [ ] Definir eventos de bloqueo o estancamiento.
-- [ ] Implementar la política de cambio ante estos eventos.
-- [ ] Evitar cambios periódicos incondicionales de Fine-Grained.
-- [ ] Validar resultados contra la versión secuencial.
+- [x] Implementar ejecución mediante pthreads.
+- [x] Definir eventos de bloqueo o estancamiento.
+- [x] Implementar la política de cambio ante estos eventos.
+- [x] Evitar cambios periódicos incondicionales de Fine-Grained.
+- [x] Validar resultados contra la versión secuencial.
 
-**Aceptación:** Política de ejecución documentada, comprobable y diferenciada de Fine-Grained.
+**Aceptación cumplida:** ráfagas con stall por estancamiento, reanudación sin perder candidatos y trazas que verifican la política; resultados idénticos a la base. Ver [docs/coarse_grained.md](docs/coarse_grained.md).
 
 ### Etapa 4 — CMP
 
@@ -227,21 +227,36 @@ Agregar `--trace-schedule fine-grained/results/schedule.csv` a `compress` o `com
 permite inspeccionar los turnos. Es una traza de software opcional, no un contador de hardware;
 registrarla añade tiempo y memoria. Ver [docs/fine_grained.md](docs/fine_grained.md).
 
+Coarse-Grained, con 5 equipos de 2 trabajadores:
+
+```bash
+cmake --build build --target fractal_coarse -j2
+mkdir -p coarse-grained/results
+./build/fractal_coarse compress sequential/examples/color128.png coarse-grained/results/color.frc --teams 5 --threads-per-team 2
+./build/fractal_seq decompress coarse-grained/results/color.frc coarse-grained/results/color.png --iterations 80
+./build/fractal_seq compare sequential/examples/color128.png coarse-grained/results/color.png
+```
+
+Agregar `--trace-schedule coarse-grained/results/schedule.csv` registra una fila por ráfaga,
+con la causa `stall` o `domain_complete`, la racha sin mejora y su umbral. Se rechaza
+`--quantum-domains`: las cesiones dependen de los datos y de la finalización del intervalo.
+Ver [docs/coarse_grained.md](docs/coarse_grained.md) para la definición y ejemplos del evento.
+
 Se conservan los argumentos posicionales originales (`compress entrada salida 8 8` y
 `decompress entrada salida 80`), el modo gris (`compress-gray`, `compare-gray`). Por compatibilidad, `--model` es opcional
 y solo acepta el modelo del ejecutable (`sequential`/`secuencial` para `fractal_seq`,
-`fine-grained` para `fractal_fine`). Los modelos cruzados se rechazan.
+`fine-grained` para `fractal_fine`, `coarse-grained` para `fractal_coarse`). Los modelos cruzados se rechazan.
 Las opciones no se pueden repetir ni duplicar con argumentos posicionales.
 
 `--teams` y `--threads-per-team` describen la configuración común; para `sequential` deben valer 1.
-Fine-Grained está disponible para compresión; Coarse-Grained, CMP y SMT continúan pendientes.
-La reconstrucción se ejecuta mediante `fractal_seq decompress`; `fractal_fine` la rechaza.
+Fine-Grained y Coarse-Grained están disponibles para compresión; CMP y SMT continúan pendientes.
+La reconstrucción se ejecuta mediante `fractal_seq decompress`; `fractal_fine` y `fractal_coarse` la rechazan.
 No se aceptan opciones de ejecución en `compare` ni parámetros de compresión en `decompress`.
 
 También se puede configurar desde una carpeta de modelo con `cmake -S sequential -B build`
-o `cmake -S fine-grained -B build`. Ambos casos reutilizan las bibliotecas de la raíz.
+`cmake -S fine-grained -B build` o `cmake -S coarse-grained -B build`. Los tres casos reutilizan las bibliotecas de la raíz.
 Para construir un ejecutable específico, usar `cmake --build build --target fractal_seq`
-o `cmake --build build --target fractal_fine`.
+`cmake --build build --target fractal_fine` o `cmake --build build --target fractal_coarse`.
 `-DBUILD_APP=OFF` permite construir la biblioteca y pruebas sin OpenCV.
 CTest registra la prueba `cli_tests` cuando Python3 está disponible; no es dependencia de
 la biblioteca C++. Las pruebas del núcleo no requieren OpenCV ni Python.
@@ -285,6 +300,20 @@ Cada decisión debe incluir:
   Solo al finalizar o cancelar se señalan todas las condiciones para reunir los hilos.
   Se mantiene el Round-Robin global, los cuantums y la reducción de mínimos por equipo.
 
+**Etapa 3 — Evento de stall aprobado por el usuario — 2026-10-15:**
+
+- Stall: racha de dominios consecutivos que no mejoran estrictamente el menor error local
+  del hilo. Con D dominios asignados para ese range, se dispara en `floor(2*D/3)+1`.
+  Se cuenta después de evaluar las ocho simetrías; los empates no mejoran el mínimo.
+- El mínimo y la posición se conservan; la racha se reinicia al mejorar, al ceder por stall
+  o al comenzar otro range. Se reanuda sin descartar candidatos. Si termina el intervalo,
+  se registra finalización en lugar de stall aunque se alcance el umbral.
+- Es estancamiento de búsqueda simulado; no representa bloqueo físico de CPU/caché ni
+  implica que el mínimo actual sea malo. Puede ocurrir incluso con un mínimo perfecto.
+- Se reutilizan equipos y sincronización en `src/cooperative_encoder.cpp`. Fine-Grained
+  mantiene cesión periódica por cuantum; Coarse-Grained cede solo por evento o finalización.
+  Las condiciones siguen siendo individuales y únicamente se notifica al siguiente turno.
+
 **Decisiones iniciales:**
 
 - C++ como lenguaje de implementación.
@@ -303,14 +332,12 @@ Registrar problemas conocidos, tareas bloqueadas y validaciones que requieren in
   Las dos ejecuciones locales fallaron antes de iniciar la prueba con
   `FATAL: ThreadSanitizer: unexpected memory mapping`; no se afirma validación con TSan.
 
-- Implementar las etapas 3–8 únicamente cuando se soliciten explícitamente.
-- Confirmar eventos de stall antes de implementar Coarse-Grained.
+- Implementar las etapas 4–8 únicamente cuando se soliciten explícitamente.
 - La configuración secuencial rechaza varios equipos/hilos para evitar informar
-  paralelismo inexistente. `10 hilos = 5 equipos × 2` ya está disponible para Fine-Grained.
+  paralelismo inexistente. `10 hilos = 5 equipos × 2` ya está disponible para Fine-Grained y Coarse-Grained.
 
 
 - Confirmar topología física y lógica de la CPU.
-- Definir cómo se modelarán los stalls de Coarse-Grained.
 - Establecer configuraciones equivalentes de comparación.
 - Verificar los requisitos académicos adicionales de la especificación.
 
@@ -465,3 +492,45 @@ Mantener este historial breve. Git conserva el historial detallado de modificaci
   Artefactos: `/tmp/fractal-targeted-wakeup-rspz92do/`.
 - README y documentación actualizados. Pendientes: etapas 3–8 y comprobación adicional
   con ThreadSanitizer ya registrada; no se implementó ninguna otra etapa.
+
+
+### 2026-10-15 — Etapa 3 — Coarse-Grained completado
+
+- Nuevo modelo `coarse-grained/` con main pequeño, CMake y `fractal_coarse`, reutilizando
+  CLI/E/S y la búsqueda matemática. Cinco tareas de etapa 3 implementadas y validadas;
+  etapas 4–8 y reconstrucción concurrente del backlog continúan pendientes.
+- Política aprobada: racha estrictamente mayor a 2/3 de dominios locales sin mejorar;
+  ráfagas reanudables, sin omisiones ni cesiones periódicas. Traza con motivo y contadores.
+  Los nombres de todos los nuevos archivos y carpetas están en inglés.
+- Mecanismo de pthreads/equipos extraído a `src/cooperative_encoder.cpp` para compartir
+  inicialización, condiciones individuales, espera por mínimos, cancelación y joins.
+- Validación Release, GNU C++ 13.3.0 y OpenCV 4.6.0 en WSL2:
+
+  | Construcción | Resultado |
+  |---|---|
+  | `/tmp/fractal-stage3-release`, `BUILD_APP=ON` | 7/7 pruebas CTest aprobadas |
+  | `/tmp/fractal-stage3-core`, `BUILD_APP=OFF` | 5/5 pruebas CTest aprobadas |
+  | `/tmp/fractal-stage3-direct`, fuente `coarse-grained/` | Target `fractal_coarse` compilado; ayuda correcta |
+
+  Comandos: `cmake -S <fuente> -B <build> -DCMAKE_BUILD_TYPE=Release -DBUILD_APP=<ON/OFF>`,
+  `cmake --build <build> -j2`, `ctest --test-dir <build> --output-on-failure`.
+  Para la configuración directa se usó `cmake --build <build> --target fractal_coarse -j2`.
+- `coarse_grained_tests`: 30 casos monocanal más RGB, con 1×1, 1×3, 5×2, 7×4 y 1×23,
+  constantes y patrones, tres geometrías de búsqueda y asignaciones vacías/desiguales.
+  Verificó 1393 stalls y 2700 reinicios por mejora, umbral estricto, primera oportunidad
+  de cesión, reanudación, cobertura sin duplicados, espera del equipo y reglas exactas.
+  Los intervalos pequeños terminan sin stalls artificiales. Timeout CTest de 45 segundos.
+- CLI: FRC gris/RGB equivalentes a la base, trazas con motivos válidos, parámetros de
+  cuantum rechazados en Coarse-Grained, protección de entrada/salida y modelo fijo.
+- `color128.png`, range=8, stride=8, RGB y gris, equipos 1×1/5×2/7×4:
+  seis FRC y sus reconstrucciones de 80 iteraciones idénticos byte por byte al binario
+  secuencial previo `/tmp/fractal-stage3-baseline/fractal_seq`.
+  Fine-Grained conserva FRC y CSV de turnos idénticos antes/después de la extracción.
+  Artefactos: `/tmp/fractal-stage3-compare-nz3zembr/`.
+- Fallo de `pthread_create` inducido con límite de 128 MiB solo en el subproceso:
+  error propagado y salida controlada sin bloqueo (timeout de 15 segundos).
+  Enlaces de documentación y `git diff --check` verificados.
+- ThreadSanitizer continúa pendiente por su limitación de entorno ya registrada; no se
+  repitió ni se presenta como aprobado. No se ejecutaron benchmarks de hardware.
+- Próximo paso, solo bajo solicitud explícita: etapa 4 (CMP), previa verificación de
+  topología física y afinidad apropiada para el hardware disponible.

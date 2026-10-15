@@ -6,9 +6,13 @@
 
 namespace fractal {
 enum class Model { Sequential, FineGrained, CoarseGrained, CMP, SMT };
-// Un evento por cuantum realmente ejecutado; no representa un contador de hardware.
+enum class ScheduleReason { Quantum, Stall, DomainComplete };
+const char* schedule_reason_name(ScheduleReason reason);
+// Un evento por turno (cuantum o ráfaga); no es un contador de hardware.
 struct ScheduleEvent {
     std::size_t channel, worker, team, range, domain_begin, domain_end;
+    ScheduleReason reason = ScheduleReason::Quantum;
+    std::size_t stagnant_domains = 0, stall_threshold = 0;
 };
 struct ExecutionConfig {
     Model model = Model::Sequential;
@@ -20,7 +24,7 @@ struct ExecutionConfig {
 };
 Model parse_model(const std::string& name);
 const char* model_name(Model model);
-// Modelos disponibles: sequential y fine-grained (codificación cooperativa).
+// Codificación: sequential, fine-grained y coarse-grained; reconstrucción: sequential.
 void validate_execution(const ExecutionConfig& execution);
 Encoded execute_encode(const Image& image, Config config = {}, ExecutionConfig execution = {});
 MultiEncoded execute_encode(const MultiImage& image, Config config = {}, ExecutionConfig execution = {});
