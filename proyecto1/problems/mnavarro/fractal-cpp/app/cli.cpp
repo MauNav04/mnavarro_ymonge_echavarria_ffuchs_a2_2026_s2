@@ -29,7 +29,7 @@ void distinct(const char* in,const char* out) {
         throw std::invalid_argument("Entrada y salida deben ser archivos distintos.");
 }
 void usage(std::ostream& out, fractal::Model model) {
-    const char* binary=model==fractal::Model::Sequential?"fractal_seq":"fractal_fine";
+    const char* binary=model==fractal::Model::Sequential?"fractal_seq":(model==fractal::Model::FineGrained?"fractal_fine":"fractal_coarse");
     out<<"Uso:\n  "<<binary<<" compress entrada.png salida.frc [range=8] [stride=8]\n"
        <<"  "<<binary<<" compress-gray entrada.png salida.frc [range=8] [stride=8]\n";
     if(model==fractal::Model::Sequential)
@@ -40,6 +40,9 @@ void usage(std::ostream& out, fractal::Model model) {
        <<"Opciones compress/ compress-gray: --range N --stride N\n"
        <<"Equipos: --teams N --threads-per-team N\n"
        <<"Modelo fijo: "<<fractal::model_name(model)<<"\n";
+    if(model==fractal::Model::CoarseGrained)
+        out<<"Coarse-Grained: stall tras >2/3 de dominios locales consecutivos sin mejorar.\n"
+           <<"Diagnostico: --trace-schedule salida.csv. Reconstruccion: fractal_seq decompress.\n";
     if(model==fractal::Model::FineGrained)
         out<<"Fine-Grained: --quantum-domains N [--trace-schedule salida.csv]\n"
            <<"Reconstruccion: usar fractal_seq decompress.\n";
@@ -103,17 +106,20 @@ Options parse(int argc, char** argv, fractal::Model model) {
         throw std::invalid_argument("Iteraciones fuera de 1..10000.");
     if(options.execution.model!=model)
         throw std::invalid_argument(std::string("Este ejecutable solo admite el modelo ")+fractal::model_name(model));
-    if((seen.count("--quantum-domains") || seen.count("--trace-schedule")) &&
-       options.execution.model!=fractal::Model::FineGrained)
-        throw std::invalid_argument("Cuantum y traza requieren fine-grained.");
-    if(decompress && options.execution.model==fractal::Model::FineGrained)
-        throw std::invalid_argument("Decodificacion fine-grained no implementada; use sequential.");
+    if(seen.count("--quantum-domains") && model!=fractal::Model::FineGrained)
+        throw std::invalid_argument("Cuantum requiere fine-grained.");
+    if(seen.count("--trace-schedule") && model==fractal::Model::Sequential)
+        throw std::invalid_argument("Traza requiere fine-grained o coarse-grained.");
+    if(decompress && options.execution.model!=fractal::Model::Sequential)
+        throw std::invalid_argument(std::string("Decodificacion ")+fractal::model_name(model)+" no implementada; use sequential.");
     if(compress || decompress) fractal::validate_execution(options.execution);
     return options;
 }
 void report(const fractal::ExecutionConfig& execution) {
     std::cout<<"Modelo: "<<fractal::model_name(execution.model)
              <<"\nEquipos: "<<execution.teams<<"\nHilos por equipo: "<<execution.threads_per_team<<'\n';
+    if(execution.model==fractal::Model::CoarseGrained)
+        std::cout<<"Planificacion: rafagas cooperativas con stall simulado (>2/3 sin mejora)\n";
     if(execution.model==fractal::Model::FineGrained)
         std::cout<<"Planificacion: Round-Robin cooperativo (software)\nCuantum: "
                  <<execution.quantum_domains<<" dominio(s)\n";
@@ -144,13 +150,20 @@ int fractal::app::run(int argc,char** argv, Model model) {
         if(!options.trace_path.empty()) {
             std::ofstream file(options.trace_path);
             if(!file) throw std::runtime_error("No se pudo abrir traza.");
-            file<<"channel,worker,team,range,domain_begin,domain_end\n";
-            for(const auto& event:trace)
+            const bool coarse=model==fractal::Model::CoarseGrained;
+            file<<"channel,worker,team,range,domain_begin,domain_end";
+            if(coarse) file<<",reason,stagnant_domains,stall_threshold";
+            file<<'\n';
+            for(const auto& event:trace) {
                 file<<event.channel<<','<<event.worker<<','<<event.team<<','<<event.range<<','
-                    <<event.domain_begin<<','<<event.domain_end<<'\n';
+                    <<event.domain_begin<<','<<event.domain_end;
+                if(coarse) file<<','<<fractal::schedule_reason_name(event.reason)<<','
+                               <<event.stagnant_domains<<','<<event.stall_threshold;
+                file<<'\n';
+            }
             file.flush();
             if(!file) throw std::runtime_error("Error escribiendo traza.");
-            std::cout<<"Cuantums registrados: "<<trace.size()<<'\n';
+            std::cout<<(coarse?"Rafagas registradas: ":"Cuantums registrados: ")<<trace.size()<<'\n';
         }
         auto size=std::filesystem::file_size(output);
         std::cout<<"Canales: "<<c.planes.size()<<"\nReglas por canal: "<<c.planes[0].rules.size()

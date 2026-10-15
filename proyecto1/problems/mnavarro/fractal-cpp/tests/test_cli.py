@@ -6,6 +6,7 @@ import tempfile
 
 binary = pathlib.Path(sys.argv[1]).resolve()
 fine_binary = pathlib.Path(sys.argv[2]).resolve()
+coarse_binary = pathlib.Path(sys.argv[3]).resolve()
 
 def run(*args, executable=binary):
     result = subprocess.run([str(executable), *map(str, args)], capture_output=True, text=True, timeout=30)
@@ -50,6 +51,19 @@ with tempfile.TemporaryDirectory(prefix="fractal-cli-") as directory:
             assert all(0 < int(e["domain_end"])-int(e["domain_begin"]) <= quantum for e in events)
             assert set(int(e["channel"]) for e in events) == ({0,1,2} if mode == "compress" else {0})
             run("decompress", fine, work / "fine.png", 80)
+    assert "fractal_coarse" in run("--help", executable=coarse_binary)
+    for mode in ["compress", "compress-gray"]:
+        reference, coarse, trace = work / "reference.frc", work / "coarse.frc", work / "coarse.csv"
+        run(mode, image, reference, 4, 3)
+        output = run(mode, image, coarse, 4, 3, "--teams", 5, "--threads-per-team", 2,
+                     "--trace-schedule", trace, executable=coarse_binary)
+        assert "stall simulado" in output
+        assert coarse.read_bytes() == reference.read_bytes()
+        with trace.open() as file:
+            events = list(csv.DictReader(file))
+        assert events and all(e["reason"] in ["stall", "domain_complete"] for e in events)
+        assert all(int(e["domain_end"]) > int(e["domain_begin"]) for e in events)
+        run("decompress", coarse, work / "coarse.png", 80)
     # Rechazar entradas inválidas antes de E/S, sin truncar una salida existente.
     sentinel = work / "sentinel.frc"
     sentinel.write_bytes(b"preservar")
@@ -83,13 +97,22 @@ with tempfile.TemporaryDirectory(prefix="fractal-cli-") as directory:
     invalid = [(binary,args,message) for args,message in invalid]
     invalid.extend([
         (fine_binary,["compress", image, sentinel, "--quantum-domains", 0], "entero positivo"),
-        (binary,["compress", image, sentinel, "--quantum-domains", 1], "requieren fine-grained"),
-        (binary,["compress", image, sentinel, "--trace-schedule", work / "bad.csv"], "requieren fine-grained"),
+        (binary,["compress", image, sentinel, "--quantum-domains", 1], "requiere fine-grained"),
+        (binary,["compress", image, sentinel, "--trace-schedule", work / "bad.csv"], "requiere fine-grained"),
         (fine_binary,["decompress", sentinel, image], "Decodificacion fine-grained"),
         (fine_binary,["compress", image, sentinel, "--trace-schedule", image], "archivos distintos"),
         (fine_binary,["compress", image, sentinel, "--trace-schedule", sentinel], "archivos distintos"),
         (binary,["compress", image, sentinel, "--model", "fine-grained"], "solo admite el modelo"),
         (fine_binary,["compress", image, sentinel, "--model", "sequential"], "solo admite el modelo"),
+    ])
+    invalid.extend([
+        (coarse_binary,["compress", image, sentinel, "--quantum-domains", 1], "requiere fine-grained"),
+        (coarse_binary,["decompress", sentinel, image], "Decodificacion coarse-grained"),
+        (coarse_binary,["compress", image, sentinel, "--model", "fine-grained"], "solo admite el modelo"),
+        (coarse_binary,["compress", image, sentinel, "--trace-schedule", image], "archivos distintos"),
+        (coarse_binary,["compress", image, sentinel, "--trace-schedule", sentinel], "archivos distintos"),
+        (coarse_binary,["compress", image, sentinel, "--teams", 0], "entero positivo"),
+        (coarse_binary,["compress", image, sentinel, "--trace-schedule"], "Falta valor"),
     ])
     original = image.read_bytes()
     for executable,args,message in invalid:

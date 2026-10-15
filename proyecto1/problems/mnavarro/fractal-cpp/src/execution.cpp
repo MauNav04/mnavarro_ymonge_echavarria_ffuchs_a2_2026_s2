@@ -1,5 +1,6 @@
 #include "fractal/execution.hpp"
 #include "fractal/fine_grained.hpp"
+#include "fractal/coarse_grained.hpp"
 #include <limits>
 #include <stdexcept>
 
@@ -22,14 +23,24 @@ const char* model_name(Model model) {
     }
     throw std::invalid_argument("Modelo invalido.");
 }
+const char* schedule_reason_name(ScheduleReason reason) {
+    switch(reason) {
+        case ScheduleReason::Quantum: return "quantum";
+        case ScheduleReason::Stall: return "stall";
+        case ScheduleReason::DomainComplete: return "domain_complete";
+    }
+    throw std::invalid_argument("Causa de turno invalida.");
+}
 void validate_execution(const ExecutionConfig& execution) {
     if (execution.teams==0 || execution.threads_per_team==0 ||
         execution.teams>std::numeric_limits<std::size_t>::max()/execution.threads_per_team)
         throw std::invalid_argument("Equipos e hilos por equipo deben ser positivos y su producto representable.");
-    if (execution.model!=Model::Sequential && execution.model!=Model::FineGrained)
+    if (execution.model!=Model::Sequential && execution.model!=Model::FineGrained && execution.model!=Model::CoarseGrained)
         throw std::invalid_argument(std::string("Modelo aun no implementado: ")+model_name(execution.model));
     if (execution.model==Model::Sequential && (execution.teams!=1 || execution.threads_per_team!=1))
         throw std::invalid_argument("El modelo secuencial requiere 1 equipo de 1 hilo.");
+    if(execution.model==Model::CoarseGrained && execution.quantum_domains!=1)
+        throw std::invalid_argument("Cuantum requiere fine-grained; coarse-grained cambia por eventos.");
     if(execution.quantum_domains==0) throw std::invalid_argument("Cuantum debe ser positivo.");
     if(execution.model==Model::Sequential && (execution.quantum_domains!=1 || execution.schedule_trace))
         throw std::invalid_argument("Cuantum y traza requieren fine-grained.");
@@ -37,6 +48,7 @@ void validate_execution(const ExecutionConfig& execution) {
 Encoded execute_encode(const Image& image, Config config, ExecutionConfig execution) {
     validate_execution(execution);
     if(execution.model==Model::FineGrained) return encode_fine_grained(image,config,execution);
+    if(execution.model==Model::CoarseGrained) return encode_coarse_grained(image,config,execution);
     return encode(image,config);
 }
 MultiEncoded execute_encode(const MultiImage& image, Config config, ExecutionConfig execution) {
@@ -50,20 +62,23 @@ MultiEncoded execute_encode(const MultiImage& image, Config config, ExecutionCon
         (void)mse(plane,plane);
     }
     MultiEncoded result;
-    for(std::size_t channel=0;channel<image.planes.size();++channel)
-        result.planes.push_back(encode_fine_grained(image.planes[channel],config,execution,channel));
+    for(std::size_t channel=0;channel<image.planes.size();++channel) {
+        if(execution.model==Model::FineGrained)
+            result.planes.push_back(encode_fine_grained(image.planes[channel],config,execution,channel));
+        else result.planes.push_back(encode_coarse_grained(image.planes[channel],config,execution,channel));
+    }
     return result;
 }
 Image execute_decode(const Encoded& code, int iterations, ExecutionConfig execution) {
     validate_execution(execution);
     if(execution.model!=Model::Sequential)
-        throw std::invalid_argument("Decodificacion fine-grained no implementada; use sequential.");
+        throw std::invalid_argument(std::string("Decodificacion ")+model_name(execution.model)+" no implementada; use sequential.");
     return decode(code,iterations);
 }
 MultiImage execute_decode(const MultiEncoded& code, int iterations, ExecutionConfig execution) {
     validate_execution(execution);
     if(execution.model!=Model::Sequential)
-        throw std::invalid_argument("Decodificacion fine-grained no implementada; use sequential.");
+        throw std::invalid_argument(std::string("Decodificacion ")+model_name(execution.model)+" no implementada; use sequential.");
     return decode(code,iterations);
 }
 }

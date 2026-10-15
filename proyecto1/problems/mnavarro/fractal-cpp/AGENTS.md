@@ -12,9 +12,9 @@ Antes de modificar código, consultar [README.md](README.md), fuente de verdad d
 La guía histórica en `sequential/README.md` no autoriza avanzar automáticamente de etapa.
 
 Cada modelo tiene su propio `main.cpp` y `CMakeLists.txt` en su carpeta, y un ejecutable
-separado: `sequential/` → `fractal_seq`, `fine-grained/` → `fractal_fine`.
-Esta organización fue aprobada por el usuario para las siguientes etapas: `coarse-grained/`
-→ `fractal_coarse`, `CMP/` → `fractal_cmp` y `SMT/` → `fractal_smt`, cuando se soliciten.
+separado: `sequential/` → `fractal_seq`, `fine-grained/` → `fractal_fine`,
+`coarse-grained/` → `fractal_coarse`. Esta organización se conservará para `CMP/`
+→ `fractal_cmp` y `SMT/` → `fractal_smt`, cuando se soliciten.
 Cada main fija su modelo; no permite ejecutar otro mediante `--model`.
 El núcleo único compartido está en `src/` e `include/`. Argumentos, E/S y mediciones se
 reutilizan desde `app/`; los main deben mantenerse pequeños, sin copiar el controlador.
@@ -86,7 +86,11 @@ Nunca inventar resultados, benchmarks, mediciones de hardware ni pruebas exitosa
 ## 5. Reglas específicas de concurrencia
 
 - **Fine-Grained:** Aproximar la alternancia por ciclos mediante cuantums mínimos y Round-Robin cooperativo.
-- **Coarse-Grained:** Modelar cambios ante bloqueos o stalls significativos. No presentarlo como equivalente a Fine-Grained con un cuantum más largo.
+- **Coarse-Grained:** Evento aprobado: más de 2/3 de los dominios asignados al hilo para
+  el range sin mejorar consecutivamente el menor error local. Conservar mínimo/posición
+  y reanudar sin omitir candidatos; reiniciar racha al mejorar o ceder por stall. La
+  finalización del intervalo tiene prioridad. Es una heurística simulada, no un stall
+  físico medido. No sustituirla por Fine-Grained con un cuantum más largo.
 - **CMP:** Utilizar ejecución real sobre múltiples núcleos físicos, verificando afinidad.
 - **SMT:** Diferenciar concurrencia por software del SMT proporcionado por hardware. Verificar topología y estado del sistema.
 
