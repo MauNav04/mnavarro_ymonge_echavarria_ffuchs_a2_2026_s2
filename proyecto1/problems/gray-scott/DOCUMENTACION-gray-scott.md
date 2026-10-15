@@ -354,6 +354,13 @@ El tablero consolidado integra las métricas de rendimiento en cuatro cuadrantes
 
 ---
 
+#### Gráfica 9: Rendimiento Computacional (Throughput en MUpdates/s)
+![Throughput](metricas/graficas/09_throughput_mupdates.png)
+
+Evalúa el caudal de procesamiento de la simulación medido en millones de celdas actualizadas por segundo ($\text{MUpdates/s} = \frac{(W-2)(H-2) \times \text{pasos}}{T_{\text{ejec}} \times 10^6}$). Esta métrica de computación científica de alto rendimiento permite comparar directamente el ancho de banda computacional y la saturación del pipeline entre modelos, homologándose con la métrica 09 de Heat2D y Ray Tracing.
+
+---
+
 ## 9. Perfilado Microarquitectónico de Hardware con Linux `perf`
 
 ### Fundamento y Requisito del Proyecto
@@ -415,8 +422,13 @@ Mide los cambios de contexto del kernel (`context-switches`) y migraciones entre
 #### Gráfica 7: Sobrecarga del Sistema Operativo (Context Switches)
 ![Cambios de Contexto](metricas/graficas/07_perf_context_switches.png)
 
-* **Archivo CSV generado:** `metricas/perf_hardware_counters.csv`
-* **Figuras científicas (300 DPI):** `05_perf_ipc_comparativo.png`, `06_perf_cache_miss_rates.png`, `07_perf_context_switches.png`
+#### Gráfica 10: Dashboard Consolidado de Microarquitectura (PMU Linux perf)
+![Dashboard Microarquitectónico](metricas/graficas/10_perf_resumen_microarquitectura.png)
+
+Tablero integral multipanel (2×2) que reúne las cuatro métricas PMU de hardware para el paper: (A) IPC, (B) Tasa de fallos L1-D (%), (C) Tasa de fallos LLC (%), (D) Conmutaciones de contexto del kernel.
+
+* **Archivos CSV generados:** `metricas/gray_scott_perf_metrics.csv` y `metricas/perf_hardware_counters.csv`
+* **Figuras científicas (300 DPI):** `05_perf_ipc_comparativo.png`, `06_perf_cache_miss_rates.png`, `07_perf_context_switches.png`, `10_perf_resumen_microarquitectura.png`
 * **Comandos para re-ejecutar:**
   ```bash
   cd scripts/

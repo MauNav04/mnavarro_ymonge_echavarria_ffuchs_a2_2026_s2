@@ -369,6 +369,68 @@ def graficar_context_switches(metricas_resumen, output_path):
     print(f"  [+] Generado: {os.path.basename(output_path)}")
 
 
+def graficar_dashboard_microarquitectura(metricas_resumen, output_path):
+    """Genera panel 2x2 consolidado con las 4 dimensiones microarquitectónicas clave."""
+    modelos = [m for m in ORDEN_CANONICO if m in metricas_resumen]
+    colors = [PALETA_MODELOS.get(m, "#7f7f7f") for m in modelos]
+    x_pos = np.arange(len(modelos))
+    short_labels = [m.replace("Fine-Grained ", "FG ").replace("SMT ", "SMT ").replace("Sobre-suscripción ", "") for m in modelos]
+
+    fig, axs = plt.subplots(2, 2, figsize=(16, 12))
+
+    # (0, 0) IPC
+    ipcs = [metricas_resumen[m]["ipc"] for m in modelos]
+    bars_ipc = axs[0, 0].bar(x_pos, ipcs, color=colors, alpha=0.85, edgecolor="#1a1a1a")
+    axs[0, 0].axhline(1.0, color="#d90429", linestyle="--", linewidth=1.2, label="Ref. 1.0 IPC")
+    axs[0, 0].set_title("(A) Instrucciones por Ciclo (IPC)")
+    axs[0, 0].set_ylabel("IPC")
+    axs[0, 0].set_xticks(x_pos)
+    axs[0, 0].set_xticklabels(short_labels, rotation=20, ha="right", fontsize=9)
+    axs[0, 0].legend(loc="upper left", fontsize=8.5)
+    for b in bars_ipc:
+        axs[0, 0].annotate(f"{b.get_height():.2f}", xy=(b.get_x() + b.get_width()/2, b.get_height()),
+                           xytext=(0, 4), textcoords="offset points", ha="center", fontsize=8.5, fontweight="bold")
+
+    # (0, 1) L1 Miss Rate
+    l1_rates = [metricas_resumen[m]["l1_miss_rate_pct"] for m in modelos]
+    bars_l1 = axs[0, 1].bar(x_pos, l1_rates, color=colors, alpha=0.85, edgecolor="#1a1a1a")
+    axs[0, 1].set_title("(B) Tasa de Fallos L1 Data Cache (%)")
+    axs[0, 1].set_ylabel("Fallos L1-D (%)")
+    axs[0, 1].set_xticks(x_pos)
+    axs[0, 1].set_xticklabels(short_labels, rotation=20, ha="right", fontsize=9)
+    for b in bars_l1:
+        axs[0, 1].annotate(f"{b.get_height():.2f}%", xy=(b.get_x() + b.get_width()/2, b.get_height()),
+                           xytext=(0, 4), textcoords="offset points", ha="center", fontsize=8.5, fontweight="bold")
+
+    # (1, 0) LLC Miss Rate
+    llc_rates = [metricas_resumen[m]["llc_miss_rate_pct"] for m in modelos]
+    bars_llc = axs[1, 0].bar(x_pos, llc_rates, color=colors, alpha=0.85, edgecolor="#1a1a1a")
+    axs[1, 0].set_title("(C) Tasa de Fallos Last-Level Cache (LLC %)")
+    axs[1, 0].set_ylabel("Fallos LLC (%)")
+    axs[1, 0].set_xticks(x_pos)
+    axs[1, 0].set_xticklabels(short_labels, rotation=20, ha="right", fontsize=9)
+    for b in bars_llc:
+        axs[1, 0].annotate(f"{b.get_height():.2f}%", xy=(b.get_x() + b.get_width()/2, b.get_height()),
+                           xytext=(0, 4), textcoords="offset points", ha="center", fontsize=8.5, fontweight="bold")
+
+    # (1, 1) Context Switches
+    cs_vals = [metricas_resumen[m]["context_switches"] for m in modelos]
+    bars_cs = axs[1, 1].bar(x_pos, cs_vals, color=colors, alpha=0.85, edgecolor="#1a1a1a")
+    axs[1, 1].set_title("(D) Cambios de Contexto del SO")
+    axs[1, 1].set_ylabel("Context Switches")
+    axs[1, 1].set_xticks(x_pos)
+    axs[1, 1].set_xticklabels(short_labels, rotation=20, ha="right", fontsize=9)
+    for b in bars_cs:
+        axs[1, 1].annotate(f"{int(b.get_height()):,}".replace(",", "."), xy=(b.get_x() + b.get_width()/2, b.get_height()),
+                           xytext=(0, 4), textcoords="offset points", ha="center", fontsize=8.5, fontweight="bold")
+
+    fig.suptitle("Dashboard Microarquitectónico Completo - Gray-Scott (Linux perf PMU)", fontsize=16, fontweight="bold")
+    plt.tight_layout()
+    plt.savefig(output_path)
+    plt.close()
+    print(f"  [+] Generado: {os.path.basename(output_path)}")
+
+
 def cargar_csv_metricas(csv_path):
     """Carga métricas de hardware desde CSV soportando formato estándar y legacy."""
     metricas_consolidadas = {}
@@ -463,39 +525,45 @@ def main():
     args = parser.parse_args()
 
     scripts_dir = os.path.dirname(os.path.abspath(__file__))
-    os.makedirs(args.output_dir, exist_ok=True)
-    os.makedirs(os.path.dirname(os.path.abspath(args.output_csv)), exist_ok=True)
+    output_dir = os.path.abspath(os.path.join(scripts_dir, args.output_dir)) if not os.path.isabs(args.output_dir) else args.output_dir
+    output_csv = os.path.abspath(os.path.join(scripts_dir, args.output_csv)) if not os.path.isabs(args.output_csv) else args.output_csv
+    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(os.path.dirname(output_csv), exist_ok=True)
 
     # Modo exclusivo de graficación a partir de CSV previo
     if args.plot_only:
         print("==============================================================================")
         print("           GENERACIÓN DE GRÁFICAS PERF DESDE CSV EXISTENTE                    ")
         print("==============================================================================")
-        csv_target = args.output_csv
+        csv_target = output_csv
         if not os.path.exists(csv_target):
             # Intentar fallback a perf_hardware_counters.csv
-            legacy_csv = os.path.join(os.path.dirname(os.path.abspath(args.output_csv)), "perf_hardware_counters.csv")
+            legacy_csv = os.path.join(os.path.dirname(output_csv), "perf_hardware_counters.csv")
             if os.path.exists(legacy_csv):
                 csv_target = legacy_csv
             else:
-                print(f"[ERROR] No existe el archivo CSV de métricas: {args.output_csv}", file=sys.stderr)
+                print(f"[ERROR] No existe el archivo CSV de métricas: {output_csv}", file=sys.stderr)
                 sys.exit(1)
 
         metricas_consolidadas = cargar_csv_metricas(csv_target)
 
         # 05_perf_ipc_comparativo.png
-        p_ipc = os.path.join(args.output_dir, "05_perf_ipc_comparativo.png")
+        p_ipc = os.path.join(output_dir, "05_perf_ipc_comparativo.png")
         graficar_ipc(metricas_consolidadas, p_ipc)
 
         # 06_perf_cache_miss_rates.png
-        p_cache = os.path.join(args.output_dir, "06_perf_cache_miss_rates.png")
+        p_cache = os.path.join(output_dir, "06_perf_cache_miss_rates.png")
         graficar_cache_miss_rates(metricas_consolidadas, p_cache)
 
         # 07_perf_context_switches.png
-        p_cs = os.path.join(args.output_dir, "07_perf_context_switches.png")
+        p_cs = os.path.join(output_dir, "07_perf_context_switches.png")
         graficar_context_switches(metricas_consolidadas, p_cs)
 
-        print("\n[OK] Gráficas de microarquitectura (05, 06, 07) generadas exitosamente desde CSV.")
+        # 10_perf_resumen_microarquitectura.png
+        p_dash = os.path.join(output_dir, "10_perf_resumen_microarquitectura.png")
+        graficar_dashboard_microarquitectura(metricas_consolidadas, p_dash)
+
+        print("\n[OK] Gráficas de microarquitectura (05, 06, 07, 10) generadas exitosamente desde CSV.")
         sys.exit(0)
 
     print("==============================================================================")
@@ -628,18 +696,21 @@ def main():
     print("==============================================================================")
     print("                 GENERANDO GRÁFICAS DE MICROARQUITECTURA                      ")
     print("==============================================================================")
-    p_ipc = os.path.join(args.output_dir, "05_perf_ipc_comparativo.png")
+    p_ipc = os.path.join(output_dir, "05_perf_ipc_comparativo.png")
     graficar_ipc(metricas_consolidadas, p_ipc)
 
-    p_cache = os.path.join(args.output_dir, "06_perf_cache_miss_rates.png")
+    p_cache = os.path.join(output_dir, "06_perf_cache_miss_rates.png")
     graficar_cache_miss_rates(metricas_consolidadas, p_cache)
 
-    p_cs = os.path.join(args.output_dir, "07_perf_context_switches.png")
+    p_cs = os.path.join(output_dir, "07_perf_context_switches.png")
     graficar_context_switches(metricas_consolidadas, p_cs)
 
+    p_dash = os.path.join(output_dir, "10_perf_resumen_microarquitectura.png")
+    graficar_dashboard_microarquitectura(metricas_consolidadas, p_dash)
+
     print("\n[OK] Perfilado y visualización microarquitectónica completada exitosamente.")
-    print(f"  -> CSV      : {os.path.abspath(args.output_csv)}")
-    print(f"  -> Gráficas : {os.path.abspath(args.output_dir)}\n")
+    print(f"  -> CSV      : {output_csv}")
+    print(f"  -> Gráficas : {output_dir}\n")
 
 
 if __name__ == "__main__":

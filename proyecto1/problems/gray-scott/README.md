@@ -221,6 +221,8 @@ make graficas
   6. **`06_perf_cache_miss_rates.png`**: Análisis de la jerarquía de memoria en dos paneles: Tasa de fallos en L1 Data Cache (%) y en Last-Level Cache (L3/LLC %).
   7. **`07_perf_context_switches.png`**: Sobrecarga de cambios de contexto del sistema operativo (`context-switches`) por modelo.
   8. **`08_dashboard_consolidado.png`**: Tablero general multipanel (2x2) que consolida: (A) Tiempos medios con IC 95%, (B) Speedup relativo, (C) Eficiencia paralela, (D) Coeficiente de variación ($CV = \sigma/\mu$, jitter e inestabilidad).
+  9. **`09_throughput_mupdates.png`**: Rendimiento computacional medido en Millones de Celdas actualizadas por segundo (MUpdates/s).
+  10. **`10_perf_resumen_microarquitectura.png`**: Tablero integral multipanel (2x2) de microarquitectura con contadores PMU: (A) IPC, (B) Tasa de fallos L1-D, (C) Tasa de fallos LLC, (D) Conmutaciones de contexto del kernel.
 
 ---
 

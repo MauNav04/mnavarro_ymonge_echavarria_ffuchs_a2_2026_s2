@@ -13,8 +13,9 @@ experimentales recolectados por benchmark.py:
   03_eficiencia_paralela.png        - Eficiencia Paralela (%) con línea ideal (100%).
   04_escalabilidad_hilos.png        - Escalabilidad Fuerte (Strong Scaling) vs Ley de Amdahl.
   08_dashboard_consolidado.png      - Dashboard científico consolidado (2x2 multipanel).
+  09_throughput_mupdates.png        - Throughput en Millones de Celdas / segundo (MUpdates/s).
 
-(Las figuras 05, 06 y 07 de perfilado microarquitectónico son generadas por profile_perf.py).
+(Las figuras 05, 06, 07 y 10 de perfilado microarquitectónico son generadas por profile_perf.py).
 ==============================================================================
 """
 
@@ -602,6 +603,59 @@ def graficar_dashboard_consolidado(resumen, output_path):
 
 
 # ==============================================================================
+# 9. THROUGHPUT - MILLONES DE ACTUALIZACIONES POR SEGUNDO (MUpdates/s)
+# ==============================================================================
+def graficar_throughput(resumen, output_path, grid_size=512, steps=16000):
+    """
+    Genera gráfico de barras de Throughput en MUpdates/s.
+    Celdas interiores actualizadas: (grid_size - 2)^2
+    Total updates: interior_cells * steps
+    Throughput (MUpdates/s) = (total_updates / 1e6) / (tiempo_ms / 1000.0)
+    """
+    modelos = obtener_modelos_ordenados(resumen.keys())
+    interior_cells = (grid_size - 2) * (grid_size - 2)
+    total_mupdates = (interior_cells * steps) / 1e6
+
+    throughputs = [total_mupdates / (resumen[m]["media_ms"] / 1000.0) if resumen[m]["media_ms"] > 0 else 0.0 for m in modelos]
+    colors = [PALETA_MODELOS.get(m, "#7f7f7f") for m in modelos]
+
+    fig, ax = plt.subplots(figsize=(12, 6.5))
+    x_pos = np.arange(len(modelos))
+    bars = ax.bar(x_pos, throughputs, color=colors, alpha=0.85, edgecolor="#1a1a1a", linewidth=1.1)
+
+    ax.set_xticks(x_pos)
+    etiquetas_x = [f"{m}\n({resumen[m]['hilos']} hilos)" for m in modelos]
+    ax.set_xticklabels(etiquetas_x, rotation=15, ha="right")
+    ax.set_ylabel("Millones de Celdas Actualizadas / s (MUpdates/s)")
+    ax.set_title("Rendimiento Computacional: Throughput en Simulación Gray-Scott")
+
+    # Línea base secuencial
+    if "Secuencial" in resumen:
+        seq_tp = total_mupdates / (resumen["Secuencial"]["media_ms"] / 1000.0)
+        ax.axhline(seq_tp, color="#d90429", linestyle="--", linewidth=1.2, label=f"Baseline Secuencial ({seq_tp:.0f} MUpdates/s)")
+        ax.legend(loc="upper left")
+
+    for bar in bars:
+        h = bar.get_height()
+        ax.annotate(
+            f"{h:,.0f}".replace(",", "."),
+            xy=(bar.get_x() + bar.get_width() / 2, h),
+            xytext=(0, 6),
+            textcoords="offset points",
+            ha="center",
+            va="bottom",
+            fontsize=9.5,
+            fontweight="bold"
+        )
+
+    ax.set_ylim(0, max(throughputs) * 1.22 if max(throughputs) > 0 else 100)
+    plt.tight_layout()
+    plt.savefig(output_path)
+    plt.close()
+    print(f"  [+] Generado: {os.path.basename(output_path)}")
+
+
+# ==============================================================================
 # PUNTO DE ENTRADA PRINCIPAL
 # ==============================================================================
 def main():
@@ -662,6 +716,10 @@ def main():
     # 8. Dashboard Consolidado Ejecutivo (Multipanel 2x2)
     p8 = os.path.join(output_dir, "08_dashboard_consolidado.png")
     graficar_dashboard_consolidado(resumen, p8)
+
+    # 9. Throughput (Millones de Celdas Actualizadas / Segundo)
+    p9 = os.path.join(output_dir, "09_throughput_mupdates.png")
+    graficar_throughput(resumen, p9, grid_size=512, steps=16000)
 
     print("\n==============================================================================")
     print(f"[OK] Generación completada con éxito. Gráficas guardadas en:\n  -> {output_dir}")

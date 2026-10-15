@@ -264,7 +264,7 @@ profile_plot:
 
 # ==============================================================================
 # GENERACIÓN DE GRÁFICAS DE RENDIMIENTO (300 DPI)
-# Genera estrictamente el estándar de las 8 figuras científicas:
+# Genera estrictamente el estándar de las 10 figuras científicas:
 #   01_tiempos_ejecucion_boxplot.png
 #   02_speedup_comparativo.png
 #   03_eficiencia_paralela.png
@@ -273,6 +273,8 @@ profile_plot:
 #   06_perf_cache_miss_rates.png
 #   07_perf_context_switches.png
 #   08_dashboard_consolidado.png
+#   09_throughput_mupdates.png
+#   10_perf_resumen_microarquitectura.png
 # ==============================================================================
 plot_metrics:
 	$(VENV_PYTHON) -W ignore plot_metrics.py
@@ -280,7 +282,7 @@ plot_metrics:
 plot: plot_metrics
 graficas: plot_all
 
-# Regenera las 8 figuras científicas completas a partir de los datos consolidados
+# Regenera las 10 figuras científicas completas a partir de los datos consolidados
 plot_all: plot_metrics profile_plot
 
 # ==============================================================================
