@@ -28,8 +28,9 @@ void distinct(const char* in,const char* out) {
     if(fs::weakly_canonical(in)==fs::weakly_canonical(out) || (fs::exists(out) && fs::equivalent(in,out)))
         throw std::invalid_argument("Entrada y salida deben ser archivos distintos.");
 }
-void usage(std::ostream& out, fractal::Model model) {
-    const char* binary=model==fractal::Model::Sequential?"fractal_seq":(model==fractal::Model::FineGrained?"fractal_fine":"fractal_coarse");
+void usage(std::ostream& out, fractal::Model model,fractal::CmpProfile profile) {
+    const char* binary=model==fractal::Model::Sequential?"fractal_seq":(model==fractal::Model::FineGrained?"fractal_fine":(model==fractal::Model::CoarseGrained?"fractal_coarse":"fractal_cmp"));
+    if(model==fractal::Model::CMP && profile==fractal::CmpProfile::Local) binary="fractal_cmp_local";
     out<<"Uso:\n  "<<binary<<" compress entrada.png salida.frc [range=8] [stride=8]\n"
        <<"  "<<binary<<" compress-gray entrada.png salida.frc [range=8] [stride=8]\n";
     if(model==fractal::Model::Sequential)
@@ -40,6 +41,9 @@ void usage(std::ostream& out, fractal::Model model) {
        <<"Opciones compress/ compress-gray: --range N --stride N\n"
        <<"Equipos: --teams N --threads-per-team N\n"
        <<"Modelo fijo: "<<fractal::model_name(model)<<"\n";
+    if(model==fractal::Model::CMP)
+        out<<"CMP perfil "<<fractal::cmp_profile_name(profile)<<": --list-cpus | --report-affinity salida.csv\n"
+           <<"Un trabajador por nucleo distinto permitido. Reconstruccion: fractal_seq decompress.\n";
     if(model==fractal::Model::CoarseGrained)
         out<<"Coarse-Grained: stall tras >2/3 de dominios locales consecutivos sin mejorar.\n"
            <<"Diagnostico: --trace-schedule salida.csv. Reconstruccion: fractal_seq decompress.\n";
@@ -48,14 +52,15 @@ void usage(std::ostream& out, fractal::Model model) {
            <<"Reconstruccion: usar fractal_seq decompress.\n";
 }
 struct Options {
-    std::string command, input, output, trace_path;
+    std::string command, input, output, trace_path, affinity_path;
     fractal::Config codec;
     fractal::ExecutionConfig execution;
     int iterations=40;
 };
-Options parse(int argc, char** argv, fractal::Model model) {
+Options parse(int argc, char** argv, fractal::Model model,fractal::CmpProfile profile) {
     Options options;
     options.execution.model=model;
+    options.execution.cmp_profile=profile;
     options.command=argv[1];
     const bool compress=options.command=="compress" || options.command=="compress-gray";
     const bool decompress=options.command=="decompress";
@@ -67,7 +72,7 @@ Options parse(int argc, char** argv, fractal::Model model) {
         std::string arg=argv[i];
         if(arg.rfind("--",0)!=0) {positional.push_back(arg); continue;}
         if(!seen.insert(arg).second) throw std::invalid_argument("Opcion repetida: "+arg);
-        const bool fineOption=arg=="--quantum-domains" || arg=="--trace-schedule";
+        const bool fineOption=arg=="--quantum-domains" || arg=="--trace-schedule" || arg=="--report-affinity";
         const bool codecOption=arg=="--range" || arg=="--stride";
         const bool executionOption=arg=="--model" || arg=="--teams" || arg=="--threads-per-team";
         if((fineOption && !compress) || (codecOption && !compress) || (arg=="--iterations" && !decompress) ||
@@ -82,6 +87,7 @@ Options parse(int argc, char** argv, fractal::Model model) {
         else if(arg=="--threads-per-team") options.execution.threads_per_team=number(value);
         else if(arg=="--quantum-domains") options.execution.quantum_domains=number(value);
         else if(arg=="--trace-schedule") options.trace_path=value;
+        else if(arg=="--report-affinity") options.affinity_path=value;
         else if(arg=="--range") options.codec.range=number(value);
         else if(arg=="--stride") options.codec.stride=number(value);
         else options.iterations=number(value);
@@ -108,8 +114,10 @@ Options parse(int argc, char** argv, fractal::Model model) {
         throw std::invalid_argument(std::string("Este ejecutable solo admite el modelo ")+fractal::model_name(model));
     if(seen.count("--quantum-domains") && model!=fractal::Model::FineGrained)
         throw std::invalid_argument("Cuantum requiere fine-grained.");
-    if(seen.count("--trace-schedule") && model==fractal::Model::Sequential)
+    if(seen.count("--trace-schedule") && model!=fractal::Model::FineGrained && model!=fractal::Model::CoarseGrained)
         throw std::invalid_argument("Traza requiere fine-grained o coarse-grained.");
+    if(seen.count("--report-affinity") && model!=fractal::Model::CMP)
+        throw std::invalid_argument("Reporte de afinidad requiere CMP.");
     if(decompress && options.execution.model!=fractal::Model::Sequential)
         throw std::invalid_argument(std::string("Decodificacion ")+fractal::model_name(model)+" no implementada; use sequential.");
     if(compress || decompress) fractal::validate_execution(options.execution);
@@ -118,6 +126,8 @@ Options parse(int argc, char** argv, fractal::Model model) {
 void report(const fractal::ExecutionConfig& execution) {
     std::cout<<"Modelo: "<<fractal::model_name(execution.model)
              <<"\nEquipos: "<<execution.teams<<"\nHilos por equipo: "<<execution.threads_per_team<<'\n';
+    if(execution.model==fractal::Model::CMP)
+        std::cout<<"CMP perfil: "<<fractal::cmp_profile_name(execution.cmp_profile)<<" (paralelismo con afinidad)\n";
     if(execution.model==fractal::Model::CoarseGrained)
         std::cout<<"Planificacion: rafagas cooperativas con stall simulado (>2/3 sin mejora)\n";
     if(execution.model==fractal::Model::FineGrained)
@@ -126,11 +136,29 @@ void report(const fractal::ExecutionConfig& execution) {
 }
 
 }
-int fractal::app::run(int argc,char** argv, Model model) {
+int fractal::app::run(int argc,char** argv, Model model,CmpProfile profile) {
  try {
-    if(argc==2 && std::string(argv[1])=="--help") {usage(std::cout,model); return 0;}
-    if(argc<4) {usage(std::cerr,model); return 1;}
-    auto options=parse(argc,argv,model);
+    if(argc==2 && std::string(argv[1])=="--help") {usage(std::cout,model,profile); return 0;}
+    if(argc==2 && std::string(argv[1])=="--list-cpus" && model==Model::CMP) {
+        const auto topology=detect_cpu_topology();
+        (void)select_cmp_cpus(topology,1,profile);
+        std::cout<<"environment="<<topology.environment<<" profile="<<cmp_profile_name(profile)
+                 <<" distribution="<<topology.distribution<<" online_cpus="<<topology.online_cpus.size()
+                 <<" online_cores="<<unique_physical_cores(topology.online_cpus).size()
+                 <<" allowed_cores="<<topology.available_cores.size()<<'\n'
+                 <<"processor="<<topology.processor<<"\nlogical_cpu,socket,core\n";
+        for(const auto& cpu:topology.available_cores)
+            std::cout<<cpu.cpu<<','<<cpu.socket<<','<<cpu.core<<'\n';
+        return 0;
+    }
+    if(argc<4) {usage(std::cerr,model,profile); return 1;}
+    auto options=parse(argc,argv,model,profile);
+    std::vector<WorkerPlacement> placements;
+    if(model==Model::CMP) options.execution.worker_placements=&placements;
+    if(!options.affinity_path.empty()) {
+        distinct(options.input.c_str(),options.affinity_path.c_str());
+        distinct(options.output.c_str(),options.affinity_path.c_str());
+    }
     std::vector<fractal::ScheduleEvent> trace;
     if(!options.trace_path.empty()) {
         distinct(options.input.c_str(),options.trace_path.c_str());
@@ -146,6 +174,21 @@ int fractal::app::run(int argc,char** argv, Model model) {
         report(options.execution);
         auto a=readImage(input,cmd=="compress-gray");
         auto start=Clock::now(); auto c=fractal::execute_encode(a,options.codec,options.execution); double elapsed=seconds(start);
+        if(model==Model::CMP) {
+            std::cout<<"Afinidad CMP verificada: ";
+            for(const auto& w:placements) if(w.channel==0) std::cout<<"[H"<<w.worker<<"->CPU"<<w.cpu<<"] ";
+            std::cout<<'\n';
+            if(!options.affinity_path.empty()) {
+                std::ofstream file(options.affinity_path);
+                if(!file) throw std::runtime_error("No se pudo abrir reporte de afinidad.");
+                file<<"profile,channel,worker,team,cpu,socket,core,observed_before,observed_after\n";
+                for(const auto& w:placements)
+                    file<<cmp_profile_name(profile)<<','<<w.channel<<','<<w.worker<<','<<w.team<<','<<w.cpu<<','
+                        <<w.socket<<','<<w.core<<','<<w.observed_before<<','<<w.observed_after<<'\n';
+                file.flush();
+                if(!file) throw std::runtime_error("Error escribiendo reporte de afinidad.");
+            }
+        }
         saveMultiCode(output,c);
         if(!options.trace_path.empty()) {
             std::ofstream file(options.trace_path);
@@ -181,7 +224,7 @@ int fractal::app::run(int argc,char** argv, Model model) {
         auto e=fractal::mse(a,b); std::cout<<"MSE global [0,1]: "<<e<<"\nPSNR global: "<<psnr(e)<<" dB\n";
         const char* names[]={"R","G","B"};
         for(std::size_t c=0;c<a.planes.size();++c) {auto m=fractal::mse(a.planes[c],b.planes[c]); std::cout<<(gray?"Gris":names[c])<<": MSE="<<m<<", PSNR="<<psnr(m)<<" dB\n";}
-    } else {usage(std::cerr,model); return 1;}
+    } else {usage(std::cerr,model,profile); return 1;}
     std::cout<<"Tiempo total (con E/S): "<<seconds(total)<<" s\n"; return 0;
  } catch(const std::exception& e) {std::cerr<<"Error: "<<e.what()<<'\n'; return 1;}
 }

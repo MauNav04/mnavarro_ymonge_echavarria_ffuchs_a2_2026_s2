@@ -5,8 +5,8 @@ Este README es la **única fuente de verdad del progreso, arquitectura y validac
 están en [AGENTS.md](AGENTS.md) y la guía académica de la versión base en
 [sequential/README.md](sequential/README.md).
 
-Alcance autorizado: **etapa 3**, con equipos de hilos por range como diseño aprobado.
-Las etapas 4–8 continúan pendientes y requieren solicitud explícita.
+Alcance autorizado: **etapa 4**, con equipos de hilos por range como diseño aprobado.
+Las etapas 5–8 continúan pendientes y requieren solicitud explícita.
 
 ## 1. Descripción del proyecto
 
@@ -31,7 +31,10 @@ Considera que yo no tengo una computadora con LINUX, así que la versión de SMT
 - **Automatización:** Makefile y Python
 - **Profiling:** Linux Perf
 - **Sistema operativo:** Linux
-- **Hardware de referencia:** Intel Core i5-1335U, 12 procesadores lógicos reportados por `lscpu`
+- **Hardware local:** Intel Core i5-1335U bajo WSL2; el kernel reporta 12 CPU lógicas/6 núcleos.
+- **Destino de evaluación confirmado por el usuario:** Ubuntu, AMD Ryzen (modelo exacto
+  pendiente; Ryzen 7 aún no confirmado), 8 núcleos físicos/16 hilos lógicos con SMT activo.
+  Con SMT inactivo se admiten 8 CPU online. CMP, SMT y Linux Perf se preparan para este destino.
 
 La topología real de núcleos físicos, P-cores, E-cores e hilos SMT debe verificarse antes de configurar afinidad y realizar benchmarks.
 
@@ -61,7 +64,8 @@ su modelo; el núcleo continúa compartido en `fractal_codec`.
 | Secuencial | `sequential/main.cpp` | `fractal_seq` |
 | Fine-Grained | `fine-grained/main.cpp` | `fractal_fine` |
 | Coarse-Grained | `coarse-grained/main.cpp` | `fractal_coarse` |
-| CMP (pendiente) | `CMP/main.cpp` | `fractal_cmp` |
+| CMP de evaluación | `CMP/main.cpp` | `fractal_cmp` |
+| CMP local/WSL | `CMP/local/main.cpp` | `fractal_cmp_local` |
 | SMT (pendiente) | `SMT/main.cpp` | `fractal_smt` |
 
 **Diseño aprobado:** equipos de hilos por range, reparto de dominios entre sus miembros y reducción de mínimos para publicar una regla. Ejemplo: 10 hilos = 5 equipos × 2 hilos.
@@ -112,13 +116,17 @@ Pruebas y equivalencia registradas en el historial.
 
 ### Etapa 4 — CMP
 
-- [ ] Implementar distribución paralela de trabajo.
+- [x] Implementar distribución paralela de trabajo.
 - [ ] Ejecutar trabajadores sobre núcleos físicos.
-- [ ] Implementar afinidad de CPU.
-- [ ] Evitar condiciones de carrera.
+- [x] Implementar afinidad de CPU.
+- [x] Evitar condiciones de carrera.
 - [ ] Verificar escalabilidad con diferentes cantidades de trabajadores.
 
-**Aceptación:** Paralelismo real sobre múltiples núcleos y resultados correctos.
+**Estado:** las dos variantes están implementadas y la local está validada funcionalmente.
+La ejecución física y la escalabilidad del perfil de evaluación siguen pendientes de probar
+en la máquina Ubuntu/AMD Ryzen 8/16. Las pruebas WSL no completan esos dos criterios.
+
+**Aceptación pendiente en hardware destino:** paralelismo real sobre múltiples núcleos y resultados correctos.
 
 ### Etapa 5 — SMT
 
@@ -242,15 +250,44 @@ con la causa `stall` o `domain_complete`, la racha sin mejora y su umbral. Se re
 `--quantum-domains`: las cesiones dependen de los datos y de la finalización del intervalo.
 Ver [docs/coarse_grained.md](docs/coarse_grained.md) para la definición y ejemplos del evento.
 
+CMP local (4 trabajadores sobre núcleos distintos reportados por el kernel):
+
+```bash
+cmake --build build --target fractal_cmp_local fractal_cmp -j2
+./build/fractal_cmp_local --list-cpus
+mkdir -p CMP/local/results
+./build/fractal_cmp_local compress sequential/examples/color128.png CMP/local/results/color.frc --teams 2 --threads-per-team 2 --report-affinity CMP/local/results/affinity.csv
+./build/fractal_seq decompress CMP/local/results/color.frc CMP/local/results/color.png 80
+```
+
+CMP de evaluación, **en Ubuntu nativo con AMD Ryzen 8/16**:
+
+```bash
+./build/fractal_cmp --list-cpus
+mkdir -p CMP/results
+./build/fractal_cmp compress sequential/examples/color128.png CMP/results/color.frc --teams 4 --threads-per-team 2 --report-affinity CMP/results/affinity.csv
+./build/fractal_seq decompress CMP/results/color.frc CMP/results/color.png 80
+./build/fractal_seq compare sequential/examples/color128.png CMP/results/color.png
+```
+
+El perfil de evaluación rechaza WSL/virtualización detectada, sistemas distintos de Ubuntu,
+CPU de otra familia y topologías fuera del contrato 8 núcleos/8 o 16 lógicas. La variante
+local conserva afinidad estricta y compara los mismos candidatos, pero sus resultados no
+sustituyen mediciones físicas. Se puede configurar desde `CMP/` o `CMP/local/`.
+`--report-affinity` registra CPU solicitada y observada antes/después de cada trabajador.
+El total `teams * threads_per_team` no puede exceder los núcleos permitidos; no se rellena
+con hermanos SMT. CMP no acepta cuantums ni trazas de turnos cooperativos.
+Ver [docs/cmp.md](docs/cmp.md).
+
 Se conservan los argumentos posicionales originales (`compress entrada salida 8 8` y
 `decompress entrada salida 80`), el modo gris (`compress-gray`, `compare-gray`). Por compatibilidad, `--model` es opcional
 y solo acepta el modelo del ejecutable (`sequential`/`secuencial` para `fractal_seq`,
-`fine-grained` para `fractal_fine`, `coarse-grained` para `fractal_coarse`). Los modelos cruzados se rechazan.
+`fine-grained` para `fractal_fine`, `coarse-grained` para `fractal_coarse` y `CMP` para ambas variantes CMP). Los modelos cruzados se rechazan.
 Las opciones no se pueden repetir ni duplicar con argumentos posicionales.
 
 `--teams` y `--threads-per-team` describen la configuración común; para `sequential` deben valer 1.
-Fine-Grained y Coarse-Grained están disponibles para compresión; CMP y SMT continúan pendientes.
-La reconstrucción se ejecuta mediante `fractal_seq decompress`; `fractal_fine` y `fractal_coarse` la rechazan.
+Fine-Grained, Coarse-Grained y las dos variantes CMP están disponibles para compresión; SMT continúa pendiente.
+La reconstrucción se ejecuta mediante `fractal_seq decompress`; los ejecutables paralelos la rechazan.
 No se aceptan opciones de ejecución en `compare` ni parámetros de compresión en `decompress`.
 
 También se puede configurar desde una carpeta de modelo con `cmake -S sequential -B build`
@@ -314,6 +351,20 @@ Cada decisión debe incluir:
   mantiene cesión periódica por cuantum; Coarse-Grained cede solo por evento o finalización.
   Las condiciones siguen siendo individuales y únicamente se notifica al siguiente turno.
 
+**Etapa 4 — Dos variantes y destino confirmado — 2026-10-15:**
+
+- `fractal_cmp_local` para pruebas en esta computadora; `fractal_cmp` para Ubuntu nativo
+  AMD Ryzen con el perfil 8/16 de RayTracing confirmado por el usuario. No se asume un
+  modelo Ryzen exacto ni que los IDs CPU de WSL sean los de la máquina de evaluación.
+- Ambas variantes reutilizan un motor CMP con pthreads concurrentes, equipos por range,
+  barreras cancelables de equipo y mínimos deterministas. No se usa el turno global de
+  Fine-Grained/Coarse-Grained durante la búsqueda.
+- Topología leída de sysfs y afinidad permitida; agrupación por socket/core, sin fallback
+  a hilos SMT ni continuación silenciosa si falla fijar/verificar afinidad.
+- SMT y Linux Perf de las etapas 5 y 8 deben implementarse para esa misma máquina Ubuntu
+  de evaluación, distinguiendo pruebas locales de mediciones físicas. No se implementan
+  aún ni se modifica el estado SMT o los permisos del kernel en esta etapa.
+
 **Decisiones iniciales:**
 
 - C++ como lenguaje de implementación.
@@ -332,12 +383,14 @@ Registrar problemas conocidos, tareas bloqueadas y validaciones que requieren in
   Las dos ejecuciones locales fallaron antes de iniciar la prueba con
   `FATAL: ThreadSanitizer: unexpected memory mapping`; no se afirma validación con TSan.
 
-- Implementar las etapas 4–8 únicamente cuando se soliciten explícitamente.
+- Implementar las etapas 5–8 únicamente cuando se soliciten explícitamente.
 - La configuración secuencial rechaza varios equipos/hilos para evitar informar
   paralelismo inexistente. `10 hilos = 5 equipos × 2` ya está disponible para Fine-Grained y Coarse-Grained.
 
 
-- Confirmar topología física y lógica de la CPU.
+- Ejecutar CMP de evaluación y verificar escalabilidad en Ubuntu/AMD Ryzen 8/16.
+- Registrar el modelo Ryzen exacto y la versión de Ubuntu en esa máquina antes de medir.
+- Confirmar allí topología física/lógica, afinidad efectiva y estado SMT; no inferirlos de WSL.
 - Establecer configuraciones equivalentes de comparación.
 - Verificar los requisitos académicos adicionales de la especificación.
 
@@ -534,3 +587,39 @@ Mantener este historial breve. Git conserva el historial detallado de modificaci
   repitió ni se presenta como aprobado. No se ejecutaron benchmarks de hardware.
 - Próximo paso, solo bajo solicitud explícita: etapa 4 (CMP), previa verificación de
   topología física y afinidad apropiada para el hardware disponible.
+
+
+### 2026-10-15 — Etapa 4 — Dos variantes CMP implementadas; validación física pendiente
+
+- Entradas `CMP/main.cpp` y `CMP/local/main.cpp`, ejecutables `fractal_cmp` y
+  `fractal_cmp_local`, CMake por variante y motor único en `CMP/encoder.cpp`.
+  `src/cpu_topology.cpp` detecta CPU online, socket/core, máscara permitida, entorno,
+  distribución y familia del procesador. El perfil de evaluación aplica Ubuntu/AMD Ryzen/8-16.
+- Equipos paralelos con barreras cancelables, resultados y candidatos por índice exclusivo;
+  afinidad fijada/verificada en cada pthread antes/después. Un fallo cancela todas las
+  barreras y reúne los hilos creados. No hay mutex global durante la búsqueda.
+- Release con OpenCV (`/tmp/fractal-stage4-release`): **8/8 pruebas CTest aprobadas**.
+  Sin OpenCV (`/tmp/fractal-stage4-core`): **6/6 aprobadas**.
+  Configuración desde `CMP/` (`/tmp/fractal-stage4-direct`): ambos targets compilan y el
+  diagnóstico local identifica WSL/Ubuntu, i5-1335U, 12 CPU online y 6 núcleos permitidos.
+- Comandos: `cmake -S <fuente> -B <build> -DCMAKE_BUILD_TYPE=Release -DBUILD_APP=<ON/OFF>`,
+  `cmake --build <build> -j2` y `ctest --test-dir <build> --output-on-failure`.
+  En la configuración directa se construyeron los targets `fractal_cmp` y `fractal_cmp_local`.
+- `cmp_tests`: **54 casos monocanal más RGB y equipos vacíos**, hasta seis trabajadores,
+  reglas/reconstrucciones exactas y afinidad en núcleos distintos según el kernel.
+  Con `taskset -c 1`, nueve casos más RGB/equipos vacíos confirman respeto de la máscara
+  restringida, incluso si el representante permitido es un hermano lógico impar.
+- Fixtures verifican selección de representantes, varios sockets, 8/16, 8/8 con SMT
+  inactivo, máscaras parciales y rechazo de exceso de trabajadores o perfil incorrecto.
+  Son pruebas del contrato, **no ejecuciones físicas del perfil target**. CLI verifica
+  reportes de afinidad, modelo fijo y rechazo del perfil de evaluación en WSL.
+- `color128.png`, range=8, stride=8, gris/RGB y equipos 1×1, 2×1, 1×2, 2×2 y 3×2:
+  **diez FRC y PNG idénticos byte por byte** a `/tmp/fractal-stage4-baseline/fractal_seq`;
+  cada reporte verifica CPU observada antes/después igual a la solicitada.
+  Artefactos: `/tmp/fractal-stage4-check-v6d_eejp/`.
+- Creación parcial de pthreads probada con límite de memoria de 48 MiB solo para el
+  subproceso: error propagado y salida sin bloqueo (timeout de 15 segundos).
+- Completadas distribución, implementación de afinidad y sincronización/memoria compartida.
+  Se mantienen pendientes los dos criterios físicos de la etapa 4; no se ejecutaron
+  benchmarks principales en WSL ni se afirma escalabilidad física por estos tests.
+  ThreadSanitizer conserva su pendiente anterior. No se implementaron etapas 5–8.
