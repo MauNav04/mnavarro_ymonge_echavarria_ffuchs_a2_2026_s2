@@ -4,9 +4,9 @@ Fecha: 2026-10-13. Alcance: revisión y extracción de la etapa 1; sin cambios e
 
 ## Flujo y responsabilidades
 
-- `sequential/main.cpp` valida argumentos, carga imágenes, llama al codec y mide tiempo
+- `app/cli.cpp` valida argumentos, carga imágenes, llama al codec y mide tiempo
   de cómputo separado del tiempo total. Comandos: `compress`, `compress-gray`, `decompress`,
-  `compare` y `compare-gray`; la interfaz común permite seleccionar modelo y configuración; en etapa 1 solo admite `sequential`, un equipo y un hilo.
+  `compare` y `compare-gray`; cada `main.cpp` fija su modelo y utiliza el controlador compartido; en etapa 1 solo admite `sequential`, un equipo y un hilo.
 - `app/image_io.cpp` convierte BGR de OpenCV a planos RGB normalizados y viceversa.
 - `src/codec.cpp` valida geometría y muestras, precalcula dominios de lado `2*range`
   reducidos por promedio 2×2 y busca exhaustivamente una regla por range.
