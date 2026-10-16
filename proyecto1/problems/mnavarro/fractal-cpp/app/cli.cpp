@@ -30,6 +30,7 @@ void distinct(const char* in,const char* out) {
 }
 void usage(std::ostream& out, fractal::Model model,fractal::CmpProfile profile) {
     const char* binary=model==fractal::Model::Sequential?"fractal_seq":(model==fractal::Model::FineGrained?"fractal_fine":(model==fractal::Model::CoarseGrained?"fractal_coarse":"fractal_cmp"));
+    if(model==fractal::Model::SMT) binary="fractal_smt";
     if(model==fractal::Model::CMP && profile==fractal::CmpProfile::Local) binary="fractal_cmp_local";
     out<<"Uso:\n  "<<binary<<" compress entrada.png salida.frc [range=8] [stride=8]\n"
        <<"  "<<binary<<" compress-gray entrada.png salida.frc [range=8] [stride=8]\n";
@@ -41,6 +42,10 @@ void usage(std::ostream& out, fractal::Model model,fractal::CmpProfile profile) 
        <<"Opciones compress/ compress-gray: --range N --stride N\n"
        <<"Equipos: --teams N --threads-per-team N\n"
        <<"Modelo fijo: "<<fractal::model_name(model)<<"\n";
+    if(model==fractal::Model::SMT)
+        out<<"SMT fisico Ubuntu/AMD Ryzen: --smt-state on|off [--report-affinity salida.csv]\n"
+           <<"Diagnostico: --list-cpus [--smt-state on|off]. Por defecto: 4 equipos de 4, estado on.\n"
+           <<"El programa no modifica SMT. Reconstruccion: fractal_seq decompress.\n";
     if(model==fractal::Model::CMP)
         out<<"CMP perfil "<<fractal::cmp_profile_name(profile)<<": --list-cpus | --report-affinity salida.csv\n"
            <<"Un trabajador por nucleo distinto permitido. Reconstruccion: fractal_seq decompress.\n";
@@ -61,6 +66,7 @@ Options parse(int argc, char** argv, fractal::Model model,fractal::CmpProfile pr
     Options options;
     options.execution.model=model;
     options.execution.cmp_profile=profile;
+    if(model==fractal::Model::SMT) {options.execution.teams=4;options.execution.threads_per_team=4;}
     options.command=argv[1];
     const bool compress=options.command=="compress" || options.command=="compress-gray";
     const bool decompress=options.command=="decompress";
@@ -74,7 +80,7 @@ Options parse(int argc, char** argv, fractal::Model model,fractal::CmpProfile pr
         if(!seen.insert(arg).second) throw std::invalid_argument("Opcion repetida: "+arg);
         const bool fineOption=arg=="--quantum-domains" || arg=="--trace-schedule" || arg=="--report-affinity";
         const bool codecOption=arg=="--range" || arg=="--stride";
-        const bool executionOption=arg=="--model" || arg=="--teams" || arg=="--threads-per-team";
+        const bool executionOption=arg=="--model" || arg=="--teams" || arg=="--threads-per-team" || arg=="--smt-state";
         if((fineOption && !compress) || (codecOption && !compress) || (arg=="--iterations" && !decompress) ||
            (executionOption && !compress && !decompress) ||
            (!fineOption && !codecOption && !executionOption && arg!="--iterations"))
@@ -88,6 +94,7 @@ Options parse(int argc, char** argv, fractal::Model model,fractal::CmpProfile pr
         else if(arg=="--quantum-domains") options.execution.quantum_domains=number(value);
         else if(arg=="--trace-schedule") options.trace_path=value;
         else if(arg=="--report-affinity") options.affinity_path=value;
+        else if(arg=="--smt-state") options.execution.smt_state=fractal::parse_smt_state(value);
         else if(arg=="--range") options.codec.range=number(value);
         else if(arg=="--stride") options.codec.stride=number(value);
         else options.iterations=number(value);
@@ -116,8 +123,10 @@ Options parse(int argc, char** argv, fractal::Model model,fractal::CmpProfile pr
         throw std::invalid_argument("Cuantum requiere fine-grained.");
     if(seen.count("--trace-schedule") && model!=fractal::Model::FineGrained && model!=fractal::Model::CoarseGrained)
         throw std::invalid_argument("Traza requiere fine-grained o coarse-grained.");
-    if(seen.count("--report-affinity") && model!=fractal::Model::CMP)
-        throw std::invalid_argument("Reporte de afinidad requiere CMP.");
+    if(seen.count("--report-affinity") && model!=fractal::Model::CMP && model!=fractal::Model::SMT)
+        throw std::invalid_argument("Reporte de afinidad requiere CMP o SMT.");
+    if(seen.count("--smt-state") && model!=fractal::Model::SMT)
+        throw std::invalid_argument("Estado SMT requiere modelo SMT.");
     if(decompress && options.execution.model!=fractal::Model::Sequential)
         throw std::invalid_argument(std::string("Decodificacion ")+fractal::model_name(model)+" no implementada; use sequential.");
     if(compress || decompress) fractal::validate_execution(options.execution);
@@ -126,6 +135,9 @@ Options parse(int argc, char** argv, fractal::Model model,fractal::CmpProfile pr
 void report(const fractal::ExecutionConfig& execution) {
     std::cout<<"Modelo: "<<fractal::model_name(execution.model)
              <<"\nEquipos: "<<execution.teams<<"\nHilos por equipo: "<<execution.threads_per_team<<'\n';
+    if(execution.model==fractal::Model::SMT)
+        std::cout<<"SMT solicitado: "<<fractal::smt_state_name(execution.smt_state)
+                 <<" (estado fisico verificado, no simulado)\n";
     if(execution.model==fractal::Model::CMP)
         std::cout<<"CMP perfil: "<<fractal::cmp_profile_name(execution.cmp_profile)<<" (paralelismo con afinidad)\n";
     if(execution.model==fractal::Model::CoarseGrained)
@@ -139,22 +151,31 @@ void report(const fractal::ExecutionConfig& execution) {
 int fractal::app::run(int argc,char** argv, Model model,CmpProfile profile) {
  try {
     if(argc==2 && std::string(argv[1])=="--help") {usage(std::cout,model,profile); return 0;}
-    if(argc==2 && std::string(argv[1])=="--list-cpus" && model==Model::CMP) {
+    if(argc>=2 && std::string(argv[1])=="--list-cpus" && (model==Model::CMP || model==Model::SMT)) {
         const auto topology=detect_cpu_topology();
-        (void)select_cmp_cpus(topology,1,profile);
+        if(model==Model::SMT) {
+            SmtState state=topology.smt_active==0?SmtState::Off:SmtState::On;
+            if(argc==4 && std::string(argv[2])=="--smt-state") state=parse_smt_state(argv[3]);
+            else if(argc!=2) throw std::invalid_argument("Diagnostico SMT: --list-cpus [--smt-state on|off].");
+            (void)select_smt_cpus(topology,1,state);
+        } else {
+            if(argc!=2) throw std::invalid_argument("Diagnostico CMP: --list-cpus.");
+            (void)select_cmp_cpus(topology,1,profile);
+        }
         std::cout<<"environment="<<topology.environment<<" profile="<<cmp_profile_name(profile)
                  <<" distribution="<<topology.distribution<<" online_cpus="<<topology.online_cpus.size()
                  <<" online_cores="<<unique_physical_cores(topology.online_cpus).size()
-                 <<" allowed_cores="<<topology.available_cores.size()<<'\n'
-                 <<"processor="<<topology.processor<<"\nlogical_cpu,socket,core\n";
-        for(const auto& cpu:topology.available_cores)
+                 <<" allowed_cores="<<topology.available_cores.size();
+        if(model==Model::SMT) std::cout<<" smt_control="<<topology.smt_control<<" smt_active="<<topology.smt_active;
+        std::cout<<'\n'<<"processor="<<topology.processor<<"\nlogical_cpu,socket,core\n";
+        for(const auto& cpu:(model==Model::SMT?topology.allowed_cpus:topology.available_cores))
             std::cout<<cpu.cpu<<','<<cpu.socket<<','<<cpu.core<<'\n';
         return 0;
     }
     if(argc<4) {usage(std::cerr,model,profile); return 1;}
     auto options=parse(argc,argv,model,profile);
     std::vector<WorkerPlacement> placements;
-    if(model==Model::CMP) options.execution.worker_placements=&placements;
+    if(model==Model::CMP || model==Model::SMT) options.execution.worker_placements=&placements;
     if(!options.affinity_path.empty()) {
         distinct(options.input.c_str(),options.affinity_path.c_str());
         distinct(options.output.c_str(),options.affinity_path.c_str());
@@ -174,17 +195,26 @@ int fractal::app::run(int argc,char** argv, Model model,CmpProfile profile) {
         report(options.execution);
         auto a=readImage(input,cmd=="compress-gray");
         auto start=Clock::now(); auto c=fractal::execute_encode(a,options.codec,options.execution); double elapsed=seconds(start);
-        if(model==Model::CMP) {
-            std::cout<<"Afinidad CMP verificada: ";
+        if(model==Model::CMP || model==Model::SMT) {
+            std::cout<<"Afinidad "<<model_name(model)<<" verificada: ";
             for(const auto& w:placements) if(w.channel==0) std::cout<<"[H"<<w.worker<<"->CPU"<<w.cpu<<"] ";
             std::cout<<'\n';
             if(!options.affinity_path.empty()) {
+                const auto topology=detect_cpu_topology();
+                if(model==Model::SMT)
+                    (void)select_smt_cpus(topology,placements.size()/c.planes.size(),options.execution.smt_state);
                 std::ofstream file(options.affinity_path);
                 if(!file) throw std::runtime_error("No se pudo abrir reporte de afinidad.");
-                file<<"profile,channel,worker,team,cpu,socket,core,observed_before,observed_after\n";
-                for(const auto& w:placements)
+                file<<"profile,channel,worker,team,cpu,socket,core,observed_before,observed_after";
+                if(model==Model::SMT) file<<",smt_state,smt_control,smt_active,online_cpus";
+                file<<'\n';
+                for(const auto& w:placements) {
                     file<<cmp_profile_name(profile)<<','<<w.channel<<','<<w.worker<<','<<w.team<<','<<w.cpu<<','
-                        <<w.socket<<','<<w.core<<','<<w.observed_before<<','<<w.observed_after<<'\n';
+                        <<w.socket<<','<<w.core<<','<<w.observed_before<<','<<w.observed_after;
+                    if(model==Model::SMT) file<<','<<smt_state_name(options.execution.smt_state)<<','<<topology.smt_control
+                                            <<','<<topology.smt_active<<','<<topology.online_cpus.size();
+                    file<<'\n';
+                }
                 file.flush();
                 if(!file) throw std::runtime_error("Error escribiendo reporte de afinidad.");
             }

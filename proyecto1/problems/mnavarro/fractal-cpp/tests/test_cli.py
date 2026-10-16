@@ -161,3 +161,33 @@ with tempfile.TemporaryDirectory(prefix="fractal-cli-") as directory:
         assert sentinel.read_bytes() == b"preservar"
         assert image.read_bytes() == original
     print(f"OK CLI: RGB/gris, sintaxis original/opciones, reconstruccion, ayuda y {len(invalid)} rechazos sin alterar archivos.")
+
+# SMT: errores y proteccion de archivos se pueden verificar sin hardware de destino.
+smt_binary = pathlib.Path(sys.argv[6]).resolve()
+assert "--smt-state" in run("--help", executable=smt_binary)
+with tempfile.TemporaryDirectory(prefix="fractal-smt-cli-") as directory:
+    work = pathlib.Path(directory)
+    image, output, report = work / "input.ppm", work / "output.frc", work / "affinity.csv"
+    image.write_bytes(b"P6\n8 8\n255\n" + bytes([127] * 192))
+    output.write_bytes(b"preserve output")
+    report.write_bytes(b"preserve report")
+    cases = [
+        (smt_binary, ["--smt-state", "unknown"]),
+        (smt_binary, ["--quantum-domains", "1"]),
+        (smt_binary, ["--model", "CMP"]),
+        (smt_binary, ["--trace-schedule", str(report)]),
+        (smt_binary, ["--smt-state", "off", "--smt-state", "on"]),
+        (binary, ["--smt-state", "on"]),
+        (cmp_local_binary, ["--smt-state", "off"]),
+    ]
+    for executable, options in cases:
+        result = subprocess.run([str(executable), "compress", str(image), str(output), *options], capture_output=True, timeout=10)
+        assert result.returncode != 0
+        assert output.read_bytes() == b"preserve output"
+        assert report.read_bytes() == b"preserve report"
+    diagnostic = subprocess.run([str(smt_binary), "--list-cpus"], capture_output=True, timeout=10)
+    if diagnostic.returncode:
+        result = subprocess.run([str(smt_binary), "compress", str(image), str(output), "--report-affinity", str(report)], capture_output=True, timeout=10)
+        assert result.returncode != 0
+        assert output.read_bytes() == b"preserve output" and report.read_bytes() == b"preserve report"
+print("OK SMT CLI: ayuda, parametros invalidos y destino incompatible preservan archivos.")

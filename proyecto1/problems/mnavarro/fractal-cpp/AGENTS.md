@@ -15,7 +15,7 @@ Cada modelo tiene su propio `main.cpp` y `CMakeLists.txt` en su carpeta, y un ej
 separado: `sequential/` → `fractal_seq`, `fine-grained/` → `fractal_fine`,
 `coarse-grained/` → `fractal_coarse`, `CMP/` → `fractal_cmp` (evaluación) y
 `CMP/local/` → `fractal_cmp_local` (pruebas locales). Esta organización se conservará
-para `SMT/` → `fractal_smt` cuando se solicite.
+para `SMT/` → `fractal_smt`.
 Cada main fija su modelo; no permite ejecutar otro mediante `--model`.
 El núcleo único compartido está en `src/` e `include/`. Argumentos, E/S y mediciones se
 reutilizan desde `app/`; los main deben mantenerse pequeños, sin copiar el controlador.
@@ -98,6 +98,10 @@ Nunca inventar resultados, benchmarks, mediciones de hardware ni pruebas exitosa
   físicos por hermanos SMT al exceder el presupuesto. Los datos WSL no validan hardware físico.
 - **SMT:** Preparar para la misma computadora Ubuntu/AMD Ryzen de evaluación de RayTracing.
   Diferenciar concurrencia por software del SMT de hardware; verificar topología y estado.
+  `--smt-state on|off` exige el estado real del kernel; no lo modifica. Conservar 16
+  trabajadores por defecto (4×4), ON sobre 16 CPU y OFF sobre 8 núcleos sobresuscritos.
+  Compartir el motor paralelo con CMP sin cambiar su política de un hilo por núcleo.
+  Mantener la comparación física ON/OFF pendiente hasta ejecutarla en el destino.
   No sustituir validaciones físicas por pruebas locales. Implementar únicamente al solicitarse.
 
 No afirmar que una simulación por software reproduce exactamente el comportamiento microarquitectónico del procesador.

@@ -5,8 +5,8 @@ Este README es la **única fuente de verdad del progreso, arquitectura y validac
 están en [AGENTS.md](AGENTS.md) y la guía académica de la versión base en
 [sequential/README.md](sequential/README.md).
 
-Alcance autorizado: **etapa 4**, con equipos de hilos por range como diseño aprobado.
-Las etapas 5–8 continúan pendientes y requieren solicitud explícita.
+Alcance autorizado: **etapa 5**, con equipos de hilos por range como diseño aprobado.
+Las etapas 6–8 continúan pendientes y requieren solicitud explícita.
 
 ## 1. Descripción del proyecto
 
@@ -66,7 +66,7 @@ su modelo; el núcleo continúa compartido en `fractal_codec`.
 | Coarse-Grained | `coarse-grained/main.cpp` | `fractal_coarse` |
 | CMP de evaluación | `CMP/main.cpp` | `fractal_cmp` |
 | CMP local/WSL | `CMP/local/main.cpp` | `fractal_cmp_local` |
-| SMT (pendiente) | `SMT/main.cpp` | `fractal_smt` |
+| SMT de evaluación | `SMT/main.cpp` | `fractal_smt` |
 
 **Diseño aprobado:** equipos de hilos por range, reparto de dominios entre sus miembros y reducción de mínimos para publicar una regla. Ejemplo: 10 hilos = 5 equipos × 2 hilos.
 
@@ -130,13 +130,19 @@ en la máquina Ubuntu/AMD Ryzen 8/16. Las pruebas WSL no completan esos dos crit
 
 ### Etapa 5 — SMT
 
-- [ ] Detectar topología de hilos lógicos y núcleos físicos.
-- [ ] Implementar configuración de afinidad para SMT.
-- [ ] Preparar ejecución con SMT habilitado y deshabilitado.
+- [x] Detectar topología de hilos lógicos y núcleos físicos.
+- [x] Implementar configuración de afinidad para SMT.
+- [x] Preparar ejecución con SMT habilitado y deshabilitado.
 - [ ] Registrar y comparar ambas configuraciones.
 - [ ] Validar resultados contra la versión secuencial.
 
-**Aceptación:** Comparación reproducible de ambas configuraciones de hardware, con mediciones verificadas.
+**Estado:** implementación y preparación validadas mediante compilación, fixtures y
+regresiones del motor compartido. `fractal_smt` exige Ubuntu/AMD Ryzen 8/16 y verifica
+el estado real; las pruebas físicas ON/OFF, su registro/comparación y la equivalencia
+SMT contra secuencial en el destino continúan pendientes. Ver [docs/smt.md](docs/smt.md).
+
+**Aceptación pendiente en hardware destino:** comparación reproducible de ambas
+configuraciones de hardware, con mediciones verificadas. No se declara la etapa completa.
 
 ### Etapa 6 — Integración y pruebas
 
@@ -279,14 +285,44 @@ El total `teams * threads_per_team` no puede exceder los núcleos permitidos; no
 con hermanos SMT. CMP no acepta cuantums ni trazas de turnos cooperativos.
 Ver [docs/cmp.md](docs/cmp.md).
 
+SMT de evaluación, en la misma máquina Ubuntu/AMD Ryzen de CMP:
+
+```bash
+cmake --build build --target fractal_smt -j2
+./build/fractal_smt --help
+./build/fractal_smt --list-cpus --smt-state on
+python3 SMT/verify_smt.py run --state on --input sequential/examples/color128.png --output-dir SMT/results/on
+```
+
+Después de que el usuario desactive SMT realmente en la computadora de evaluación,
+conservando los mismos binarios y entrada:
+
+```bash
+./build/fractal_smt --list-cpus --smt-state off
+ctest --test-dir build -R smt_hardware_tests --output-on-failure
+python3 SMT/verify_smt.py run --state off --input sequential/examples/color128.png --output-dir SMT/results/off
+python3 SMT/verify_smt.py compare --on SMT/results/on --off SMT/results/off --output SMT/results/comparison.json
+```
+
+Por defecto son 4 equipos × 4 trabajadores en ambos estados. ON usa 16 CPU lógicas;
+OFF conserva 16 pthreads sobre 8 núcleos, con sobresuscripción por software.
+`--smt-state` comprueba el estado esperado y no lo cambia. El programa rechaza estados
+desconocidos/incompatibles y entornos reconocidos como virtualizados; no ofrece una
+simulación local que se pueda confundir con SMT físico. `--report-affinity salida.csv`
+registra CPU efectiva y estado verificado. La herramienta guarda diagnósticos, comandos,
+tiempos individuales y hashes; exige resultados FRC/PNG idénticos a secuencial.
+Guía completa, comandos manuales y protocolo de ambas corridas en [docs/smt.md](docs/smt.md).
+Los comandos ON/OFF anteriores están preparados, pero **pendientes de ejecutar en el Ryzen**.
+También se puede configurar con `cmake -S SMT -B build-smt`.
+
 Se conservan los argumentos posicionales originales (`compress entrada salida 8 8` y
 `decompress entrada salida 80`), el modo gris (`compress-gray`, `compare-gray`). Por compatibilidad, `--model` es opcional
 y solo acepta el modelo del ejecutable (`sequential`/`secuencial` para `fractal_seq`,
-`fine-grained` para `fractal_fine`, `coarse-grained` para `fractal_coarse` y `CMP` para ambas variantes CMP). Los modelos cruzados se rechazan.
+`fine-grained` para `fractal_fine`, `coarse-grained` para `fractal_coarse`, `CMP` para ambas variantes CMP y `SMT` para `fractal_smt`). Los modelos cruzados se rechazan.
 Las opciones no se pueden repetir ni duplicar con argumentos posicionales.
 
 `--teams` y `--threads-per-team` describen la configuración común; para `sequential` deben valer 1.
-Fine-Grained, Coarse-Grained y las dos variantes CMP están disponibles para compresión; SMT continúa pendiente.
+Fine-Grained, Coarse-Grained, las dos variantes CMP y SMT están disponibles para compresión; SMT requiere el hardware de evaluación.
 La reconstrucción se ejecuta mediante `fractal_seq decompress`; los ejecutables paralelos la rechazan.
 No se aceptan opciones de ejecución en `compare` ni parámetros de compresión en `decompress`.
 
@@ -383,7 +419,7 @@ Registrar problemas conocidos, tareas bloqueadas y validaciones que requieren in
   Las dos ejecuciones locales fallaron antes de iniciar la prueba con
   `FATAL: ThreadSanitizer: unexpected memory mapping`; no se afirma validación con TSan.
 
-- Implementar las etapas 5–8 únicamente cuando se soliciten explícitamente.
+- Implementar las etapas 6–8 únicamente cuando se soliciten explícitamente.
 - La configuración secuencial rechaza varios equipos/hilos para evitar informar
   paralelismo inexistente. `10 hilos = 5 equipos × 2` ya está disponible para Fine-Grained y Coarse-Grained.
 
@@ -391,6 +427,9 @@ Registrar problemas conocidos, tareas bloqueadas y validaciones que requieren in
 - Ejecutar CMP de evaluación y verificar escalabilidad en Ubuntu/AMD Ryzen 8/16.
 - Registrar el modelo Ryzen exacto y la versión de Ubuntu en esa máquina antes de medir.
 - Confirmar allí topología física/lógica, afinidad efectiva y estado SMT; no inferirlos de WSL.
+- Ejecutar `smt_hardware_tests` y `SMT/verify_smt.py run` en ambos estados reales del Ryzen,
+  comparar sus registros y actualizar las dos tareas pendientes de etapa 5 con evidencia.
+- Confirmar el modelo exacto de Ryzen. No ejecutar aún benchmarks estadísticos ni Perf.
 - Establecer configuraciones equivalentes de comparación.
 - Verificar los requisitos académicos adicionales de la especificación.
 
@@ -634,3 +673,47 @@ Mantener este historial breve. Git conserva el historial detallado de modificaci
   núcleos físicos del anfitrión ni su estado SMT.
 - Validación: revisión de la documentación, enlaces locales y `git diff --check`.
   Sin cambios de código ni nuevos checkboxes completados; se conservan pendientes físicos.
+
+
+### 2026-10-16 — Etapa 5 — SMT implementado; comparación física pendiente
+
+- `SMT/main.cpp`, CMake y `fractal_smt`, con 4×4 trabajadores por defecto. Adaptado el
+  reparto ON/OFF de RayTracing al diseño fractal aprobado de equipos por range.
+- Detección de todos los lógicos permitidos y estado `smt/control` + `smt/active`.
+  ON usa lógicos distintos, OFF sobresuscribe núcleos; sin numeración fija de hermanos,
+  sin alterar el estado del sistema y sin aceptar pinning como sustituto de SMT OFF real.
+- Motor concurrente de CMP trasladado a `src/parallel_encoder.cpp` y reutilizado por
+  ambos modelos. CMP conserva su política. Afinidad efectiva comprobada por trabajador;
+  en SMT se vuelve a verificar topología/estado al reunir los pthreads.
+- `SMT/verify_smt.py`: protocolo funcional de corrida/registro y comparación ON/OFF,
+  igualdad FRC/PNG contra secuencial, diagnósticos y comandos con tiempos individuales,
+  hashes de entrada/binarios/máquina/artefactos. No implementa benchmarks ni Perf.
+- Validación local WSL2, GNU C++ 13.3.0, OpenCV 4.6.0:
+
+  | Construcción | Resultado |
+  |---|---|
+  | `/tmp/fractal-stage5-release`, `BUILD_APP=ON` | 10 aprobadas, 1 omitida de 11 CTest |
+  | `/tmp/fractal-stage5-core`, `BUILD_APP=OFF` | 7 aprobadas, 1 omitida de 8 CTest |
+  | `/tmp/fractal-stage5-direct`, fuente `SMT/` | Target `fractal_smt` compilado y ayuda correcta |
+
+  Comandos: `cmake -S <fuente> -B <build> -DCMAKE_BUILD_TYPE=Release -DBUILD_APP=<ON/OFF>`,
+  `cmake --build <build> -j2`, `ctest --test-dir <build> --output-on-failure`.
+  En la construcción directa se usó `--target fractal_smt`.
+- `smt_tests`: contratos ON/OFF con fixtures, IDs dispersos, máscaras limitadas, estados
+  desconocidos, trabajadores fuera de presupuesto y hardware/sistema incorrectos.
+  `smt_record_tests`: comparación de registros sintéticos y rechazo de incompatibilidades
+  de máquina/entrada/binario/configuración/estado y de artefactos alterados.
+  CLI: ayuda, opciones incompatibles y preservación de archivos al rechazar el destino.
+- `smt_hardware_tests` se omitió correctamente por falta del destino: no es una prueba física
+  aprobada. Preparada para comparar 15 casos RGB con secuencial en cada estado del Ryzen.
+  Las regresiones existentes de secuencial, Fine-Grained, Coarse-Grained y CMP aprobaron.
+- Comprobación adicional con `color128.png`, range=8, stride=8, CMP local 2×2:
+  dos FRC y sus reconstrucciones RGB/gris idénticos al secuencial anterior de
+  `/tmp/fractal-stage5-baseline`. Artefactos: `/tmp/fractal-stage5-equivalence-f8dcl5t9/`.
+  El registrador SMT rechazó WSL antes de crear el directorio de resultados.
+  `git diff --check` y enlaces locales de la documentación revisados.
+- Tres tareas de preparación de etapa 5 marcadas; registro/comparación física y validación
+  SMT contra secuencial en el destino permanecen pendientes. No se ejecutaron experimentos
+  físicos, no se cambió SMT y no se implementaron las etapas 6–8.
+- Siguiente paso: llevar esta misma construcción al Ryzen, seguir `docs/smt.md` y conservar
+  las dos corridas reales antes de declarar completa la etapa 5.
