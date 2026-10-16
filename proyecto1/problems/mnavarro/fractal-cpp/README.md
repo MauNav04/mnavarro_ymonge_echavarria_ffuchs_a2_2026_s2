@@ -623,3 +623,14 @@ Mantener este historial breve. Git conserva el historial detallado de modificaci
   Se mantienen pendientes los dos criterios físicos de la etapa 4; no se ejecutaron
   benchmarks principales en WSL ni se afirma escalabilidad física por estos tests.
   ThreadSanitizer conserva su pendiente anterior. No se implementaron etapas 5–8.
+
+### 2026-10-16 — Aclaración documental de CMP frente a SMT
+
+- `docs/cmp.md` aclara que CMP selecciona un único hilo lógico por núcleo reportado,
+  sin activar/desactivar SMT ni implementar la etapa 5. Incluye la salida WSL aportada
+  por el usuario: 12 CPU lógicas, 6 núcleos reportados y 6 representantes permitidos.
+- Se distingue disponibilidad de ejecución: 2 equipos de 2 usan cuatro representantes;
+  la afinidad aplicada se comprueba con `--report-affinity`. La salida WSL no certifica
+  núcleos físicos del anfitrión ni su estado SMT.
+- Validación: revisión de la documentación, enlaces locales y `git diff --check`.
+  Sin cambios de código ni nuevos checkboxes completados; se conservan pendientes físicos.

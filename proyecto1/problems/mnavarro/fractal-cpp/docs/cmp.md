@@ -18,6 +18,51 @@ del entorno de ejecución, sin duplicar ni cambiar el algoritmo matemático. El 
 perfil se fijan en cada main; `--model` no permite cambiar a otro modelo y no existe un
 flag que convierta silenciosamente la variante de evaluación en local.
 
+## CMP y SMT: qué significa la referencia 8/16
+
+**CMP utiliza como máximo un trabajador por núcleo distinto reportado por el kernel.**
+En la computadora de evaluación, los 8 núcleos pueden exponer 16 CPU lógicas cuando SMT
+está activo. CMP elige un único representante lógico de cada núcleo: como máximo **8
+trabajadores**, sin asignar dos trabajadores a hermanos SMT del mismo núcleo.
+
+La mención de «8 con SMT inactivo» solo describe otra topología que CMP puede reconocer:
+seguirían siendo 8 núcleos, esta vez con una CPU lógica online por núcleo. **Esta implementación
+no activa ni desactiva SMT, no compara estados SMT ON/OFF y no implementa el modelo SMT
+de la etapa 5.** Reconoce la topología para seleccionar núcleos distintos con afinidad.
+No es necesario desactivar SMT para ejecutar CMP con esta selección.
+
+### Ejemplo local aportado por el usuario
+
+Salida de `fractal_cmp_local --list-cpus` reportada el 2026-10-16:
+
+```text
+environment=wsl profile=local distribution=ubuntu online_cpus=12 online_cores=6 allowed_cores=6
+processor= 13th Gen Intel(R) Core(TM) i5-1335U
+logical_cpu,socket,core
+0,0,0
+2,0,1
+4,0,2
+6,0,3
+8,0,4
+10,0,5
+```
+
+- `online_cpus=12`: el kernel de WSL expone 12 CPU lógicas online.
+- `online_cores=6`: ese kernel las agrupa en 6 pares distintos `(socket, core)`.
+- `allowed_cores=6`: la máscara actual permite elegir un representante de cada uno de esos
+  seis núcleos reportados. Es el máximo de trabajadores CMP disponibles en este entorno.
+- La lista selecciona las CPU lógicas `0, 2, 4, 6, 8, 10`, cada una con un `core` distinto.
+  Los números pares son propios de esta salida; la implementación no presupone esa numeración.
+
+Esta lista enumera representantes **disponibles**, no trabajadores ya ejecutados. Por ejemplo,
+`--teams 2 --threads-per-team 2` crea cuatro trabajadores y selecciona las primeras cuatro
+CPU de esa lista (`0, 2, 4, 6`). Para comprobar la afinidad aplicada durante una compresión,
+usar `--report-affinity`: la CPU solicitada debe coincidir con la observada antes y después.
+
+Al ser WSL, esta salida describe la topología expuesta por su kernel; **no certifica la
+topología física real del i5-1335U ni el estado SMT del equipo anfitrión**. Tampoco sustituye
+la validación de la computadora Ubuntu/AMD Ryzen de evaluación.
+
 ## Topología y afinidad
 
 Se adopta de [RayTracing CMP](../../../echavarria/RayTracing/CMP/main.cpp) el reparto contiguo,
