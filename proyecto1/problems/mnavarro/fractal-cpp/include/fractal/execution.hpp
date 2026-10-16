@@ -1,5 +1,6 @@
 #pragma once
 #include "fractal/color.hpp"
+#include "fractal/cpu_topology.hpp"
 #include <cstddef>
 #include <string>
 #include <vector>
@@ -14,6 +15,10 @@ struct ScheduleEvent {
     ScheduleReason reason = ScheduleReason::Quantum;
     std::size_t stagnant_domains = 0, stall_threshold = 0;
 };
+struct WorkerPlacement {
+    std::size_t channel, worker, team;
+    int cpu, socket, core, observed_before, observed_after;
+};
 struct ExecutionConfig {
     Model model = Model::Sequential;
     std::size_t teams = 1;
@@ -21,10 +26,13 @@ struct ExecutionConfig {
     std::size_t quantum_domains = 1;
     // Diagnóstico opcional: eventos añadidos en orden de ejecución. El llamador conserva el vector.
     std::vector<ScheduleEvent>* schedule_trace = nullptr;
+    CmpProfile cmp_profile = CmpProfile::Local;
+    // Añadido solo tras reunir los pthreads; cada trabajador verifica máscara y CPU efectiva.
+    std::vector<WorkerPlacement>* worker_placements = nullptr;
 };
 Model parse_model(const std::string& name);
 const char* model_name(Model model);
-// Codificación: sequential, fine-grained y coarse-grained; reconstrucción: sequential.
+// Codificación: sequential, fine-grained y coarse-grained y CMP; reconstrucción: sequential.
 void validate_execution(const ExecutionConfig& execution);
 Encoded execute_encode(const Image& image, Config config = {}, ExecutionConfig execution = {});
 MultiEncoded execute_encode(const MultiImage& image, Config config = {}, ExecutionConfig execution = {});

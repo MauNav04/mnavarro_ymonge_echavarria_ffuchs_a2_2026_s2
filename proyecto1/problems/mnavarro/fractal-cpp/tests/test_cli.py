@@ -7,6 +7,8 @@ import tempfile
 binary = pathlib.Path(sys.argv[1]).resolve()
 fine_binary = pathlib.Path(sys.argv[2]).resolve()
 coarse_binary = pathlib.Path(sys.argv[3]).resolve()
+cmp_local_binary = pathlib.Path(sys.argv[4]).resolve()
+cmp_target_binary = pathlib.Path(sys.argv[5]).resolve()
 
 def run(*args, executable=binary):
     result = subprocess.run([str(executable), *map(str, args)], capture_output=True, text=True, timeout=30)
@@ -64,6 +66,32 @@ with tempfile.TemporaryDirectory(prefix="fractal-cli-") as directory:
         assert events and all(e["reason"] in ["stall", "domain_complete"] for e in events)
         assert all(int(e["domain_end"]) > int(e["domain_begin"]) for e in events)
         run("decompress", coarse, work / "coarse.png", 80)
+    assert "fractal_cmp_local" in run("--help", executable=cmp_local_binary)
+    assert "fractal_cmp" in run("--help", executable=cmp_target_binary)
+    topology_result = subprocess.run([str(cmp_local_binary), "--list-cpus"], capture_output=True, text=True, timeout=30)
+    cmp_available = topology_result.returncode == 0
+    if cmp_available:
+        listing = topology_result.stdout.splitlines()
+        rows = list(csv.DictReader(listing[2:]))
+        available_cores = len(rows)
+        assert available_cores > 0 and len(set((r["socket"], r["core"]) for r in rows)) == available_cores
+        for mode in ["compress", "compress-gray"]:
+            reference, cmp_code = work / "reference.frc", work / "cmp.frc"
+            run(mode, image, reference, 4, 3)
+            report = work / "affinity.csv"
+            output = run(mode, image, cmp_code, 4, 3, "--teams", 1, "--threads-per-team", min(2, available_cores),
+                         "--report-affinity", report, executable=cmp_local_binary)
+            assert "Afinidad CMP verificada" in output and "perfil: local" in output
+            assert cmp_code.read_bytes() == reference.read_bytes()
+            with report.open() as file:
+                assignments = list(csv.DictReader(file))
+            assert len(assignments) == min(2, available_cores) * (3 if mode == "compress" else 1)
+            assert all(r["cpu"] == r["observed_before"] == r["observed_after"] and r["profile"] == "local" for r in assignments)
+            run("decompress", cmp_code, work / "cmp.png", 80)
+        # El perfil físico NO se etiqueta como ejecutado en WSL/VM. Solo se valida el rechazo.
+        if listing[0].split()[0] != "environment=native-or-unknown":
+            refused = subprocess.run([str(cmp_target_binary), "--list-cpus"], capture_output=True, text=True, timeout=30)
+            assert refused.returncode != 0 and "requiere Linux nativo" in refused.stderr
     # Rechazar entradas inválidas antes de E/S, sin truncar una salida existente.
     sentinel = work / "sentinel.frc"
     sentinel.write_bytes(b"preservar")
@@ -114,6 +142,17 @@ with tempfile.TemporaryDirectory(prefix="fractal-cli-") as directory:
         (coarse_binary,["compress", image, sentinel, "--teams", 0], "entero positivo"),
         (coarse_binary,["compress", image, sentinel, "--trace-schedule"], "Falta valor"),
     ])
+    invalid.extend([
+        (cmp_local_binary,["compress", image, sentinel, "--quantum-domains", 1], "requiere fine-grained"),
+        (cmp_local_binary,["compress", image, sentinel, "--trace-schedule", work / "invalid.csv"], "Traza requiere"),
+        (cmp_local_binary,["decompress", sentinel, image], "Decodificacion CMP"),
+        (cmp_local_binary,["compress", image, sentinel, "--model", "sequential"], "solo admite el modelo"),
+        (cmp_local_binary,["compress", image, sentinel, "--report-affinity", image], "archivos distintos"),
+        (cmp_local_binary,["compress", image, sentinel, "--report-affinity", sentinel], "archivos distintos"),
+        (binary,["compress", image, sentinel, "--report-affinity", work / "invalid.csv"], "requiere CMP"),
+    ] if cmp_available else [])
+    if cmp_available:
+        invalid.append((cmp_local_binary,["compress", image, sentinel, "--teams", available_cores+1], "nucleos distintos permitidos"))
     original = image.read_bytes()
     for executable,args,message in invalid:
         result = subprocess.run([str(executable), *map(str, args)], capture_output=True, text=True, timeout=30)

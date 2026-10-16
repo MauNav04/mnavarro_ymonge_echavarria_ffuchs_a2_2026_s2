@@ -50,7 +50,7 @@ int main() {
             const auto decoded=fractal::execute_decode(result,40);
             require(fractal::mse(decoded,fractal::decode(fractal::encode(multi,{4,3}),40))==0);
         }
-        for(auto name : {"CMP","SMT"}) {
+        for(auto name : {"SMT"}) {
             const auto model=fractal::parse_model(name);
             rejects([&]{fractal::validate_execution({model,5,2});});
         }

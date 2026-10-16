@@ -1,6 +1,7 @@
 #include "fractal/execution.hpp"
 #include "fractal/fine_grained.hpp"
 #include "fractal/coarse_grained.hpp"
+#include "fractal/cmp.hpp"
 #include <limits>
 #include <stdexcept>
 
@@ -35,10 +36,17 @@ void validate_execution(const ExecutionConfig& execution) {
     if (execution.teams==0 || execution.threads_per_team==0 ||
         execution.teams>std::numeric_limits<std::size_t>::max()/execution.threads_per_team)
         throw std::invalid_argument("Equipos e hilos por equipo deben ser positivos y su producto representable.");
-    if (execution.model!=Model::Sequential && execution.model!=Model::FineGrained && execution.model!=Model::CoarseGrained)
+    if (execution.model!=Model::Sequential && execution.model!=Model::FineGrained && execution.model!=Model::CoarseGrained && execution.model!=Model::CMP)
         throw std::invalid_argument(std::string("Modelo aun no implementado: ")+model_name(execution.model));
     if (execution.model==Model::Sequential && (execution.teams!=1 || execution.threads_per_team!=1))
         throw std::invalid_argument("El modelo secuencial requiere 1 equipo de 1 hilo.");
+    if(execution.model!=Model::CMP && execution.worker_placements)
+        throw std::invalid_argument("Reporte de afinidad requiere CMP.");
+    if(execution.model==Model::CMP) {
+        if(execution.quantum_domains!=1 || execution.schedule_trace)
+            throw std::invalid_argument("CMP no utiliza cuantums ni turnos cooperativos.");
+        (void)select_cmp_cpus(detect_cpu_topology(),execution.teams*execution.threads_per_team,execution.cmp_profile);
+    }
     if(execution.model==Model::CoarseGrained && execution.quantum_domains!=1)
         throw std::invalid_argument("Cuantum requiere fine-grained; coarse-grained cambia por eventos.");
     if(execution.quantum_domains==0) throw std::invalid_argument("Cuantum debe ser positivo.");
@@ -49,6 +57,7 @@ Encoded execute_encode(const Image& image, Config config, ExecutionConfig execut
     validate_execution(execution);
     if(execution.model==Model::FineGrained) return encode_fine_grained(image,config,execution);
     if(execution.model==Model::CoarseGrained) return encode_coarse_grained(image,config,execution);
+    if(execution.model==Model::CMP) return encode_cmp(image,config,execution);
     return encode(image,config);
 }
 MultiEncoded execute_encode(const MultiImage& image, Config config, ExecutionConfig execution) {
@@ -65,7 +74,9 @@ MultiEncoded execute_encode(const MultiImage& image, Config config, ExecutionCon
     for(std::size_t channel=0;channel<image.planes.size();++channel) {
         if(execution.model==Model::FineGrained)
             result.planes.push_back(encode_fine_grained(image.planes[channel],config,execution,channel));
-        else result.planes.push_back(encode_coarse_grained(image.planes[channel],config,execution,channel));
+        else if(execution.model==Model::CoarseGrained)
+            result.planes.push_back(encode_coarse_grained(image.planes[channel],config,execution,channel));
+        else result.planes.push_back(encode_cmp(image.planes[channel],config,execution,channel));
     }
     return result;
 }
