@@ -111,6 +111,15 @@ La desactivación de SMT en BIOS/UEFI y las pruebas físicas correspondientes re
 
 ## 6. Benchmarking y profiling
 
+Automatización vigente: Makefile raíz incluye `scripts/Makefile`; CMake sigue siendo
+la única definición de compilación. Conservar objetivos `all`, `run_*`, `verify_*` y
+`test` similares a RayTracing/gray-scott. `scripts/test_models.py` es una suite funcional,
+no un benchmark. La suite completa debe fallar si falta CMP/SMT o el estado solicitado;
+`test_local` prueba únicamente lo permitido por el entorno. Ningún objetivo modifica SMT.
+Guardar registros por corrida y propagar errores/timeouts. No marcar la matriz nueva
+validada en Ryzen hasta ejecutarla allí, aunque los modelos individuales ya se hayan probado.
+
+
 El destino de SMT y Linux Perf es la computadora de evaluación de RayTracing: Ubuntu,
 AMD Ryzen (modelo exacto pendiente), topología 8/16 confirmada por el usuario. Las
 pruebas locales de contratos no sustituyen la ejecución física. No dar por medido SMT/Perf sobre esa máquina

@@ -5,8 +5,8 @@ Este README es la **única fuente de verdad del progreso, arquitectura y validac
 están en [AGENTS.md](AGENTS.md) y la guía académica de la versión base en
 [sequential/README.md](sequential/README.md).
 
-Alcance autorizado: **limpieza de CMP local y actualización documental tras validar los modelos**, con equipos de hilos por range como diseño aprobado.
-Las etapas 6–8 continúan pendientes y requieren solicitud explícita.
+Alcance autorizado: **etapa 6 — integración y pruebas**, con equipos de hilos por range como diseño aprobado.
+Las etapas 7–8 continúan pendientes y requieren solicitud explícita.
 
 ## 1. Descripción del proyecto
 
@@ -152,13 +152,20 @@ sustituye sus artefactos ni las mediciones verificadas del criterio experimental
 
 ### Etapa 6 — Integración y pruebas
 
-- [ ] Configurar CMake para todos los ejecutables.
-- [ ] Integrar Makefile para automatización.
-- [ ] Implementar `test_models.py`.
+- [x] Configurar CMake para todos los ejecutables.
+- [x] Integrar Makefile para automatización.
+- [x] Implementar `test_models.py`.
 - [ ] Validar resultados para diferentes cantidades de trabajadores.
 - [ ] Comprobar errores, sincronización y ausencia de bloqueos.
 
-**Aceptación:** Todos los modelos compilan, ejecutan y superan sus pruebas funcionales.
+**Estado:** automatización preparada con Makefile raíz y `scripts/Makefile`, CMake y
+`scripts/test_models.py`. La nueva matriz completa con CMP/SMT debe ejecutarse en el
+Ryzen; las últimas dos tareas mantienen pendiente esa validación. Los modelos ya fueron
+confirmados funcionales por el usuario antes de integrar esta suite.
+Ver [docs/testing.md](docs/testing.md) para el protocolo, comandos y artefactos.
+
+**Aceptación pendiente de la nueva suite en destino:** todos los modelos compilan,
+ejecutan y superan las pruebas integradas de etapa 6.
 
 ### Etapa 7 — Benchmarking y métricas
 
@@ -216,6 +223,27 @@ Documentar los comandos reales y verificados para:
 - Ejecutar Linux Perf.
 
 Desde `proyecto1/problems/mnavarro/fractal-cpp/`:
+
+La interfaz de automatización recomendada para etapa 6 es:
+
+```bash
+make help
+make all
+make test_local                         # CTest y tres modelos portables; permite WSL
+make topology SMT_STATE=on              # En Ubuntu/AMD Ryzen de evaluación
+make test QUICK=1 SMT_STATE=on          # Comprobación breve de todos los modelos
+make test SMT_STATE=on                  # Matriz completa en el destino
+# Tras desactivar SMT realmente mediante intervención del usuario:
+make test SMT_STATE=off
+```
+
+La suite completa falla si falta el hardware/estado requerido; no omite CMP/SMT
+silenciosamente. `make -C scripts <objetivo>` ofrece los mismos comandos.
+`run_seq`, `run_fine`, `run_coarse`, `run_cmp`, `run_smt_on` y `run_smt_off`
+comprimen y reconstruyen una imagen demostrativa. Los `verify_*` comparan contra
+secuencial; `record_smt_on/off` y `compare_smt` conservan la comparación ON/OFF.
+Guía detallada de ejecución, parámetros y resultados: [docs/testing.md](docs/testing.md).
+Los comandos CMake directos continúan disponibles:
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_APP=ON
@@ -413,11 +441,13 @@ Registrar problemas conocidos, tareas bloqueadas y validaciones que requieren in
   Las dos ejecuciones locales fallaron antes de iniciar la prueba con
   `FATAL: ThreadSanitizer: unexpected memory mapping`; no se afirma validación con TSan.
 
-- Implementar las etapas 6–8 únicamente cuando se soliciten explícitamente.
+- Implementar las etapas 7–8 únicamente cuando se soliciten explícitamente.
 - La configuración secuencial rechaza varios equipos/hilos para evitar informar
   paralelismo inexistente. `10 hilos = 5 equipos × 2` ya está disponible para Fine-Grained y Coarse-Grained.
 
 
+- Ejecutar la nueva suite de etapa 6 con `make test SMT_STATE=on` y, tras la intervención
+  de SMT, `make test SMT_STATE=off`; conservar los dos `report.json`.
 - Documentar la escalabilidad de CMP con diferentes cantidades de trabajadores en Ubuntu/AMD Ryzen.
 - Registrar el modelo Ryzen exacto y la versión de Ubuntu en esa máquina antes de medir.
 - Incorporar los registros ON/OFF del Ryzen mediante `SMT/verify_smt.py` y su comparación.
@@ -736,3 +766,35 @@ Mantener este historial breve. Git conserva el historial detallado de modificaci
   los comandos vigentes y el estado actual están en las secciones 4, 6 y 8.
 - Pendientes: incorporar registros ON/OFF, documentar escalabilidad y abordar etapas
   6–8 únicamente bajo solicitud explícita.
+
+
+### 2026-10-16 — Etapa 6 — Automatización preparada; matriz Ryzen pendiente
+
+- Makefile raíz y `scripts/Makefile` con interfaz `all`, modelos individuales,
+  `run_*`, `verify_*`, `test`, `test_unit`, `test_local` y registro/comparación SMT.
+  Revisadas las referencias de RayTracing y gray-scott; CMake continúa definiendo la
+  compilación única. Ningún objetivo cambia SMT ni implementa benchmarking/Perf.
+- `scripts/test_models.py`: 176 casos completos o 18 rápidos para cinco modelos,
+  RGB/gris, constantes/patrones, geometrías y equipos variados, FRC/PNG exactos,
+  afinidad, errores, protección de archivos, timeouts y registros JSON por corrida.
+  Un destino incompatible produce fallo y registro parcial, nunca una validación omitida.
+- CTest incorpora integración portátil, cinco pruebas del orquestador (incluidos
+  contratos sintéticos SMT ON/OFF) y fallos reales de `pthread_create` limitando solo
+  la memoria del subproceso. Se verificó salida controlada de Fine-Grained/Coarse-Grained.
+- Validación WSL2 con GNU C++ 13.3.0, OpenCV 4.6.0 y Python3:
+  `make -C scripts test_local BUILD_DIR=/tmp/fractal-stage6-release JOBS=2`: **13/13**.
+  `ctest --test-dir /tmp/fractal-stage6-release --output-on-failure`: **13 aprobadas,
+  2 físicas omitidas de 15**. Los cinco ejecutables compilan.
+- Matriz completa de secuencial/Fine-Grained/Coarse-Grained: **88 casos** FRC/PNG
+  exactos, sin fallos ni timeouts. Registro:
+  `/tmp/fractal-stage6-matrix/run-20261016-123832-6ead4e0a/report.json`.
+- Make raíz: `run_seq`, `run_fine` y `run_coarse` con imagen pequeña 16×24,
+  range=4, stride=3 y equipos 2×2; FRC/PNG idénticos. `verify_all QUICK=1` rechazó WSL,
+  devolvió error a Make y conservó `success: false`. Objetivos CMP/SMT revisados con
+  `make -n`, sin atribuirles ejecución física en esta sesión.
+- README: tres tareas de preparación completadas; validación de la nueva matriz con
+  múltiples trabajadores y comprobaciones completas en Ryzen pendientes. La confirmación
+  anterior de modelos individuales no se confunde con haber corrido esta suite nueva.
+- Guía de instalación, objetivos, parámetros, resultados y protocolo ON/OFF en
+  [docs/testing.md](docs/testing.md). Enlaces locales y `git diff --check` revisados.
+  Próximo paso: ejecutar los comandos de etapa 6 en el Ryzen y conservar sus registros.
