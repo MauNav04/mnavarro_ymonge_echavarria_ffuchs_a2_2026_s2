@@ -46,9 +46,9 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_APP=ON
 cmake --build build --target fractal_cmp fractal_seq -j2
 ./build/fractal_cmp --list-cpus
 mkdir -p CMP/results
-./build/fractal_cmp compress sequential/examples/color128.png CMP/results/color.frc --teams 4 --threads-per-team 2 --report-affinity CMP/results/affinity.csv
+./build/fractal_cmp compress assets/color128.png CMP/results/color.frc --teams 4 --threads-per-team 2 --report-affinity CMP/results/affinity.csv
 ./build/fractal_seq decompress CMP/results/color.frc CMP/results/color.png 80
-./build/fractal_seq compare sequential/examples/color128.png CMP/results/color.png
+./build/fractal_seq compare assets/color128.png CMP/results/color.png
 ```
 
 Se puede configurar desde `CMP/` con `cmake -S CMP -B build-cmp`. `--teams` por

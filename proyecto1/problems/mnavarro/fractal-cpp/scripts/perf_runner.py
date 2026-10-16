@@ -170,7 +170,7 @@ def campaign(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--build-dir", type=Path, default=ROOT / "build")
-    parser.add_argument("--input", type=Path, default=ROOT / "sequential/examples/color128.png")
+    parser.add_argument("--input", type=Path, default=ROOT / "assets/color128.png")
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--perf", default="perf")
     parser.add_argument("--models", default="all")

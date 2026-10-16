@@ -48,6 +48,7 @@ La topología real de núcleos físicos, P-cores, E-cores e hilos SMT debe verif
 Estructura vigente tras la extracción de la etapa 1:
 
 - `sequential/`: punto de entrada secuencial (nombre actualizado por solicitud del usuario).
+- `assets/`: imágenes de entrada compartidas por todos los modelos.
 - `app/`: controlador CLI, entrada/salida, mediciones y serialización FRC1/FRC2 compartidos.
 - `tests/`: pruebas del núcleo, ejecución y entrada/salida.
 - `fine-grained/`: simulación de planificación de grano fino.
@@ -264,6 +265,10 @@ preparación, campañas fijas y escalabilidad ON/OFF, y un único `make plot` pa
 Las figuras Perf de RayTracing y gray-scott se generan por separado con la
 [receta de etapa 8](docs/profiling.md).
 
+La entrada predeterminada es `assets/color128.png`. Para elegir otra imagen,
+usar `INPUT=assets/mirrors512.png` (también en benchmarks y Perf). Las salidas
+demostrativas siguen en `results/demo/<modelo>/`; las imágenes de entrada no se redimensionan.
+
 Para etapa 7, después de instalar `scripts/requirements.txt` en un entorno virtual:
 
 ```bash
@@ -300,12 +305,12 @@ Los comandos CMake directos continúan disponibles:
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_APP=ON
 cmake --build build -j2
 ctest --test-dir build --output-on-failure
-mkdir -p sequential/examples/results
+mkdir -p results/demo/seq
 ./build/fractal_seq --help
 ./build/fractal_fine --help
-./build/fractal_seq compress sequential/examples/color128.png sequential/examples/results/color.frc --teams 1 --threads-per-team 1 --range 8 --stride 8
-./build/fractal_seq decompress sequential/examples/results/color.frc sequential/examples/results/color.png --iterations 80
-./build/fractal_seq compare sequential/examples/color128.png sequential/examples/results/color.png
+./build/fractal_seq compress assets/color128.png results/demo/seq/color.frc --teams 1 --threads-per-team 1 --range 8 --stride 8
+./build/fractal_seq decompress results/demo/seq/color.frc results/demo/seq/color.png --iterations 80
+./build/fractal_seq compare assets/color128.png results/demo/seq/color.png
 ```
 Rebuild de un directirio/modo específico.
 ```
@@ -316,9 +321,9 @@ Fine-Grained, con 10 trabajadores organizados en 5 equipos de 2:
 
 ```bash
 mkdir -p fine-grained/results
-./build/fractal_fine compress sequential/examples/color128.png fine-grained/results/color.frc --teams 5 --threads-per-team 2 --quantum-domains 1
+./build/fractal_fine compress assets/color128.png fine-grained/results/color.frc --teams 5 --threads-per-team 2 --quantum-domains 1
 ./build/fractal_seq decompress fine-grained/results/color.frc fine-grained/results/color.png --iterations 80
-./build/fractal_seq compare sequential/examples/color128.png fine-grained/results/color.png
+./build/fractal_seq compare assets/color128.png fine-grained/results/color.png
 ```
 
 Cuantum por defecto: 1 dominio y sus ocho simetrías; se configura con `--quantum-domains N`.
@@ -331,9 +336,9 @@ Coarse-Grained, con 5 equipos de 2 trabajadores:
 ```bash
 cmake --build build --target fractal_coarse -j2
 mkdir -p coarse-grained/results
-./build/fractal_coarse compress sequential/examples/color128.png coarse-grained/results/color.frc --teams 5 --threads-per-team 2
+./build/fractal_coarse compress assets/color128.png coarse-grained/results/color.frc --teams 5 --threads-per-team 2
 ./build/fractal_seq decompress coarse-grained/results/color.frc coarse-grained/results/color.png --iterations 80
-./build/fractal_seq compare sequential/examples/color128.png coarse-grained/results/color.png
+./build/fractal_seq compare assets/color128.png coarse-grained/results/color.png
 ```
 
 Agregar `--trace-schedule coarse-grained/results/schedule.csv` registra una fila por ráfaga,
@@ -347,9 +352,9 @@ CMP de evaluación, **en Ubuntu nativo con AMD Ryzen 8/16**:
 cmake --build build --target fractal_cmp -j2
 ./build/fractal_cmp --list-cpus
 mkdir -p CMP/results
-./build/fractal_cmp compress sequential/examples/color128.png CMP/results/color.frc --teams 4 --threads-per-team 2 --report-affinity CMP/results/affinity.csv
+./build/fractal_cmp compress assets/color128.png CMP/results/color.frc --teams 4 --threads-per-team 2 --report-affinity CMP/results/affinity.csv
 ./build/fractal_seq decompress CMP/results/color.frc CMP/results/color.png 80
-./build/fractal_seq compare sequential/examples/color128.png CMP/results/color.png
+./build/fractal_seq compare assets/color128.png CMP/results/color.png
 ```
 
 El perfil de evaluación rechaza WSL/virtualización detectada, sistemas distintos de Ubuntu,
@@ -366,7 +371,7 @@ SMT de evaluación, en la misma máquina Ubuntu/AMD Ryzen de CMP:
 cmake --build build --target fractal_smt -j2
 ./build/fractal_smt --help
 ./build/fractal_smt --list-cpus --smt-state on
-python3 SMT/verify_smt.py run --state on --input sequential/examples/color128.png --output-dir SMT/results/on
+python3 SMT/verify_smt.py run --state on --input assets/color128.png --output-dir SMT/results/on
 ```
 
 Después de que el usuario desactive SMT realmente en la computadora de evaluación,
@@ -375,7 +380,7 @@ conservando los mismos binarios y entrada:
 ```bash
 ./build/fractal_smt --list-cpus --smt-state off
 ctest --test-dir build -R smt_hardware_tests --output-on-failure
-python3 SMT/verify_smt.py run --state off --input sequential/examples/color128.png --output-dir SMT/results/off
+python3 SMT/verify_smt.py run --state off --input assets/color128.png --output-dir SMT/results/off
 python3 SMT/verify_smt.py compare --on SMT/results/on --off SMT/results/off --output SMT/results/comparison.json
 ```
 
@@ -530,7 +535,7 @@ Mantener este historial breve. Git conserva el historial detallado de modificaci
 ### 2026-10-13 — Etapa 1 — Arquitectura y punto de entrada completados
 
 - Extraído el núcleo único a `src/` e `include/` y la E/S compartida a `app/`.
-  `sequential/main.cpp` conserva el controlador base; ejemplos permanecen en `sequential/examples/`.
+  `sequential/main.cpp` conserva el controlador base; las imágenes compartidas están actualmente en `assets/`.
 - `include/fractal/search.hpp` permite preparar dominios y ranges, buscar un intervalo
   de dominios y combinar mínimos con desempate determinista. Se conserva la aritmética
   original y el formato/orden de reglas FRC1/FRC2. `rules` se dimensiona por adelantado.
@@ -947,3 +952,21 @@ Mantener este historial breve. Git conserva el historial detallado de modificaci
 - Marcada únicamente la implementación de etapa 8. Siguen pendientes la captura física
   y el análisis experimental de contadores/modelos/SMT, además de los pendientes de
   etapas anteriores que requieren esa misma máquina. No se implementa el backlog.
+
+### 2026-10-16 — Imágenes de entrada compartidas
+
+- Trasladadas con `git mv` las cinco imágenes de entrada a `assets/`;
+  sus hashes SHA-256 se conservan. Esta carpeta sirve a todos los modelos.
+- Actualizadas las entradas predeterminadas de Make, benchmarking y Perf, las guías
+  de los modelos y la guía secuencial. Las salidas demostrativas conservan sus rutas
+  en `results/demo/<modelo>/`. Se preservan los resultados locales anteriores.
+- Compilación Release completa y demostraciones `run_seq`, `run_fine`, `run_coarse`
+  ejecutadas usando la nueva entrada predeterminada: FRC idénticos y reconstrucciones
+  de 128×128. Artefactos diagnósticos en `/tmp/fractal-images-demo/`.
+- `benchmark.py` ejecutado sin `--input`, en modo diagnóstico con seq/fine/coarse:
+  tres mediciones y equivalencia FRC verificadas; CSV en `/tmp/fractal-images-benchmark/`.
+- CTest: **18 aprobadas y 3 físicas omitidas de 21**, sin fallos. CMP, SMT y Perf
+  físicos siguen pendientes en el Ryzen; este traslado no modifica su estado de avance.
+- Revisadas las referencias de entrada y `git diff --check`. No se alteran el algoritmo,
+  los formatos ni los parámetros de carga. Los comandos habituales mantienen `build`
+  como directorio predeterminado de compilación.

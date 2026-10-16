@@ -124,7 +124,7 @@ grande puede necesitar más tiempo, especialmente con planificación cooperativa
 | `BUILD_TYPE`, `JOBS` | `Release`, `2` |
 | `PYTHON` | `python3` |
 | `RESULTS_DIR` | `<raíz>/results` |
-| `INPUT` | `sequential/examples/color128.png` |
+| `INPUT` | `assets/color128.png` |
 | `RANGE`, `STRIDE`, `ITERATIONS` | `8`, `8`, `80` |
 | `TEAMS`, `THREADS_PER_TEAM` | `4`, `2`, para demostraciones fine/coarse/CMP |
 | `SMT_TEAMS`, `SMT_THREADS_PER_TEAM` | `4`, `4`, para demostraciones/registros SMT |

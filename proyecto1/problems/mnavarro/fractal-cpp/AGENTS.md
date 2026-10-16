@@ -19,6 +19,8 @@ reintroducir una variante local ni un perfil que omita la verificación del dest
 Cada main fija su modelo; no permite ejecutar otro mediante `--model`.
 El núcleo único compartido está en `src/` e `include/`. Argumentos, E/S y mediciones se
 reutilizan desde `app/`; los main deben mantenerse pequeños, sin copiar el controlador.
+Las imágenes de entrada compartidas viven en `assets/`; no guardarlas dentro de
+un modelo, `app/` ni `src/`. Las salidas y campañas conservan sus directorios de resultados.
 Conservar el algoritmo matemático y los formatos FRC1/FRC2.
 Diseño aprobado: equipos de hilos por range; cada hilo evalúa dominios distintos y el equipo
 reduce mínimos para publicar una única regla. En empates conservar el orden dominio/simetría

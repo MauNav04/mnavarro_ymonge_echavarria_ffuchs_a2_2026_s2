@@ -45,7 +45,7 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_APP=ON
 cmake --build build -j2
 ctest --test-dir build --output-on-failure
 ./build/fractal_smt --list-cpus --smt-state on
-python3 SMT/verify_smt.py run --state on --input sequential/examples/color128.png --output-dir SMT/results/on
+python3 SMT/verify_smt.py run --state on --input assets/color128.png --output-dir SMT/results/on
 ```
 
 Tras desactivar SMT realmente y reiniciar si corresponde, sin recompilar ni cambiar
@@ -54,7 +54,7 @@ entrada/parámetros, repetir en la misma máquina:
 ```bash
 ./build/fractal_smt --list-cpus --smt-state off
 ctest --test-dir build -R smt_hardware_tests --output-on-failure
-python3 SMT/verify_smt.py run --state off --input sequential/examples/color128.png --output-dir SMT/results/off
+python3 SMT/verify_smt.py run --state off --input assets/color128.png --output-dir SMT/results/off
 python3 SMT/verify_smt.py compare --on SMT/results/on --off SMT/results/off --output SMT/results/comparison.json
 ```
 
@@ -77,7 +77,7 @@ Ejecución manual equivalente:
 
 ```bash
 mkdir -p SMT/results/manual
-./build/fractal_smt compress sequential/examples/color128.png SMT/results/manual/color.frc --smt-state on --teams 4 --threads-per-team 4 --report-affinity SMT/results/manual/affinity.csv
+./build/fractal_smt compress assets/color128.png SMT/results/manual/color.frc --smt-state on --teams 4 --threads-per-team 4 --report-affinity SMT/results/manual/affinity.csv
 ./build/fractal_seq decompress SMT/results/manual/color.frc SMT/results/manual/color.png --iterations 80
 ```
 
