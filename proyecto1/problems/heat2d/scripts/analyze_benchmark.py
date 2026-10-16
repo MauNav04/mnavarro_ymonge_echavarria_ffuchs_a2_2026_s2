@@ -318,25 +318,7 @@ def validate_groups(groups):
             "duplicate run identifiers."
         )
 
-    for model in (
-        "fine_grained",
-        "coarse_grained",
-        "cmp",
-        "smt",
-    ):
-        has_model = any(
-            key[0] == model
-            for key in groups
-        )
-
-        if (
-            has_model
-            and (model, 1) not in groups
-        ):
-            raise ValueError(
-                f"{model} requires a 1-context baseline "
-                "to calculate model scalability."
-            )
+    # Si un modelo no tiene corrida de 1 hilo, se usará el baseline secuencial
 
     for key, group in groups.items():
         run_ids = {
@@ -591,14 +573,15 @@ def calculate_statistics(
                 )
             )
 
+            baseline_model_samples = (
+                groups[(model, 1)]
+                if (model, 1) in groups
+                else sequential_samples
+            )
+
             model_scalabilities = (
                 paired_ratios(
-                    groups[
-                        (
-                            model,
-                            1,
-                        )
-                    ],
+                    baseline_model_samples,
                     samples,
                 )
             )

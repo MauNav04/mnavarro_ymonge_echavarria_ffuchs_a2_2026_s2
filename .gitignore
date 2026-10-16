@@ -34,6 +34,8 @@ results/
 !proyecto1/problems/heat2d/benchmark_results/ryzen_smt_200/*.csv
 !proyecto1/problems/heat2d/benchmark_results/ryzen_smt_200/plots/*.png
 !proyecto1/problems/heat2d/benchmark_results/heat2d_perf_metrics.csv
+!proyecto1/problems/heat2d/metricas/*.csv
+!proyecto1/problems/heat2d/metricas/graficas/*.png
 
 # Gray-Scott compilation output
 proyecto1/problems/gray-scott/scripts/gray_scott_seq
