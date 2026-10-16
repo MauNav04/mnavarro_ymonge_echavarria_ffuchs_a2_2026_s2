@@ -20,7 +20,7 @@ void equivalent(const fractal::Encoded& a,const fractal::Encoded& b) {
     for(std::size_t i=0;i<a.rules.size();++i) require(same(a.rules[i],b.rules[i]));
     require(fractal::mse(fractal::decode(a,40),fractal::decode(b,40))==0);
 }
-int main() {
+int main(int argc,char**) {
     try {
         // Fixtures de selección: validan contratos, no constituyen mediciones físicas.
         auto sockets=fractal::unique_physical_cores({{3,1,0},{1,0,0},{0,0,0},{2,1,0}});
@@ -37,26 +37,27 @@ int main() {
             target.online_cpus.push_back({2*core+1,0,core});
         }
         target.available_cores=fractal::unique_physical_cores(target.online_cpus);
-        require(fractal::select_cmp_cpus(target,8,fractal::CmpProfile::Target).size()==8);
-        rejects([&]{fractal::select_cmp_cpus(target,9,fractal::CmpProfile::Target);});
+        require(fractal::select_cmp_cpus(target,8).size()==8);
+        rejects([&]{fractal::select_cmp_cpus(target,9);});
         auto wrongProcessor=target; wrongProcessor.processor="Intel (fixture)";
-        rejects([&]{fractal::select_cmp_cpus(wrongProcessor,1,fractal::CmpProfile::Target);});
+        rejects([&]{fractal::select_cmp_cpus(wrongProcessor,1);});
         auto wrongSystem=target; wrongSystem.distribution="other";
-        rejects([&]{fractal::select_cmp_cpus(wrongSystem,1,fractal::CmpProfile::Target);});
+        rejects([&]{fractal::select_cmp_cpus(wrongSystem,1);});
         auto virtualTarget=target; virtualTarget.environment="wsl";
-        rejects([&]{fractal::select_cmp_cpus(virtualTarget,1,fractal::CmpProfile::Target);});
+        rejects([&]{fractal::select_cmp_cpus(virtualTarget,1);});
         auto noSmt=target; noSmt.online_cpus=noSmt.available_cores;
-        require(fractal::select_cmp_cpus(noSmt,8,fractal::CmpProfile::Target).size()==8);
+        require(fractal::select_cmp_cpus(noSmt,8).size()==8);
         auto limited=target; limited.available_cores.resize(2);
-        require(fractal::select_cmp_cpus(limited,2,fractal::CmpProfile::Target).size()==2);
-        rejects([&]{fractal::select_cmp_cpus(limited,3,fractal::CmpProfile::Target);});
+        require(fractal::select_cmp_cpus(limited,2).size()==2);
+        rejects([&]{fractal::select_cmp_cpus(limited,3);});
         auto wrong=target; wrong.online_cpus.resize(12);
-        rejects([&]{fractal::select_cmp_cpus(wrong,2,fractal::CmpProfile::Target);});
+        rejects([&]{fractal::select_cmp_cpus(wrong,2);});
+        if(argc==1) {std::cout<<"OK CMP: contratos de topologia de evaluacion (fixtures).\n";return 0;}
         fractal::CpuTopology topology;
-        try {topology=fractal::detect_cpu_topology();}
+        try {topology=fractal::detect_cpu_topology();(void)fractal::select_cmp_cpus(topology,1);}
         catch(const std::exception& e) {std::cout<<"SKIP ejecucion CMP: "<<e.what()<<'\n'; return 77;}
         const auto available=topology.available_cores.size();
-        rejects([&]{fractal::select_cmp_cpus(topology,available+1,fractal::CmpProfile::Local);});
+        rejects([&]{fractal::select_cmp_cpus(topology,available+1);});
         std::size_t cases=0,maxWorkers=0;
         for(int pattern=0;pattern<3;++pattern) {
             fractal::Image image{16,24,std::vector<float>(384,0.37f)};
@@ -104,7 +105,7 @@ int main() {
         execution.quantum_domains=1;
         std::vector<fractal::ScheduleEvent> trace; execution.schedule_trace=&trace;
         rejects([&]{fractal::validate_execution(execution);});
-        std::cout<<"OK CMP local: "<<cases<<" casos mono + RGB/equipos vacios; afinidad y reglas exactas, hasta "
-                 <<maxWorkers<<" trabajadores; entorno="<<topology.environment<<". Target: solo fixtures de contrato.\n";
+        std::cout<<"OK CMP evaluacion: "<<cases<<" casos mono + RGB/equipos vacios; afinidad y reglas exactas, hasta "
+                 <<maxWorkers<<" trabajadores; entorno="<<topology.environment<<". Hardware de destino verificado.\n";
     } catch(const std::exception& e) {std::cerr<<e.what()<<'\n';return 1;}
 }

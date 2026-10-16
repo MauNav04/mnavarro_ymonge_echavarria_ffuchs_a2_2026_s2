@@ -50,10 +50,7 @@ int main() {
             const auto decoded=fractal::execute_decode(result,40);
             require(fractal::mse(decoded,fractal::decode(fractal::encode(multi,{4,3}),40))==0);
         }
-        for(auto name : {"SMT"}) {
-            const auto model=fractal::parse_model(name);
-            rejects([&]{fractal::validate_execution({model,5,2});});
-        }
+        rejects([]{fractal::validate_execution({static_cast<fractal::Model>(999),1,1});});
         require(fractal::parse_model("secuencial")==fractal::Model::Sequential);
         rejects([]{fractal::parse_model("unknown");});
         rejects([]{fractal::validate_execution({fractal::Model::Sequential,0,1});});

@@ -13,9 +13,9 @@ La guía histórica en `sequential/README.md` no autoriza avanzar automáticamen
 
 Cada modelo tiene su propio `main.cpp` y `CMakeLists.txt` en su carpeta, y un ejecutable
 separado: `sequential/` → `fractal_seq`, `fine-grained/` → `fractal_fine`,
-`coarse-grained/` → `fractal_coarse`, `CMP/` → `fractal_cmp` (evaluación) y
-`CMP/local/` → `fractal_cmp_local` (pruebas locales). Esta organización se conservará
-para `SMT/` → `fractal_smt` cuando se solicite.
+`coarse-grained/` → `fractal_coarse`, `CMP/` → `fractal_cmp` y
+`SMT/` → `fractal_smt`. CMP conserva únicamente la versión de evaluación; no
+reintroducir una variante local ni un perfil que omita la verificación del destino.
 Cada main fija su modelo; no permite ejecutar otro mediante `--model`.
 El núcleo único compartido está en `src/` e `include/`. Argumentos, E/S y mediciones se
 reutilizan desde `app/`; los main deben mantenerse pequeños, sin copiar el controlador.
@@ -92,12 +92,17 @@ Nunca inventar resultados, benchmarks, mediciones de hardware ni pruebas exitosa
   y reanudar sin omitir candidatos; reiniciar racha al mejorar o ceder por stall. La
   finalización del intervalo tiene prioridad. Es una heurística simulada, no un stall
   físico medido. No sustituirla por Fine-Grained con un cuantum más largo.
-- **CMP:** Dos variantes con algoritmo compartido: local/WSL para pruebas funcionales y
-  evaluación en Ubuntu nativo, AMD Ryzen, 8 núcleos/16 lógicos (8 con SMT inactivo).
+- **CMP:** Única versión para evaluación en Ubuntu nativo, AMD Ryzen,
+  8 núcleos/16 lógicos (8 con SMT inactivo).
   Utilizar pthreads concurrentes y verificar afinidad efectiva; no reemplazar núcleos
   físicos por hermanos SMT al exceder el presupuesto. Los datos WSL no validan hardware físico.
 - **SMT:** Preparar para la misma computadora Ubuntu/AMD Ryzen de evaluación de RayTracing.
   Diferenciar concurrencia por software del SMT de hardware; verificar topología y estado.
+  `--smt-state on|off` exige el estado real del kernel; no lo modifica. Conservar 16
+  trabajadores por defecto (4×4), ON sobre 16 CPU y OFF sobre 8 núcleos sobresuscritos.
+  Compartir el motor paralelo con CMP sin cambiar su política de un hilo por núcleo.
+  Registrar validaciones realizadas por el usuario como tales. No atribuirles mediciones
+  detalladas ni artefactos que no se hayan proporcionado.
   No sustituir validaciones físicas por pruebas locales. Implementar únicamente al solicitarse.
 
 No afirmar que una simulación por software reproduce exactamente el comportamiento microarquitectónico del procesador.
@@ -107,8 +112,8 @@ La desactivación de SMT en BIOS/UEFI y las pruebas físicas correspondientes re
 ## 6. Benchmarking y profiling
 
 El destino de SMT y Linux Perf es la computadora de evaluación de RayTracing: Ubuntu,
-AMD Ryzen (modelo exacto pendiente), topología 8/16 confirmada por el usuario. Las versiones
-locales sirven para validar funcionalidad. No dar por medido SMT/Perf sobre esa máquina
+AMD Ryzen (modelo exacto pendiente), topología 8/16 confirmada por el usuario. Las
+pruebas locales de contratos no sustituyen la ejecución física. No dar por medido SMT/Perf sobre esa máquina
 si solo se ejecutó en WSL. Esta regla no autoriza implementar etapas futuras.
 
 - Mantener entradas y parámetros comparables.

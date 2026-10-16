@@ -5,8 +5,8 @@ Este README es la **única fuente de verdad del progreso, arquitectura y validac
 están en [AGENTS.md](AGENTS.md) y la guía académica de la versión base en
 [sequential/README.md](sequential/README.md).
 
-Alcance autorizado: **etapa 4**, con equipos de hilos por range como diseño aprobado.
-Las etapas 5–8 continúan pendientes y requieren solicitud explícita.
+Alcance autorizado: **limpieza de CMP local y actualización documental tras validar los modelos**, con equipos de hilos por range como diseño aprobado.
+Las etapas 6–8 continúan pendientes y requieren solicitud explícita.
 
 ## 1. Descripción del proyecto
 
@@ -21,7 +21,12 @@ El objetivo es implementar y evaluar experimentalmente cuatro modelos de ejecuci
 
 El proyecto parte de una implementación secuencial existente, utilizada como referencia para medir el rendimiento de las versiones concurrentes.
 
-Considera que yo no tengo una computadora con LINUX, así que la versión de SMT y Linux perf no se va a poder probar de la manera en que lo pide el profesor. Implementa esto adaptando lo que existen en la carpeta ../../echavarria/RayTracing/SMT, ../../echavarria/RayTracing/scripts/Makefile y ../../echavarria/RayTracing/scripts/profile_perf.py .
+**Validación funcional confirmada por el usuario — 2026-10-16:** todos los modelos
+funcionan en la computadora de evaluación, incluida la prueba SMT. Esta confirmación
+se registra como prueba realizada por el usuario; no como una ejecución del asistente.
+CMP y SMT conservan únicamente el destino Ubuntu/AMD Ryzen. Los registros detallados,
+la escalabilidad y las mediciones estadísticas/Perf se documentan por separado cuando
+exista evidencia; las etapas 6–8 no se adelantan con esta limpieza.
 
 ## 2. Tecnologías y entorno
 
@@ -65,8 +70,7 @@ su modelo; el núcleo continúa compartido en `fractal_codec`.
 | Fine-Grained | `fine-grained/main.cpp` | `fractal_fine` |
 | Coarse-Grained | `coarse-grained/main.cpp` | `fractal_coarse` |
 | CMP de evaluación | `CMP/main.cpp` | `fractal_cmp` |
-| CMP local/WSL | `CMP/local/main.cpp` | `fractal_cmp_local` |
-| SMT (pendiente) | `SMT/main.cpp` | `fractal_smt` |
+| SMT de evaluación | `SMT/main.cpp` | `fractal_smt` |
 
 **Diseño aprobado:** equipos de hilos por range, reparto de dominios entre sus miembros y reducción de mínimos para publicar una regla. Ejemplo: 10 hilos = 5 equipos × 2 hilos.
 
@@ -117,26 +121,34 @@ Pruebas y equivalencia registradas en el historial.
 ### Etapa 4 — CMP
 
 - [x] Implementar distribución paralela de trabajo.
-- [ ] Ejecutar trabajadores sobre núcleos físicos.
+- [x] Ejecutar trabajadores sobre núcleos físicos.
 - [x] Implementar afinidad de CPU.
 - [x] Evitar condiciones de carrera.
 - [ ] Verificar escalabilidad con diferentes cantidades de trabajadores.
 
-**Estado:** las dos variantes están implementadas y la local está validada funcionalmente.
-La ejecución física y la escalabilidad del perfil de evaluación siguen pendientes de probar
-en la máquina Ubuntu/AMD Ryzen 8/16. Las pruebas WSL no completan esos dos criterios.
+**Estado:** única versión `fractal_cmp` para Ubuntu/AMD Ryzen. Funcionalidad en la
+máquina de evaluación confirmada por el usuario el 2026-10-16. Se eliminó la variante
+local y su selección de perfil; se mantiene el motor compartido con SMT.
 
-**Aceptación pendiente en hardware destino:** paralelismo real sobre múltiples núcleos y resultados correctos.
+**Aceptación funcional confirmada por el usuario:** ejecución correcta en el destino.
+La escalabilidad con diferentes cantidades de trabajadores sigue pendiente de documentar.
 
 ### Etapa 5 — SMT
 
-- [ ] Detectar topología de hilos lógicos y núcleos físicos.
-- [ ] Implementar configuración de afinidad para SMT.
-- [ ] Preparar ejecución con SMT habilitado y deshabilitado.
+- [x] Detectar topología de hilos lógicos y núcleos físicos.
+- [x] Implementar configuración de afinidad para SMT.
+- [x] Preparar ejecución con SMT habilitado y deshabilitado.
 - [ ] Registrar y comparar ambas configuraciones.
-- [ ] Validar resultados contra la versión secuencial.
+- [x] Validar resultados contra la versión secuencial.
 
-**Aceptación:** Comparación reproducible de ambas configuraciones de hardware, con mediciones verificadas.
+**Estado:** prueba SMT y funcionamiento de todos los modelos en la máquina de evaluación
+confirmados por el usuario el 2026-10-16. Se registra su validación funcional satisfactoria;
+no se inventan resultados numéricos ni registros que no se hayan compartido.
+Ver [docs/smt.md](docs/smt.md) para conservar o repetir las corridas.
+
+**Funcionalidad validada por el usuario.** El registro reproducible y la comparación
+experimental ON/OFF permanecen pendientes de incorporar; la confirmación funcional no
+sustituye sus artefactos ni las mediciones verificadas del criterio experimental.
 
 ### Etapa 6 — Integración y pruebas
 
@@ -250,19 +262,10 @@ con la causa `stall` o `domain_complete`, la racha sin mejora y su umbral. Se re
 `--quantum-domains`: las cesiones dependen de los datos y de la finalización del intervalo.
 Ver [docs/coarse_grained.md](docs/coarse_grained.md) para la definición y ejemplos del evento.
 
-CMP local (4 trabajadores sobre núcleos distintos reportados por el kernel):
-
-```bash
-cmake --build build --target fractal_cmp_local fractal_cmp -j2
-./build/fractal_cmp_local --list-cpus
-mkdir -p CMP/local/results
-./build/fractal_cmp_local compress sequential/examples/color128.png CMP/local/results/color.frc --teams 2 --threads-per-team 2 --report-affinity CMP/local/results/affinity.csv
-./build/fractal_seq decompress CMP/local/results/color.frc CMP/local/results/color.png 80
-```
-
 CMP de evaluación, **en Ubuntu nativo con AMD Ryzen 8/16**:
 
 ```bash
+cmake --build build --target fractal_cmp -j2
 ./build/fractal_cmp --list-cpus
 mkdir -p CMP/results
 ./build/fractal_cmp compress sequential/examples/color128.png CMP/results/color.frc --teams 4 --threads-per-team 2 --report-affinity CMP/results/affinity.csv
@@ -271,22 +274,52 @@ mkdir -p CMP/results
 ```
 
 El perfil de evaluación rechaza WSL/virtualización detectada, sistemas distintos de Ubuntu,
-CPU de otra familia y topologías fuera del contrato 8 núcleos/8 o 16 lógicas. La variante
-local conserva afinidad estricta y compara los mismos candidatos, pero sus resultados no
-sustituyen mediciones físicas. Se puede configurar desde `CMP/` o `CMP/local/`.
+CPU de otra familia y topologías fuera del contrato 8 núcleos/8 o 16 lógicas.
+Se puede configurar desde `CMP/`. No existe una variante local.
 `--report-affinity` registra CPU solicitada y observada antes/después de cada trabajador.
 El total `teams * threads_per_team` no puede exceder los núcleos permitidos; no se rellena
 con hermanos SMT. CMP no acepta cuantums ni trazas de turnos cooperativos.
 Ver [docs/cmp.md](docs/cmp.md).
 
+SMT de evaluación, en la misma máquina Ubuntu/AMD Ryzen de CMP:
+
+```bash
+cmake --build build --target fractal_smt -j2
+./build/fractal_smt --help
+./build/fractal_smt --list-cpus --smt-state on
+python3 SMT/verify_smt.py run --state on --input sequential/examples/color128.png --output-dir SMT/results/on
+```
+
+Después de que el usuario desactive SMT realmente en la computadora de evaluación,
+conservando los mismos binarios y entrada:
+
+```bash
+./build/fractal_smt --list-cpus --smt-state off
+ctest --test-dir build -R smt_hardware_tests --output-on-failure
+python3 SMT/verify_smt.py run --state off --input sequential/examples/color128.png --output-dir SMT/results/off
+python3 SMT/verify_smt.py compare --on SMT/results/on --off SMT/results/off --output SMT/results/comparison.json
+```
+
+Por defecto son 4 equipos × 4 trabajadores en ambos estados. ON usa 16 CPU lógicas;
+OFF conserva 16 pthreads sobre 8 núcleos, con sobresuscripción por software.
+`--smt-state` comprueba el estado esperado y no lo cambia. El programa rechaza estados
+desconocidos/incompatibles y entornos reconocidos como virtualizados; no ofrece una
+simulación local que se pueda confundir con SMT físico. `--report-affinity salida.csv`
+registra CPU efectiva y estado verificado. La herramienta guarda diagnósticos, comandos,
+tiempos individuales y hashes; exige resultados FRC/PNG idénticos a secuencial.
+Guía completa, comandos manuales y protocolo de ambas corridas en [docs/smt.md](docs/smt.md).
+El usuario confirmó una prueba SMT satisfactoria en el Ryzen; conservar o repetir ambos
+registros con estos comandos para documentar la comparación experimental ON/OFF.
+También se puede configurar con `cmake -S SMT -B build-smt`.
+
 Se conservan los argumentos posicionales originales (`compress entrada salida 8 8` y
 `decompress entrada salida 80`), el modo gris (`compress-gray`, `compare-gray`). Por compatibilidad, `--model` es opcional
 y solo acepta el modelo del ejecutable (`sequential`/`secuencial` para `fractal_seq`,
-`fine-grained` para `fractal_fine`, `coarse-grained` para `fractal_coarse` y `CMP` para ambas variantes CMP). Los modelos cruzados se rechazan.
+`fine-grained` para `fractal_fine`, `coarse-grained` para `fractal_coarse`, `CMP` para `fractal_cmp` y `SMT` para `fractal_smt`). Los modelos cruzados se rechazan.
 Las opciones no se pueden repetir ni duplicar con argumentos posicionales.
 
 `--teams` y `--threads-per-team` describen la configuración común; para `sequential` deben valer 1.
-Fine-Grained, Coarse-Grained y las dos variantes CMP están disponibles para compresión; SMT continúa pendiente.
+Fine-Grained, Coarse-Grained, CMP y SMT están disponibles para compresión; SMT requiere el hardware de evaluación.
 La reconstrucción se ejecuta mediante `fractal_seq decompress`; los ejecutables paralelos la rechazan.
 No se aceptan opciones de ejecución en `compare` ni parámetros de compresión en `decompress`.
 
@@ -351,19 +384,16 @@ Cada decisión debe incluir:
   mantiene cesión periódica por cuantum; Coarse-Grained cede solo por evento o finalización.
   Las condiciones siguen siendo individuales y únicamente se notifica al siguiente turno.
 
-**Etapa 4 — Dos variantes y destino confirmado — 2026-10-15:**
+**CMP — Única versión de evaluación — 2026-10-16:**
 
-- `fractal_cmp_local` para pruebas en esta computadora; `fractal_cmp` para Ubuntu nativo
-  AMD Ryzen con el perfil 8/16 de RayTracing confirmado por el usuario. No se asume un
-  modelo Ryzen exacto ni que los IDs CPU de WSL sean los de la máquina de evaluación.
-- Ambas variantes reutilizan un motor CMP con pthreads concurrentes, equipos por range,
-  barreras cancelables de equipo y mínimos deterministas. No se usa el turno global de
-  Fine-Grained/Coarse-Grained durante la búsqueda.
-- Topología leída de sysfs y afinidad permitida; agrupación por socket/core, sin fallback
-  a hilos SMT ni continuación silenciosa si falla fijar/verificar afinidad.
-- SMT y Linux Perf de las etapas 5 y 8 deben implementarse para esa misma máquina Ubuntu
-  de evaluación, distinguiendo pruebas locales de mediciones físicas. No se implementan
-  aún ni se modifica el estado SMT o los permisos del kernel en esta etapa.
+- Por solicitud del usuario, se elimina `CMP/local/` y el perfil local tras confirmar
+  funcionalidad en la computadora de evaluación. `fractal_cmp` exige Ubuntu/AMD Ryzen
+  8/16, selecciona un representante por núcleo y verifica afinidad efectiva.
+- CMP y SMT comparten `src/parallel_encoder.cpp`, con equipos por range, barreras
+  cancelables y mínimos deterministas. Se conserva el algoritmo matemático.
+- CSV y diagnósticos conservan la etiqueta `target` para mantener compatibilidad con los
+  registros SMT; no corresponde a un perfil seleccionable.
+- Linux Perf continúa destinado a la misma máquina Ubuntu y pendiente de su etapa.
 
 **Decisiones iniciales:**
 
@@ -383,14 +413,17 @@ Registrar problemas conocidos, tareas bloqueadas y validaciones que requieren in
   Las dos ejecuciones locales fallaron antes de iniciar la prueba con
   `FATAL: ThreadSanitizer: unexpected memory mapping`; no se afirma validación con TSan.
 
-- Implementar las etapas 5–8 únicamente cuando se soliciten explícitamente.
+- Implementar las etapas 6–8 únicamente cuando se soliciten explícitamente.
 - La configuración secuencial rechaza varios equipos/hilos para evitar informar
   paralelismo inexistente. `10 hilos = 5 equipos × 2` ya está disponible para Fine-Grained y Coarse-Grained.
 
 
-- Ejecutar CMP de evaluación y verificar escalabilidad en Ubuntu/AMD Ryzen 8/16.
+- Documentar la escalabilidad de CMP con diferentes cantidades de trabajadores en Ubuntu/AMD Ryzen.
 - Registrar el modelo Ryzen exacto y la versión de Ubuntu en esa máquina antes de medir.
-- Confirmar allí topología física/lógica, afinidad efectiva y estado SMT; no inferirlos de WSL.
+- Incorporar los registros ON/OFF del Ryzen mediante `SMT/verify_smt.py` y su comparación.
+  La prueba funcional satisfactoria ya fue confirmada por el usuario; no se han adjuntado
+  aquí los artefactos experimentales detallados.
+- Confirmar el modelo exacto de Ryzen. No ejecutar aún benchmarks estadísticos ni Perf.
 - Establecer configuraciones equivalentes de comparación.
 - Verificar los requisitos académicos adicionales de la especificación.
 
@@ -634,3 +667,72 @@ Mantener este historial breve. Git conserva el historial detallado de modificaci
   núcleos físicos del anfitrión ni su estado SMT.
 - Validación: revisión de la documentación, enlaces locales y `git diff --check`.
   Sin cambios de código ni nuevos checkboxes completados; se conservan pendientes físicos.
+
+
+### 2026-10-16 — Etapa 5 — SMT implementado; comparación física pendiente
+
+- `SMT/main.cpp`, CMake y `fractal_smt`, con 4×4 trabajadores por defecto. Adaptado el
+  reparto ON/OFF de RayTracing al diseño fractal aprobado de equipos por range.
+- Detección de todos los lógicos permitidos y estado `smt/control` + `smt/active`.
+  ON usa lógicos distintos, OFF sobresuscribe núcleos; sin numeración fija de hermanos,
+  sin alterar el estado del sistema y sin aceptar pinning como sustituto de SMT OFF real.
+- Motor concurrente de CMP trasladado a `src/parallel_encoder.cpp` y reutilizado por
+  ambos modelos. CMP conserva su política. Afinidad efectiva comprobada por trabajador;
+  en SMT se vuelve a verificar topología/estado al reunir los pthreads.
+- `SMT/verify_smt.py`: protocolo funcional de corrida/registro y comparación ON/OFF,
+  igualdad FRC/PNG contra secuencial, diagnósticos y comandos con tiempos individuales,
+  hashes de entrada/binarios/máquina/artefactos. No implementa benchmarks ni Perf.
+- Validación local WSL2, GNU C++ 13.3.0, OpenCV 4.6.0:
+
+  | Construcción | Resultado |
+  |---|---|
+  | `/tmp/fractal-stage5-release`, `BUILD_APP=ON` | 10 aprobadas, 1 omitida de 11 CTest |
+  | `/tmp/fractal-stage5-core`, `BUILD_APP=OFF` | 7 aprobadas, 1 omitida de 8 CTest |
+  | `/tmp/fractal-stage5-direct`, fuente `SMT/` | Target `fractal_smt` compilado y ayuda correcta |
+
+  Comandos: `cmake -S <fuente> -B <build> -DCMAKE_BUILD_TYPE=Release -DBUILD_APP=<ON/OFF>`,
+  `cmake --build <build> -j2`, `ctest --test-dir <build> --output-on-failure`.
+  En la construcción directa se usó `--target fractal_smt`.
+- `smt_tests`: contratos ON/OFF con fixtures, IDs dispersos, máscaras limitadas, estados
+  desconocidos, trabajadores fuera de presupuesto y hardware/sistema incorrectos.
+  `smt_record_tests`: comparación de registros sintéticos y rechazo de incompatibilidades
+  de máquina/entrada/binario/configuración/estado y de artefactos alterados.
+  CLI: ayuda, opciones incompatibles y preservación de archivos al rechazar el destino.
+- `smt_hardware_tests` se omitió correctamente por falta del destino: no es una prueba física
+  aprobada. Preparada para comparar 15 casos RGB con secuencial en cada estado del Ryzen.
+  Las regresiones existentes de secuencial, Fine-Grained, Coarse-Grained y CMP aprobaron.
+- Comprobación adicional con `color128.png`, range=8, stride=8, CMP local 2×2:
+  dos FRC y sus reconstrucciones RGB/gris idénticos al secuencial anterior de
+  `/tmp/fractal-stage5-baseline`. Artefactos: `/tmp/fractal-stage5-equivalence-f8dcl5t9/`.
+  El registrador SMT rechazó WSL antes de crear el directorio de resultados.
+  `git diff --check` y enlaces locales de la documentación revisados.
+- Tres tareas de preparación de etapa 5 marcadas; registro/comparación física y validación
+  SMT contra secuencial en el destino permanecen pendientes. No se ejecutaron experimentos
+  físicos, no se cambió SMT y no se implementaron las etapas 6–8.
+- Siguiente paso: llevar esta misma construcción al Ryzen, seguir `docs/smt.md` y conservar
+  las dos corridas reales antes de declarar completa la etapa 5.
+
+
+### 2026-10-16 — Validación de usuario y retiro de CMP local
+
+- El usuario confirma prueba SMT satisfactoria en la computadora de evaluación y
+  funcionalidad de todos los modelos. Registrada como validación del usuario, sin
+  inventar tiempos, métricas o archivos experimentales.
+- Eliminados `CMP/local/`, `fractal_cmp_local` y la selección de perfiles de la API.
+  Solo permanece `fractal_cmp` para Ubuntu/AMD Ryzen; algoritmo y equipos conservados.
+- Resultados anteriores conservados en `CMP/results/previous_local/` (artefactos locales
+  históricos, no resultados de evaluación). Retirados binario y construcción local obsoletos.
+- Pruebas CMP separadas en contratos de topología y ejecución física. Las pruebas
+  físicas CMP/SMT se omiten fuera del destino, sin añadir una vía local alternativa.
+- Validación de esta limpieza: configuración Release `BUILD_APP=ON`,
+  `cmake --build build -j2` y `ctest --test-dir build --output-on-failure`:
+  **10 aprobadas, 2 físicas omitidas de 12**. El árbol `build/` quedó actualizado
+  sin el ejecutable anterior. No se repitió aquí la prueba física del usuario.
+- Sin OpenCV (`/tmp/fractal-cmp-cleanup-core`, `BUILD_APP=OFF`): **7 aprobadas y
+  2 físicas omitidas de 9**. Construcción desde `CMP/`
+  (`/tmp/fractal-cmp-cleanup-direct`): target `fractal_cmp` y ayuda correctos.
+  Enlaces locales, conservación de resultados anteriores y `git diff --check` verificados.
+- Los apartados históricos anteriores describen versiones y pendientes de su fecha;
+  los comandos vigentes y el estado actual están en las secciones 4, 6 y 8.
+- Pendientes: incorporar registros ON/OFF, documentar escalabilidad y abordar etapas
+  6–8 únicamente bajo solicitud explícita.
