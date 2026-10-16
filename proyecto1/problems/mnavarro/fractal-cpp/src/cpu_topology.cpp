@@ -13,13 +13,6 @@
 #endif
 
 namespace fractal {
-const char* cmp_profile_name(CmpProfile profile) {
-    switch(profile) {
-        case CmpProfile::Local: return "local";
-        case CmpProfile::Target: return "target";
-    }
-    throw std::invalid_argument("Perfil CMP invalido.");
-}
 std::vector<CpuCore> unique_physical_cores(std::vector<CpuCore> cpus) {
     std::sort(cpus.begin(),cpus.end(),[](const CpuCore& a,const CpuCore& b){return a.cpu<b.cpu;});
     std::set<int> logical;
@@ -104,18 +97,15 @@ CpuTopology detect_cpu_topology() {
     return topology;
 #endif
 }
-std::vector<CpuCore> select_cmp_cpus(const CpuTopology& topology,std::size_t workers,CmpProfile profile) {
-    (void)cmp_profile_name(profile);
-    if(profile==CmpProfile::Target) {
-        if(topology.environment!="native-or-unknown")
-            throw std::invalid_argument("El perfil target requiere Linux nativo; use fractal_cmp_local en este entorno.");
-        if(topology.distribution!="ubuntu" || topology.processor.find("AMD Ryzen")==std::string::npos)
-            throw std::invalid_argument("El perfil target requiere Ubuntu y CPU AMD Ryzen, segun el destino de evaluacion.");
-        // Contrato extraído de los scripts RayTracing: 8 cores, SMT ON=16 lógicos/OFF=8.
-        const auto cores=unique_physical_cores(topology.online_cpus);
-        if(cores.size()!=8 || (topology.online_cpus.size()!=8 && topology.online_cpus.size()!=16))
-            throw std::invalid_argument("El perfil target espera 8 nucleos y 8/16 CPUs online segun SMT; verificar hardware RayTracing.");
-    }
+std::vector<CpuCore> select_cmp_cpus(const CpuTopology& topology,std::size_t workers) {
+    if(topology.environment!="native-or-unknown")
+        throw std::invalid_argument("CMP/SMT requiere Linux nativo en la computadora Ubuntu/AMD Ryzen de evaluacion.");
+    if(topology.distribution!="ubuntu" || topology.processor.find("AMD Ryzen")==std::string::npos)
+        throw std::invalid_argument("El perfil target requiere Ubuntu y CPU AMD Ryzen, segun el destino de evaluacion.");
+    // Contrato extraído de los scripts RayTracing: 8 cores, SMT ON=16 lógicos/OFF=8.
+    const auto cores=unique_physical_cores(topology.online_cpus);
+    if(cores.size()!=8 || (topology.online_cpus.size()!=8 && topology.online_cpus.size()!=16))
+        throw std::invalid_argument("El perfil target espera 8 nucleos y 8/16 CPUs online segun SMT; verificar hardware RayTracing.");
     if(workers==0 || workers>topology.available_cores.size())
         throw std::invalid_argument("CMP solicita "+std::to_string(workers)+" trabajadores, pero solo hay "+
                                     std::to_string(topology.available_cores.size())+" nucleos distintos permitidos.");
@@ -136,7 +126,7 @@ SmtState parse_smt_state(const std::string& name) {
 std::vector<CpuCore> select_smt_cpus(const CpuTopology& topology,std::size_t workers,SmtState expected) {
     (void)smt_state_name(expected);
     // Mismo destino estricto que CMP; nunca convertir WSL en evidencia física de SMT.
-    (void)select_cmp_cpus(topology,1,CmpProfile::Target);
+    (void)select_cmp_cpus(topology,1);
     const bool on=expected==SmtState::On;
     if(topology.smt_active!=(on?1:0) ||
        (on && topology.smt_control!="on") ||

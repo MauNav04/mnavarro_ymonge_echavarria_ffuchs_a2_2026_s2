@@ -26,7 +26,6 @@ struct ExecutionConfig {
     std::size_t quantum_domains = 1;
     // Diagnóstico opcional: eventos añadidos en orden de ejecución. El llamador conserva el vector.
     std::vector<ScheduleEvent>* schedule_trace = nullptr;
-    CmpProfile cmp_profile = CmpProfile::Local;
     // Añadido solo tras reunir los pthreads; cada trabajador verifica máscara y CPU efectiva.
     std::vector<WorkerPlacement>* worker_placements = nullptr;
     SmtState smt_state = SmtState::On;

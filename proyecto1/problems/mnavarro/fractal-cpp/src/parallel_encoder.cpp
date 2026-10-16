@@ -143,7 +143,7 @@ public:
     Pool(const Image& a,Config config,const ExecutionConfig& e,std::size_t c)
         :image(a),problem(prepare_encoding(a,config)),execution(e),channel(c),
          cpus(e.model==Model::SMT ? select_smt_cpus(detect_cpu_topology(),e.teams*e.threads_per_team,e.smt_state)
-                                 : select_cmp_cpus(detect_cpu_topology(),e.teams*e.threads_per_team,e.cmp_profile)),
+                                 : select_cmp_cpus(detect_cpu_topology(),e.teams*e.threads_per_team)),
          result{a.width,a.height,config.range,{}},placements(cpus.size()),startup(cpus.size()+1) {
         result.rules.resize(problem.range_count());
         for(std::size_t team=0;team<e.teams;++team)

@@ -90,7 +90,8 @@ con CPU/socket/core, CPU observada al entrar/salir y estado SMT verificado.
 
 Las pruebas `smt_tests` validan fixtures ON/OFF, numeración dispersa, máscaras restringidas,
 estados desconocidos y destinos incompatibles. No constituyen ejecución física SMT.
-`cmp_tests` valida el motor concurrente compartido en el equipo local contra secuencial.
+`cmp_hardware_tests` valida el motor compartido contra secuencial en el destino;
+`cmp_tests` valida los contratos de topología sin una variante CMP local.
 `cli_tests` comprueba errores y preservación de archivos. `smt_record_tests` prueba el
 comparador con registros sintéticos y rechaza incompatibilidades/alteraciones.
 
@@ -98,6 +99,8 @@ comparador con registros sintéticos y rechaza incompatibilidades/alteraciones.
 En el Ryzen comprueba 15 casos RGB (cinco distribuciones, tres geometrías), reglas,
 reconstrucciones y afinidad real para el estado actual. Ejecutarlo una vez con cada estado.
 
-Pendientes: ejecutar los dos estados en el Ryzen, conservar y comparar registros reales,
-confirmar el modelo de CPU y actualizar el README con evidencia. No marcar la etapa completa
-hasta cumplir esos criterios. Las etapas 6–8 no se implementan aquí.
+El usuario confirmó el 2026-10-16 una prueba SMT satisfactoria en el Ryzen y el
+funcionamiento de todos los modelos. Esta confirmación corresponde a validación funcional
+realizada por el usuario, no a una prueba física ejecutada por el asistente.
+Pendientes: incorporar los registros reales ON/OFF y su comparación, confirmar el modelo
+de CPU y documentar las mediciones experimentales. Las etapas 6–8 no se implementan aquí.

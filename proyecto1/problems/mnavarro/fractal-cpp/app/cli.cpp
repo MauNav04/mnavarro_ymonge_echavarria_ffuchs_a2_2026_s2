@@ -28,10 +28,9 @@ void distinct(const char* in,const char* out) {
     if(fs::weakly_canonical(in)==fs::weakly_canonical(out) || (fs::exists(out) && fs::equivalent(in,out)))
         throw std::invalid_argument("Entrada y salida deben ser archivos distintos.");
 }
-void usage(std::ostream& out, fractal::Model model,fractal::CmpProfile profile) {
+void usage(std::ostream& out, fractal::Model model) {
     const char* binary=model==fractal::Model::Sequential?"fractal_seq":(model==fractal::Model::FineGrained?"fractal_fine":(model==fractal::Model::CoarseGrained?"fractal_coarse":"fractal_cmp"));
     if(model==fractal::Model::SMT) binary="fractal_smt";
-    if(model==fractal::Model::CMP && profile==fractal::CmpProfile::Local) binary="fractal_cmp_local";
     out<<"Uso:\n  "<<binary<<" compress entrada.png salida.frc [range=8] [stride=8]\n"
        <<"  "<<binary<<" compress-gray entrada.png salida.frc [range=8] [stride=8]\n";
     if(model==fractal::Model::Sequential)
@@ -47,7 +46,7 @@ void usage(std::ostream& out, fractal::Model model,fractal::CmpProfile profile) 
            <<"Diagnostico: --list-cpus [--smt-state on|off]. Por defecto: 4 equipos de 4, estado on.\n"
            <<"El programa no modifica SMT. Reconstruccion: fractal_seq decompress.\n";
     if(model==fractal::Model::CMP)
-        out<<"CMP perfil "<<fractal::cmp_profile_name(profile)<<": --list-cpus | --report-affinity salida.csv\n"
+        out<<"CMP perfil "<<"target"<<": --list-cpus | --report-affinity salida.csv\n"
            <<"Un trabajador por nucleo distinto permitido. Reconstruccion: fractal_seq decompress.\n";
     if(model==fractal::Model::CoarseGrained)
         out<<"Coarse-Grained: stall tras >2/3 de dominios locales consecutivos sin mejorar.\n"
@@ -62,10 +61,9 @@ struct Options {
     fractal::ExecutionConfig execution;
     int iterations=40;
 };
-Options parse(int argc, char** argv, fractal::Model model,fractal::CmpProfile profile) {
+Options parse(int argc, char** argv, fractal::Model model) {
     Options options;
     options.execution.model=model;
-    options.execution.cmp_profile=profile;
     if(model==fractal::Model::SMT) {options.execution.teams=4;options.execution.threads_per_team=4;}
     options.command=argv[1];
     const bool compress=options.command=="compress" || options.command=="compress-gray";
@@ -139,7 +137,7 @@ void report(const fractal::ExecutionConfig& execution) {
         std::cout<<"SMT solicitado: "<<fractal::smt_state_name(execution.smt_state)
                  <<" (estado fisico verificado, no simulado)\n";
     if(execution.model==fractal::Model::CMP)
-        std::cout<<"CMP perfil: "<<fractal::cmp_profile_name(execution.cmp_profile)<<" (paralelismo con afinidad)\n";
+        std::cout<<"CMP perfil: "<<"target"<<" (paralelismo con afinidad)\n";
     if(execution.model==fractal::Model::CoarseGrained)
         std::cout<<"Planificacion: rafagas cooperativas con stall simulado (>2/3 sin mejora)\n";
     if(execution.model==fractal::Model::FineGrained)
@@ -148,9 +146,9 @@ void report(const fractal::ExecutionConfig& execution) {
 }
 
 }
-int fractal::app::run(int argc,char** argv, Model model,CmpProfile profile) {
+int fractal::app::run(int argc,char** argv, Model model) {
  try {
-    if(argc==2 && std::string(argv[1])=="--help") {usage(std::cout,model,profile); return 0;}
+    if(argc==2 && std::string(argv[1])=="--help") {usage(std::cout,model); return 0;}
     if(argc>=2 && std::string(argv[1])=="--list-cpus" && (model==Model::CMP || model==Model::SMT)) {
         const auto topology=detect_cpu_topology();
         if(model==Model::SMT) {
@@ -160,9 +158,9 @@ int fractal::app::run(int argc,char** argv, Model model,CmpProfile profile) {
             (void)select_smt_cpus(topology,1,state);
         } else {
             if(argc!=2) throw std::invalid_argument("Diagnostico CMP: --list-cpus.");
-            (void)select_cmp_cpus(topology,1,profile);
+            (void)select_cmp_cpus(topology,1);
         }
-        std::cout<<"environment="<<topology.environment<<" profile="<<cmp_profile_name(profile)
+        std::cout<<"environment="<<topology.environment<<" profile="<<"target"
                  <<" distribution="<<topology.distribution<<" online_cpus="<<topology.online_cpus.size()
                  <<" online_cores="<<unique_physical_cores(topology.online_cpus).size()
                  <<" allowed_cores="<<topology.available_cores.size();
@@ -172,8 +170,8 @@ int fractal::app::run(int argc,char** argv, Model model,CmpProfile profile) {
             std::cout<<cpu.cpu<<','<<cpu.socket<<','<<cpu.core<<'\n';
         return 0;
     }
-    if(argc<4) {usage(std::cerr,model,profile); return 1;}
-    auto options=parse(argc,argv,model,profile);
+    if(argc<4) {usage(std::cerr,model); return 1;}
+    auto options=parse(argc,argv,model);
     std::vector<WorkerPlacement> placements;
     if(model==Model::CMP || model==Model::SMT) options.execution.worker_placements=&placements;
     if(!options.affinity_path.empty()) {
@@ -209,7 +207,7 @@ int fractal::app::run(int argc,char** argv, Model model,CmpProfile profile) {
                 if(model==Model::SMT) file<<",smt_state,smt_control,smt_active,online_cpus";
                 file<<'\n';
                 for(const auto& w:placements) {
-                    file<<cmp_profile_name(profile)<<','<<w.channel<<','<<w.worker<<','<<w.team<<','<<w.cpu<<','
+                    file<<"target"<<','<<w.channel<<','<<w.worker<<','<<w.team<<','<<w.cpu<<','
                         <<w.socket<<','<<w.core<<','<<w.observed_before<<','<<w.observed_after;
                     if(model==Model::SMT) file<<','<<smt_state_name(options.execution.smt_state)<<','<<topology.smt_control
                                             <<','<<topology.smt_active<<','<<topology.online_cpus.size();
@@ -254,7 +252,7 @@ int fractal::app::run(int argc,char** argv, Model model,CmpProfile profile) {
         auto e=fractal::mse(a,b); std::cout<<"MSE global [0,1]: "<<e<<"\nPSNR global: "<<psnr(e)<<" dB\n";
         const char* names[]={"R","G","B"};
         for(std::size_t c=0;c<a.planes.size();++c) {auto m=fractal::mse(a.planes[c],b.planes[c]); std::cout<<(gray?"Gris":names[c])<<": MSE="<<m<<", PSNR="<<psnr(m)<<" dB\n";}
-    } else {usage(std::cerr,model,profile); return 1;}
+    } else {usage(std::cerr,model); return 1;}
     std::cout<<"Tiempo total (con E/S): "<<seconds(total)<<" s\n"; return 0;
  } catch(const std::exception& e) {std::cerr<<"Error: "<<e.what()<<'\n'; return 1;}
 }

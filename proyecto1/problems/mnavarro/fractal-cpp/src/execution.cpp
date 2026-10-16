@@ -53,7 +53,7 @@ void validate_execution(const ExecutionConfig& execution) {
     if(execution.model==Model::CMP) {
         if(execution.quantum_domains!=1 || execution.schedule_trace)
             throw std::invalid_argument("CMP no utiliza cuantums ni turnos cooperativos.");
-        (void)select_cmp_cpus(detect_cpu_topology(),execution.teams*execution.threads_per_team,execution.cmp_profile);
+        (void)select_cmp_cpus(detect_cpu_topology(),execution.teams*execution.threads_per_team);
     }
     if(execution.model==Model::CoarseGrained && execution.quantum_domains!=1)
         throw std::invalid_argument("Cuantum requiere fine-grained; coarse-grained cambia por eventos.");
