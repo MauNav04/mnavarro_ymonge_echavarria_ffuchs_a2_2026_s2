@@ -955,7 +955,7 @@ Mantener este historial breve. Git conserva el historial detallado de modificaci
 
 ### 2026-10-16 — Imágenes de entrada compartidas
 
-- Trasladadas con `git mv` las cinco imágenes de entrada a `assets/`;
+- Trasladadas originalmente con `git mv` las cinco imágenes a una carpeta compartida;
   sus hashes SHA-256 se conservan. Esta carpeta sirve a todos los modelos.
 - Actualizadas las entradas predeterminadas de Make, benchmarking y Perf, las guías
   de los modelos y la guía secuencial. Las salidas demostrativas conservan sus rutas
@@ -970,3 +970,21 @@ Mantener este historial breve. Git conserva el historial detallado de modificaci
 - Revisadas las referencias de entrada y `git diff --check`. No se alteran el algoritmo,
   los formatos ni los parámetros de carga. Los comandos habituales mantienen `build`
   como directorio predeterminado de compilación.
+
+### 2026-10-16 — Entradas directamente en assets
+
+- Por solicitud del usuario, las rutas de entrada apuntan directamente a `assets/`.
+  Actualizados Make, los CLI de benchmarking/Perf, AGENTS y las guías de los modelos.
+  La entrada predeterminada sigue siendo `assets/color128.png`; el ejemplo de carga
+  usa el archivo actual `assets/mirrors512.png`.
+- Comprobadas todas las referencias de imágenes contra los archivos existentes,
+  incluidas las rutas relativas de la guía secuencial. Se respetan las imágenes
+  trasladadas y renombradas por el usuario, entre ellas `color480.png` y `mirrors512.png`.
+- Compilación Release y demostraciones seq/fine/coarse correctas con la entrada
+  predeterminada nueva: FRC idénticos y reconstrucciones de 128×128. Diagnóstico real
+  de benchmarking sin `--input`: tres mediciones correctas y equivalencia FRC.
+  Artefactos en `/tmp/fractal-assets-flat-demo/` y `/tmp/fractal-assets-flat-benchmark/`.
+- CTest: **18 aprobadas y 3 físicas omitidas de 21**, sin fallos. Comprobados también
+  los valores predeterminados de entrada de los CLI de benchmarking y Perf.
+  Las capturas físicas CMP/SMT/Perf siguen pendientes en el Ryzen; no se modifican
+  los checkboxes de esas validaciones. `git diff --check` revisado.
