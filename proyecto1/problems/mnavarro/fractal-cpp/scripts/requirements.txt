@@ -1,0 +1,3 @@
+# Matplotlib: PNG cientificos a 300 DPI; SciPy: cuantiles t-Student y g.l. de Welch.
+matplotlib>=3.6,<4
+scipy>=1.10,<2

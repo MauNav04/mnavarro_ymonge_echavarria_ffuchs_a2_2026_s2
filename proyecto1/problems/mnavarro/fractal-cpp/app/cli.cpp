@@ -12,6 +12,7 @@
 #include <vector>
 #include <algorithm>
 #include <fstream>
+#include <iomanip>
 namespace {
 using Clock=std::chrono::steady_clock;
 double seconds(Clock::time_point start) {return std::chrono::duration<double>(Clock::now()-start).count();}
@@ -25,7 +26,7 @@ int number(const std::string& s) {
 double psnr(double e) {return e==0?std::numeric_limits<double>::infinity():10*std::log10(1/e);}
 void distinct(const char* in,const char* out) {
     namespace fs=std::filesystem;
-    if(fs::weakly_canonical(in)==fs::weakly_canonical(out) || (fs::exists(out) && fs::equivalent(in,out)))
+    if(fs::weakly_canonical(in)==fs::weakly_canonical(out) || (fs::exists(in) && fs::exists(out) && fs::equivalent(in,out)))
         throw std::invalid_argument("Entrada y salida deben ser archivos distintos.");
 }
 void usage(std::ostream& out, fractal::Model model) {
@@ -40,6 +41,7 @@ void usage(std::ostream& out, fractal::Model model) {
        <<"  "<<binary<<" compare-gray original.png reconstruida.png\n"
        <<"Opciones compress/ compress-gray: --range N --stride N\n"
        <<"Equipos: --teams N --threads-per-team N\n"
+       <<"Metricas de compresion: --report-metrics salida.csv (tiempo y eventos de software)\n"
        <<"Modelo fijo: "<<fractal::model_name(model)<<"\n";
     if(model==fractal::Model::SMT)
         out<<"SMT fisico Ubuntu/AMD Ryzen: --smt-state on|off [--report-affinity salida.csv]\n"
@@ -56,7 +58,7 @@ void usage(std::ostream& out, fractal::Model model) {
            <<"Reconstruccion: usar fractal_seq decompress.\n";
 }
 struct Options {
-    std::string command, input, output, trace_path, affinity_path;
+    std::string command, input, output, trace_path, affinity_path, metrics_path;
     fractal::Config codec;
     fractal::ExecutionConfig execution;
     int iterations=40;
@@ -76,7 +78,7 @@ Options parse(int argc, char** argv, fractal::Model model) {
         std::string arg=argv[i];
         if(arg.rfind("--",0)!=0) {positional.push_back(arg); continue;}
         if(!seen.insert(arg).second) throw std::invalid_argument("Opcion repetida: "+arg);
-        const bool fineOption=arg=="--quantum-domains" || arg=="--trace-schedule" || arg=="--report-affinity";
+        const bool fineOption=arg=="--quantum-domains" || arg=="--trace-schedule" || arg=="--report-affinity" || arg=="--report-metrics";
         const bool codecOption=arg=="--range" || arg=="--stride";
         const bool executionOption=arg=="--model" || arg=="--teams" || arg=="--threads-per-team" || arg=="--smt-state";
         if((fineOption && !compress) || (codecOption && !compress) || (arg=="--iterations" && !decompress) ||
@@ -92,6 +94,7 @@ Options parse(int argc, char** argv, fractal::Model model) {
         else if(arg=="--quantum-domains") options.execution.quantum_domains=number(value);
         else if(arg=="--trace-schedule") options.trace_path=value;
         else if(arg=="--report-affinity") options.affinity_path=value;
+        else if(arg=="--report-metrics") options.metrics_path=value;
         else if(arg=="--smt-state") options.execution.smt_state=fractal::parse_smt_state(value);
         else if(arg=="--range") options.codec.range=number(value);
         else if(arg=="--stride") options.codec.stride=number(value);
@@ -172,6 +175,14 @@ int fractal::app::run(int argc,char** argv, Model model) {
     }
     if(argc<4) {usage(std::cerr,model); return 1;}
     auto options=parse(argc,argv,model);
+    ExecutionCounters counters;
+    if(!options.metrics_path.empty()) {
+        options.execution.counters=&counters;
+        distinct(options.input.c_str(),options.metrics_path.c_str());
+        distinct(options.output.c_str(),options.metrics_path.c_str());
+        if(!options.affinity_path.empty()) distinct(options.affinity_path.c_str(),options.metrics_path.c_str());
+        if(!options.trace_path.empty()) distinct(options.trace_path.c_str(),options.metrics_path.c_str());
+    }
     std::vector<WorkerPlacement> placements;
     if(model==Model::CMP || model==Model::SMT) options.execution.worker_placements=&placements;
     if(!options.affinity_path.empty()) {
@@ -237,6 +248,18 @@ int fractal::app::run(int argc,char** argv, Model model) {
             std::cout<<(coarse?"Rafagas registradas: ":"Cuantums registrados: ")<<trace.size()<<'\n';
         }
         auto size=std::filesystem::file_size(output);
+        if(!options.metrics_path.empty()) {
+            std::ofstream file(options.metrics_path);
+            if(!file) throw std::runtime_error("No se pudo abrir reporte de metricas.");
+            file<<"model,teams,threads_per_team,threads,quantum,range,stride,width,height,channels,time_ms,turns,scheduler_switches,stalls,frc_bytes\n";
+            file<<model_name(model)<<','<<options.execution.teams<<','<<options.execution.threads_per_team<<','
+                <<options.execution.teams*options.execution.threads_per_team<<','<<options.execution.quantum_domains<<','
+                <<options.codec.range<<','<<options.codec.stride<<','<<a.planes[0].width<<','<<a.planes[0].height<<','
+                <<a.planes.size()<<','<<std::setprecision(17)<<elapsed*1000<<','<<counters.turns<<','
+                <<counters.scheduler_switches<<','<<counters.stalls<<','<<size<<'\n';
+            file.flush();
+            if(!file) throw std::runtime_error("Error escribiendo reporte de metricas.");
+        }
         std::cout<<"Canales: "<<c.planes.size()<<"\nReglas por canal: "<<c.planes[0].rules.size()
                  <<"\nBytes FRC: "<<size<<"\nRelacion contra pixeles sin comprimir: "
                  <<double(a.planes[0].pixels.size()*a.planes.size())/size<<":1\nCodificacion (sin E/S): "<<elapsed<<" s\n";

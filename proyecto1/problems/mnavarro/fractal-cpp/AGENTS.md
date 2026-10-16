@@ -125,6 +125,16 @@ AMD Ryzen (modelo exacto pendiente), topología 8/16 confirmada por el usuario. 
 pruebas locales de contratos no sustituyen la ejecución física. No dar por medido SMT/Perf sobre esa máquina
 si solo se ejecutó en WSL. Esta regla no autoriza implementar etapas futuras.
 
+- Automatización de etapa 7: `benchmark_full`/`benchmark_fast`, `scalability` y `plot`.
+  Conservar CSV individuales antes de analizar, hashes/metadatos y etiquetas físicas,
+  diagnósticas o sintéticas. No mezclar estados SMT ni campañas incompatibles.
+- Campañas formales: Release, Ryzen real, 200 corridas mínimas por configuración.
+  Los diagnósticos cortos se etiquetan y no sustituyen la campaña formal. Ningún objetivo
+  modifica SMT. CMP no se sobresuscribe a 16 trabajadores para completar una curva.
+- Estadísticas: Student-t para IC de medias y método de incertidumbre del speedup
+  documentado; no eliminar outliers ni inventar intervalos con una sola muestra.
+- Los contadores cooperativos son de software. IPC, caché y contexto del SO requieren
+  etapa 8/Perf; no llenar esos campos con estimaciones ni ceros supuestamente medidos.
 - Mantener entradas y parámetros comparables.
 - Utilizar la versión secuencial como referencia.
 - Guardar resultados individuales antes de calcular estadísticas.

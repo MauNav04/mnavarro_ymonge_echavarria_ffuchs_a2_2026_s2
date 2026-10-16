@@ -5,8 +5,8 @@ Este README es la **única fuente de verdad del progreso, arquitectura y validac
 están en [AGENTS.md](AGENTS.md) y la guía académica de la versión base en
 [sequential/README.md](sequential/README.md).
 
-Alcance autorizado: **etapa 6 — integración y pruebas**, con equipos de hilos por range como diseño aprobado.
-Las etapas 7–8 continúan pendientes y requieren solicitud explícita.
+Alcance autorizado: **etapa 7 — benchmarking y métricas**, con equipos de hilos por range como diseño aprobado.
+La etapa 8 continúa pendiente y requiere solicitud explícita.
 
 ## 1. Descripción del proyecto
 
@@ -169,15 +169,22 @@ ejecutan y superan las pruebas integradas de etapa 6.
 
 ### Etapa 7 — Benchmarking y métricas
 
-- [ ] Implementar `benchmark.py`.
+- [x] Implementar `benchmark.py`.
 - [ ] Ejecutar al menos 200 repeticiones por configuración experimental.
-- [ ] Guardar resultados individuales en CSV.
-- [ ] Calcular tiempo, speedup, eficiencia y escalabilidad.
-- [ ] Calcular media, desviación estándar e intervalos de confianza del 95 %.
-- [ ] Implementar `metrics.py` para generar gráficas automáticamente.
+- [x] Guardar resultados individuales en CSV.
+- [x] Calcular tiempo, speedup, eficiencia y escalabilidad.
+- [x] Calcular media, desviación estándar e intervalos de confianza del 95 %.
+- [x] Implementar `metrics.py` para generar gráficas automáticamente.
 - [ ] Generar boxplots y analizar convergencia.
 
-**Aceptación:** Resultados estadísticos y gráficas reproducibles desde los CSV.
+**Estado:** recolección, estadísticas y gráficas implementadas; pruebas numéricas,
+figuras sintéticas y campañas diagnósticas locales validadas. Las 200 repeticiones físicas
+y el análisis experimental de convergencia en el Ryzen continúan pendientes.
+Cobertura y equivalencia de métricas con RayTracing/gray-scott, comandos y metodología
+en [docs/benchmarking.md](docs/benchmarking.md).
+
+**Aceptación física pendiente:** campañas reproducibles en el Ryzen y revisión de sus
+CSV/gráficas. No se presentan los diagnósticos locales como resultados de evaluación.
 
 ### Etapa 8 — Profiling
 
@@ -243,6 +250,25 @@ silenciosamente. `make -C scripts <objetivo>` ofrece los mismos comandos.
 comprimen y reconstruyen una imagen demostrativa. Los `verify_*` comparan contra
 secuencial; `record_smt_on/off` y `compare_smt` conservan la comparación ON/OFF.
 Guía detallada de ejecución, parámetros y resultados: [docs/testing.md](docs/testing.md).
+Para realizar las 200 repeticiones por modelo/configuración y generar todas las
+figuras de rendimiento, seguir la [receta completa de etapa 7](docs/benchmarking.md#receta-completa-200-corridas-y-todas-las-figuras-de-etapa-7):
+preparación, campañas fijas y escalabilidad ON/OFF, y un único `make plot` para combinarlo.
+Las figuras Perf de RayTracing requieren todavía la etapa 8.
+
+Para etapa 7, después de instalar `scripts/requirements.txt` en un entorno virtual:
+
+```bash
+make benchmark_fast BUILD_DIR=build-evaluation FAST_DIR=metrics/check-on
+make plot BENCH_DIR=metrics/check-on
+make benchmark_full BUILD_DIR=build-evaluation SMT_STATE=on BENCH_DIR=metrics/benchmark-on
+make scalability BUILD_DIR=build-evaluation SMT_STATE=on SCALING_DIR=metrics/scaling-on
+```
+
+Repetir las campañas en OFF tras la intervención real de SMT. Los objetivos formales
+requieren Release, hardware de evaluación y al menos 200 corridas; no cambian SMT.
+Gráficas ON/OFF, parámetros y rutas en [docs/benchmarking.md](docs/benchmarking.md).
+Las figuras de contadores Perf corresponden a etapa 8 y no se inventan en estos CSV.
+
 Los comandos CMake directos continúan disponibles:
 
 ```bash
@@ -441,13 +467,15 @@ Registrar problemas conocidos, tareas bloqueadas y validaciones que requieren in
   Las dos ejecuciones locales fallaron antes de iniciar la prueba con
   `FATAL: ThreadSanitizer: unexpected memory mapping`; no se afirma validación con TSan.
 
-- Implementar las etapas 7–8 únicamente cuando se soliciten explícitamente.
+- Implementar la etapa 8 únicamente cuando se solicite explícitamente.
 - La configuración secuencial rechaza varios equipos/hilos para evitar informar
   paralelismo inexistente. `10 hilos = 5 equipos × 2` ya está disponible para Fine-Grained y Coarse-Grained.
 
 
 - Ejecutar la nueva suite de etapa 6 con `make test SMT_STATE=on` y, tras la intervención
   de SMT, `make test SMT_STATE=off`; conservar los dos `report.json`.
+- Ejecutar las campañas de etapa 7 en ON/OFF con 200 repeticiones por configuración,
+  conservar raw.csv y revisar escalabilidad/convergencia; diagnóstico local no equivale a medición física.
 - Documentar la escalabilidad de CMP con diferentes cantidades de trabajadores en Ubuntu/AMD Ryzen.
 - Registrar el modelo Ryzen exacto y la versión de Ubuntu en esa máquina antes de medir.
 - Incorporar los registros ON/OFF del Ryzen mediante `SMT/verify_smt.py` y su comparación.
@@ -798,3 +826,57 @@ Mantener este historial breve. Git conserva el historial detallado de modificaci
 - Guía de instalación, objetivos, parámetros, resultados y protocolo ON/OFF en
   [docs/testing.md](docs/testing.md). Enlaces locales y `git diff --check` revisados.
   Próximo paso: ejecutar los comandos de etapa 6 en el Ryzen y conservar sus registros.
+
+
+### 2026-10-16 — Etapa 7 — Benchmarks y métricas preparados; campañas físicas pendientes
+
+- Comparados RayTracing y gray-scott: tiempos individuales, media/mediana/extremos,
+  desviación muestral, IC 95 %, speedup, eficiencia, CV, estabilidad, escalabilidad
+  fuerte y Amdahl. Añadida convergencia acumulada exigida por este roadmap.
+- `scripts/benchmark.py`: CSV incremental, warmups excluidos, cooldown, timeouts,
+  referencia FRC secuencial, verificación de afinidad y estado real, hashes/metadatos,
+  campañas diagnósticas explícitas y mínimo formal de 200 corridas/configuración en Release.
+- `scripts/metrics.py`, alias `plot_metrics.py` y `scalability.py`: estadísticas y nueve
+  figuras posibles a 300 DPI desde CSV y metadata, sin ejecutar modelos al graficar.
+  Rechazan mezclas incompatibles y duplicados; los análisis parciales quedan identificados.
+  SciPy calcula Student-t y Welch; Matplotlib genera figuras, sin dependencia de pandas.
+- Makefile: `benchmark_full`, `benchmark_fast`, `benchmark_on/off`, `scalability`,
+  `benchmark_scaling`, `benchmark_scaling_fast`, `metrics`, `plot` y sus alias.
+  El intérprete `PYTHON` también se transmite a CMake/CTest para usar el entorno científico.
+- C++: `--report-metrics` emite tiempo exclusivo de codificación con precisión completa
+  y contadores cooperativos opcionales, sin acumular trazas. Se conservan búsqueda,
+  desempates, equipos y FRC1/FRC2. Eventos de software no se etiquetan como contexto del SO.
+- Validación Release en WSL2, GNU C++ 13.3.0 y OpenCV 4.6.0:
+  `/tmp/fractal-stage7-release`, CTest con Python científico: **16 aprobadas y 2 físicas
+  omitidas de 18**. Solo núcleo (`/tmp/fractal-stage7-core`, `BUILD_APP=OFF`):
+  **7 aprobadas y 2 físicas omitidas de 9**.
+- Nuevas pruebas: seis codificaciones RGB/gris con contadores contrastados contra las
+  trazas, tiempos positivos, archivos protegidos; pipeline real diagnóstico en tres
+  modelos; rechazo de campañas formales cortas y protección de directorios existentes.
+  Estadísticas con valores conocidos y 200 muestras sintéticas, incompatibilidades,
+  faltantes/duplicados y nueve figuras sintéticas identificadas.
+- Comandos reales Make: `benchmark_fast` con tres corridas de seq/fine/coarse sobre
+  imagen 16×24 produjo **9 mediciones diagnósticas**; `benchmark_scaling_fast` con dos
+  corridas por configuración produjo **22 mediciones diagnósticas**. Resúmenes y
+  gráficas generados y combinados desde sus CSV. Artefactos en
+  `/tmp/fractal-stage7-make-fast/`, `/tmp/fractal-stage7-make-scaling/` y
+  `/tmp/fractal-stage7-combined-plots/`. Inspeccionado el dashboard y verificados 300 DPI.
+  Estas comprobaciones no son benchmarks físicos ni permiten concluir rendimiento del Ryzen.
+- Las pruebas detectaron una comprobación de equivalencia de rutas que fallaba si un
+  reporte todavía no existía; se corrigió y se repitieron satisfactoriamente las pruebas
+  afectadas. Enlaces y `git diff --check` revisados.
+- Cinco tareas de software marcadas. Pendientes: campañas físicas de 200 corridas por
+  configuración ON/OFF y revisión experimental de convergencia/escalabilidad. La figura
+  de convergencia y sus tablas ya están preparadas; no se inventa ese análisis físico.
+  IPC, caché, ciclos, instrucciones y contexto del kernel corresponden a etapa 8 pendiente.
+- Guía completa y correspondencia de métricas: [docs/benchmarking.md](docs/benchmarking.md).
+
+
+### 2026-10-16 — Receta de 200 corridas y gráficas combinadas
+
+- Añadida al inicio de `docs/benchmarking.md` la secuencia completa para medir todos
+  los modelos y escalabilidad en ON/OFF, y generar figuras desde los cuatro CSV.
+- Aclarados automatización de repeticiones, número de mediciones, resultados esperados
+  y diferencia respecto a las figuras que necesitan Perf en etapa 8.
+- Validación documental: objetivos y argumentos contrastados con Makefile, enlaces y
+  `git diff --check`. No se ejecutaron campañas físicas ni se cambiaron estados de avance.

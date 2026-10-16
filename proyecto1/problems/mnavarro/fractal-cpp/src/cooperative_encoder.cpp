@@ -104,6 +104,11 @@ class Scheduler {
         if(execution.schedule_trace)
             execution.schedule_trace->push_back({channel,id,worker.team,team.range,begin,end,
                                                  reason,worker.stagnant,threshold});
+        // execute_turn se ejecuta bajo el mutex del planificador: no requiere atomics.
+        if(execution.counters) {
+            ++execution.counters->turns;
+            if(reason==ScheduleReason::Stall) ++execution.counters->stalls;
+        }
         if(reason==ScheduleReason::Stall) worker.stagnant=0;
         if(end==worker.end) {
             worker.ready=false;
@@ -120,6 +125,7 @@ class Scheduler {
         // Fine: cesión incondicional por cuantum. Coarse: solo por stall o intervalo terminado.
         // Se omiten miembros sin dominios/equipos finalizados y se conserva el trabajo parcial.
         if(!select_next(id)) stopped=true;
+        else if(execution.counters && turn!=id) ++execution.counters->scheduler_switches;
     }
     static void* entry(void* pointer) noexcept {
         auto& context=*static_cast<Context*>(pointer);

@@ -27,7 +27,7 @@ TEST_ARGS = --build-dir "$(BUILD_DIR)" --results-dir "$(RESULTS_DIR)/integration
 
 .PHONY: all configure seq fine coarse cmp smt help test test_unit test_local test_models verify_all verify_seq verify_fine verify_coarse verify_cmp verify_smt verify_smt_on verify_smt_off run_seq run_sequential run_fine run_coarse run_cmp run_smt run_smt_on run_smt_off topology record_smt_on record_smt_off compare_smt clean
 configure:
-	cmake -S "$(ROOT)" -B "$(BUILD_DIR)" -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) -DBUILD_APP=ON
+	cmake -S "$(ROOT)" -B "$(BUILD_DIR)" -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) -DBUILD_APP=ON -DPython3_EXECUTABLE="$(shell command -v "$(PYTHON)")"
 all: configure
 	cmake --build "$(BUILD_DIR)" --parallel $(JOBS)
 seq fine coarse cmp smt: configure
@@ -88,4 +88,52 @@ help:
 	@echo 'Build: all seq fine coarse cmp smt | Tests: test test_unit test_local verify_all verify_cmp verify_smt_on verify_smt_off'
 	@echo 'Run: run_seq run_fine run_coarse run_cmp run_smt_on run_smt_off | SMT records: record_smt_on record_smt_off compare_smt'
 	@echo 'Options: JOBS BUILD_DIR INPUT RANGE STRIDE ITERATIONS TEAMS THREADS_PER_TEAM SMT_TEAMS SMT_THREADS_PER_TEAM QUANTUM GRAY QUICK TIMEOUT RESULTS_DIR TEST_INPUT'
-	@echo 'SMT_STATE=on|off verifica el estado; ningun target cambia SMT. Etapas 7/8 no implementadas.'
+	@echo 'SMT_STATE=on|off verifica el estado; ningun target cambia SMT. Etapa 8 (Perf) pendiente. Benchmark y graficas: benchmark_full benchmark_fast scalability plot.'
+
+# Etapa 7: mediciones -> CSV individuales -> tablas/figuras desde CSV.
+RUNS ?= 200
+FAST_RUNS ?= 5
+RUNS_SCALING ?= 200
+THREADS_SCALING ?= 1,2,4,8,16
+COOLDOWN ?= 0.15
+WARMUPS ?= 1
+BENCHMARK_MODELS ?= all
+BENCH_DIR ?= $(ROOT)/metrics/benchmark-$(SMT_STATE)
+FAST_DIR ?= $(ROOT)/metrics/diagnostic-$(SMT_STATE)
+SCALING_DIR ?= $(ROOT)/metrics/scaling-$(SMT_STATE)
+CSV_FILES ?= "$(BENCH_DIR)/raw.csv"
+PLOT_DIR ?= $(BENCH_DIR)/plots
+STATS_DIR ?= $(BENCH_DIR)/statistics
+BENCH_ARGS = --build-dir "$(BUILD_DIR)" --input "$(INPUT)" --models "$(BENCHMARK_MODELS)" --smt-state $(SMT_STATE) --teams $(TEAMS) --members $(THREADS_PER_TEAM) --smt-teams $(SMT_TEAMS) --smt-members $(SMT_THREADS_PER_TEAM) --range $(RANGE) --stride $(STRIDE) --quantum $(QUANTUM) --cooldown $(COOLDOWN) --warmups $(WARMUPS) --timeout $(TIMEOUT) $(if $(filter 1,$(GRAY)),--gray,)
+.PHONY: benchmark benchmark_full benchmark_fast benchmark_on benchmark_off benchmark_scaling benchmark_scaling_fast scalability escalabilidad metrics plot_metrics plot graficas
+benchmark: all
+	$(PYTHON) "$(ROOT)/scripts/benchmark.py" $(BENCH_ARGS) --runs $(RUNS) --output-dir "$(BENCH_DIR)"
+	$(PYTHON) "$(ROOT)/scripts/metrics.py" --csv "$(BENCH_DIR)/raw.csv" --output-dir "$(BENCH_DIR)/statistics" --no-plots
+benchmark_full: benchmark
+benchmark_fast: all
+	$(PYTHON) "$(ROOT)/scripts/benchmark.py" $(BENCH_ARGS) --runs $(FAST_RUNS) --diagnostic --output-dir "$(FAST_DIR)"
+	$(PYTHON) "$(ROOT)/scripts/metrics.py" --csv "$(FAST_DIR)/raw.csv" --output-dir "$(FAST_DIR)/statistics" --no-plots
+benchmark_on:
+	$(MAKE) -f "$(ROOT)/scripts/Makefile" benchmark SMT_STATE=on
+benchmark_off:
+	$(MAKE) -f "$(ROOT)/scripts/Makefile" benchmark SMT_STATE=off
+scalability: all
+	$(PYTHON) "$(ROOT)/scripts/scalability.py" $(BENCH_ARGS) --runs $(RUNS_SCALING) --threads $(THREADS_SCALING) --output-dir "$(SCALING_DIR)"
+	$(PYTHON) "$(ROOT)/scripts/metrics.py" --csv "$(SCALING_DIR)/raw.csv" --output-dir "$(SCALING_DIR)/statistics" --no-plots
+benchmark_scaling: scalability
+escalabilidad: scalability
+benchmark_scaling_fast: all
+	$(PYTHON) "$(ROOT)/scripts/scalability.py" $(BENCH_ARGS) --runs $(FAST_RUNS) --threads $(THREADS_SCALING) --diagnostic --output-dir "$(SCALING_DIR)"
+	$(PYTHON) "$(ROOT)/scripts/metrics.py" --csv "$(SCALING_DIR)/raw.csv" --output-dir "$(SCALING_DIR)/statistics" --no-plots
+metrics:
+	$(PYTHON) "$(ROOT)/scripts/metrics.py" --csv $(CSV_FILES) --output-dir "$(STATS_DIR)" --no-plots
+plot_metrics:
+	$(PYTHON) "$(ROOT)/scripts/plot_metrics.py" --csv $(CSV_FILES) --output-dir "$(PLOT_DIR)"
+plot: plot_metrics
+graficas: plot_metrics
+
+.PHONY: test_benchmarks
+test_benchmarks: all
+	$(PYTHON) -c 'import scipy, matplotlib'
+	$(PYTHON) "$(ROOT)/tests/test_metrics.py"
+	ctest --test-dir "$(BUILD_DIR)" -R 'benchmark_report|benchmark_pipeline' --output-on-failure
