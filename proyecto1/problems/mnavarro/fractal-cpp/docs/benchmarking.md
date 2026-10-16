@@ -5,7 +5,8 @@
 Esta es la secuencia para obtener CSV, tablas y gráficas de rendimiento equivalentes
 al alcance de benchmarking de RayTracing. Las 200 corridas son **por modelo y
 configuración**: Make invoca el script y el script hace las repeticiones automáticamente.
-No ejecutar Make 200 veces. Las gráficas de contadores Perf aún requieren la etapa 8.
+No ejecutar Make 200 veces. Las gráficas adicionales de contadores Perf se obtienen
+con la [receta de etapa 8](profiling.md).
 
 Ejecutar en Ubuntu nativo del Ryzen, desde `proyecto1/problems/mnavarro/fractal-cpp/`.
 Usar el mismo código, imagen, parámetros y binarios en ON/OFF. Los directorios de
@@ -68,9 +69,10 @@ indica `success: true` y `complete: true`. Conservar las cuatro carpetas complet
 incluidos sus `metadata.json`, y la carpeta de figuras. Restaurar después SMT según
 la configuración habitual del equipo.
 
-**Límite actual:** IPC, cache-miss rates, ciclos, instrucciones y cambios de contexto
-del SO de RayTracing proceden de Perf. Estos comandos no producen esas figuras;
-se incorporarán al implementar la etapa 8. Tampoco se añade el modelo Fine-Grained
+**Separación de campañas:** IPC, cache-miss rates, ciclos, instrucciones y cambios de
+contexto del SO proceden de Perf. Los comandos anteriores generan las figuras de
+benchmarking; para añadir las cinco figuras de contadores ejecutar
+[las campañas y `make profile_plot` de etapa 8](profiling.md). Tampoco se añade el modelo Fine-Grained
 cíclico de las referencias: se conserva el cooperativo aprobado para fractales.
 
 ## Correspondencia con RayTracing y gray-scott
@@ -356,7 +358,7 @@ se omite en CTest con código 77; `make test_benchmarks` exige instalarlas.
 Pendientes: campañas físicas de 200 corridas por configuración en ON/OFF, escalabilidad,
 conservación de los CSV y análisis experimental de convergencia en el Ryzen. Los modelos
 individuales ya fueron confirmados por el usuario, pero esa confirmación no se presenta
-como una campaña de benchmarks realizada. No se implementa Perf en esta etapa.
+como una campaña de benchmarks realizada. Esta etapa mide rendimiento; la captura Perf se documenta en [etapa 8](profiling.md).
 
 
 Validación local de esta implementación: Release con OpenCV, 16 pruebas aprobadas y

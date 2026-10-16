@@ -88,7 +88,7 @@ help:
 	@echo 'Build: all seq fine coarse cmp smt | Tests: test test_unit test_local verify_all verify_cmp verify_smt_on verify_smt_off'
 	@echo 'Run: run_seq run_fine run_coarse run_cmp run_smt_on run_smt_off | SMT records: record_smt_on record_smt_off compare_smt'
 	@echo 'Options: JOBS BUILD_DIR INPUT RANGE STRIDE ITERATIONS TEAMS THREADS_PER_TEAM SMT_TEAMS SMT_THREADS_PER_TEAM QUANTUM GRAY QUICK TIMEOUT RESULTS_DIR TEST_INPUT'
-	@echo 'SMT_STATE=on|off verifica el estado; ningun target cambia SMT. Etapa 8 (Perf) pendiente. Benchmark y graficas: benchmark_full benchmark_fast scalability plot.'
+	@echo 'SMT_STATE=on|off verifica el estado; ningun target cambia SMT. Perf: setup_perf profile_fast profile_perf profile_plot test_profiles. Benchmark y graficas: benchmark_full benchmark_fast scalability plot.'
 
 # Etapa 7: mediciones -> CSV individuales -> tablas/figuras desde CSV.
 RUNS ?= 200
@@ -137,3 +137,37 @@ test_benchmarks: all
 	$(PYTHON) -c 'import scipy, matplotlib'
 	$(PYTHON) "$(ROOT)/tests/test_metrics.py"
 	ctest --test-dir "$(BUILD_DIR)" -R 'benchmark_report|benchmark_pipeline' --output-on-failure
+
+# Etapa 8: Perf por proceso, pares de eventos y estado SMT verificado.
+PERF ?= perf
+PERF_RUNS ?= 200
+PERF_FAST_RUNS ?= 1
+PERF_MODELS ?= all
+PERF_MIN_RUNNING ?= 90
+PERF_TIMEOUT ?= 600
+PERF_DIR ?= $(ROOT)/metrics/perf-$(SMT_STATE)
+PERF_FAST_DIR ?= $(ROOT)/metrics/perf-diagnostic-$(SMT_STATE)
+PERF_CHECK_DIR ?= $(ROOT)/metrics/perf-check-$(SMT_STATE)
+PERF_CSV_FILES ?= "$(PERF_DIR)/events.csv"
+PERF_PLOT_DIR ?= $(ROOT)/metrics/perf-plots
+PERF_ARGS = --build-dir "$(BUILD_DIR)" --input "$(INPUT)" --perf "$(PERF)" --models "$(PERF_MODELS)" --smt-state $(SMT_STATE) --teams $(TEAMS) --members $(THREADS_PER_TEAM) --smt-teams $(SMT_TEAMS) --smt-members $(SMT_THREADS_PER_TEAM) --range $(RANGE) --stride $(STRIDE) --quantum $(QUANTUM) --cooldown $(COOLDOWN) --warmups $(WARMUPS) --timeout $(PERF_TIMEOUT) --min-running $(PERF_MIN_RUNNING) $(if $(filter 1,$(GRAY)),--gray,)
+.PHONY: setup_perf profile profile_perf perfilado profile_fast profile_on profile_off profile_plot test_profiles
+setup_perf: all
+	$(PYTHON) "$(ROOT)/scripts/profile.py" $(PERF_ARGS) --check --output-dir "$(PERF_CHECK_DIR)"
+profile_perf: all
+	$(PYTHON) "$(ROOT)/scripts/profile.py" $(PERF_ARGS) --runs $(PERF_RUNS) --output-dir "$(PERF_DIR)"
+	$(PYTHON) "$(ROOT)/scripts/profile_metrics.py" --csv "$(PERF_DIR)/events.csv" --output-dir "$(PERF_DIR)/statistics" --no-plots
+profile: profile_perf
+perfilado: profile_perf
+profile_fast: all
+	$(PYTHON) "$(ROOT)/scripts/profile.py" $(PERF_ARGS) --diagnostic --runs $(PERF_FAST_RUNS) --output-dir "$(PERF_FAST_DIR)"
+	$(PYTHON) "$(ROOT)/scripts/profile_metrics.py" --csv "$(PERF_FAST_DIR)/events.csv" --output-dir "$(PERF_FAST_DIR)/statistics" --no-plots
+profile_on:
+	$(MAKE) -f "$(ROOT)/scripts/Makefile" profile_perf SMT_STATE=on
+profile_off:
+	$(MAKE) -f "$(ROOT)/scripts/Makefile" profile_perf SMT_STATE=off
+profile_plot:
+	$(PYTHON) "$(ROOT)/scripts/profile_metrics.py" --csv $(PERF_CSV_FILES) --output-dir "$(PERF_PLOT_DIR)"
+test_profiles: all
+	$(PYTHON) -c 'import scipy, matplotlib'
+	ctest --test-dir "$(BUILD_DIR)" -R '^perf_' --output-on-failure

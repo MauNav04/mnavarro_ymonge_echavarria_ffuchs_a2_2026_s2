@@ -5,8 +5,8 @@ Este README es la **única fuente de verdad del progreso, arquitectura y validac
 están en [AGENTS.md](AGENTS.md) y la guía académica de la versión base en
 [sequential/README.md](sequential/README.md).
 
-Alcance autorizado: **etapa 7 — benchmarking y métricas**, con equipos de hilos por range como diseño aprobado.
-La etapa 8 continúa pendiente y requiere solicitud explícita.
+Alcance autorizado: **etapa 8 — profiling con Linux Perf**, con equipos de hilos por range como diseño aprobado.
+La automatización está implementada y validada por software; las capturas físicas de Perf siguen pendientes en el Ryzen.
 
 ## 1. Descripción del proyecto
 
@@ -26,7 +26,7 @@ funcionan en la computadora de evaluación, incluida la prueba SMT. Esta confirm
 se registra como prueba realizada por el usuario; no como una ejecución del asistente.
 CMP y SMT conservan únicamente el destino Ubuntu/AMD Ryzen. Los registros detallados,
 la escalabilidad y las mediciones estadísticas/Perf se documentan por separado cuando
-exista evidencia; las etapas 6–8 no se adelantan con esta limpieza.
+exista evidencia; la confirmación funcional no sustituye las campañas experimentales.
 
 ## 2. Tecnologías y entorno
 
@@ -188,13 +188,21 @@ CSV/gráficas. No se presentan los diagnósticos locales como resultados de eval
 
 ### Etapa 8 — Profiling
 
-- [ ] Implementar `profile.py` utilizando Linux Perf.
+- [x] Implementar `profile.py` utilizando Linux Perf.
 - [ ] Recolectar contadores de hardware disponibles.
 - [ ] Analizar ciclos, instrucciones, fallos de caché y cambios de contexto.
 - [ ] Comparar el comportamiento de los modelos.
 - [ ] Analizar el impacto de SMT habilitado/deshabilitado.
 
-**Aceptación:** Resultados de profiling organizados y comparables.
+**Software validado:** captura por grupos, detección de eventos/permisos, CSV individuales,
+metadatos y trazas, comparación FRC con secuencial, análisis estadístico y cinco figuras
+adicionales equivalentes a las referencias. `make setup_perf`, `profile_fast`,
+`profile_perf` y `profile_plot`; receta ON/OFF de 200 repeticiones en
+[docs/profiling.md](docs/profiling.md).
+
+**Aceptación física pendiente:** recolectar los contadores disponibles en Ubuntu/Ryzen,
+revisar cobertura y comparar realmente los cinco modelos y SMT ON/OFF. Las otras
+cuatro casillas requieren esas mediciones; las pruebas sintéticas no las completan.
 
 ### Backlog
 
@@ -253,7 +261,8 @@ Guía detallada de ejecución, parámetros y resultados: [docs/testing.md](docs/
 Para realizar las 200 repeticiones por modelo/configuración y generar todas las
 figuras de rendimiento, seguir la [receta completa de etapa 7](docs/benchmarking.md#receta-completa-200-corridas-y-todas-las-figuras-de-etapa-7):
 preparación, campañas fijas y escalabilidad ON/OFF, y un único `make plot` para combinarlo.
-Las figuras Perf de RayTracing requieren todavía la etapa 8.
+Las figuras Perf de RayTracing y gray-scott se generan por separado con la
+[receta de etapa 8](docs/profiling.md).
 
 Para etapa 7, después de instalar `scripts/requirements.txt` en un entorno virtual:
 
@@ -268,6 +277,22 @@ Repetir las campañas en OFF tras la intervención real de SMT. Los objetivos fo
 requieren Release, hardware de evaluación y al menos 200 corridas; no cambian SMT.
 Gráficas ON/OFF, parámetros y rutas en [docs/benchmarking.md](docs/benchmarking.md).
 Las figuras de contadores Perf corresponden a etapa 8 y no se inventan en estos CSV.
+
+Para añadir las métricas y figuras de Perf (Ubuntu/Ryzen; no modifica SMT):
+
+```bash
+make setup_perf BUILD_DIR=build-evaluation PYTHON=.venv/bin/python SMT_STATE=on
+make profile_fast BUILD_DIR=build-evaluation PYTHON=.venv/bin/python SMT_STATE=on
+make profile_perf BUILD_DIR=build-evaluation PYTHON=.venv/bin/python SMT_STATE=on PERF_DIR=metrics/perf-on
+# Tras desactivar SMT realmente:
+make profile_perf BUILD_DIR=build-evaluation PYTHON=.venv/bin/python SMT_STATE=off PERF_DIR=metrics/perf-off
+make profile_plot PYTHON=.venv/bin/python PERF_CSV_FILES="metrics/perf-on/events.csv metrics/perf-off/events.csv" PERF_PLOT_DIR=metrics/perf-plots
+```
+
+Por defecto se capturan 200 repeticiones por modelo **y por cada uno de seis grupos**:
+hasta 6.000 compresiones medidas por estado. La guía de [profiling](docs/profiling.md)
+explica instalación, permisos, eventos N/D, archivos, cinco figuras y diferencia entre
+el tiempo del algoritmo y el alcance de Perf sobre todo el proceso.
 
 Los comandos CMake directos continúan disponibles:
 
@@ -447,7 +472,7 @@ Cada decisión debe incluir:
   cancelables y mínimos deterministas. Se conserva el algoritmo matemático.
 - CSV y diagnósticos conservan la etiqueta `target` para mantener compatibilidad con los
   registros SMT; no corresponde a un perfil seleccionable.
-- Linux Perf continúa destinado a la misma máquina Ubuntu y pendiente de su etapa.
+- Linux Perf conserva el mismo destino Ubuntu/Ryzen; automatización en etapa 8 y capturas físicas pendientes.
 
 **Decisiones iniciales:**
 
@@ -467,7 +492,9 @@ Registrar problemas conocidos, tareas bloqueadas y validaciones que requieren in
   Las dos ejecuciones locales fallaron antes de iniciar la prueba con
   `FATAL: ThreadSanitizer: unexpected memory mapping`; no se afirma validación con TSan.
 
-- Implementar la etapa 8 únicamente cuando se solicite explícitamente.
+- Ejecutar `setup_perf`, el diagnóstico y las campañas Perf de 200 repeticiones por
+  grupo/modelo en ON/OFF; conservar CSV/metadatos y revisar cobertura y gráficas.
+  La automatización de etapa 8 está implementada; no hay mediciones físicas adjuntas.
 - La configuración secuencial rechaza varios equipos/hilos para evitar informar
   paralelismo inexistente. `10 hilos = 5 equipos × 2` ya está disponible para Fine-Grained y Coarse-Grained.
 
@@ -481,7 +508,8 @@ Registrar problemas conocidos, tareas bloqueadas y validaciones que requieren in
 - Incorporar los registros ON/OFF del Ryzen mediante `SMT/verify_smt.py` y su comparación.
   La prueba funcional satisfactoria ya fue confirmada por el usuario; no se han adjuntado
   aquí los artefactos experimentales detallados.
-- Confirmar el modelo exacto de Ryzen. No ejecutar aún benchmarks estadísticos ni Perf.
+- Conservar el modelo exacto de Ryzen, versión de Perf y kernel junto con las campañas;
+  no presentar diagnósticos locales o datos sintéticos como mediciones físicas.
 - Establecer configuraciones equivalentes de comparación.
 - Verificar los requisitos académicos adicionales de la especificación.
 
@@ -880,3 +908,42 @@ Mantener este historial breve. Git conserva el historial detallado de modificaci
   y diferencia respecto a las figuras que necesitan Perf en etapa 8.
 - Validación documental: objetivos y argumentos contrastados con Makefile, enlaces y
   `git diff --check`. No se ejecutaron campañas físicas ni se cambiaron estados de avance.
+
+
+### 2026-10-16 — Etapa 8: Linux Perf, contadores y figuras
+
+- Implementada la entrada `scripts/profile.py`, alias `profile_perf.py`, motor
+  `perf_runner.py`, lector `perf_support.py` y análisis `profile_metrics.py`.
+  Se reutilizan ejecución con timeout, configuración de modelos, afinidad y hashes;
+  no se modifica C++ ni la arquitectura de equipos por range.
+- Revisión de los perfiladores de RayTracing y gray-scott: IPC, ciclos, instrucciones,
+  caché genérica/L1/LLC, predicción, contexto del SO, migraciones, fallos de página,
+  task-clock y CPU efectivas. Se añade `duration_time` para calcular CPU efectivas
+  sobre la misma pasada. Se conserva el alcance de comando completo, explícitamente
+  separado del tiempo de codificación de etapa 7.
+- Seis grupos con parejas PMU simultáneas, contadores heredados por los trabajadores,
+  disponibilidad sondeada y salida cruda por pasada. No se cambian permisos ni SMT.
+  Eventos ausentes, no contados o de runtime insuficiente quedan excluidos y visibles;
+  nunca se presentan ceros inventados ni se sustituye LLC por caché genérica.
+- CSV incremental, metadatos con hashes/versiones/topología, estado verificado,
+  comparación FRC y afinidad CMP/SMT en cada pasada. Un fallo conserva registros y
+  `success=false`; las campañas incompatibles, duplicadas o truncadas se rechazan.
+- Estadísticas Student-t con ceros válidos, cobertura por evento, comparación ON/OFF
+  de configuraciones iguales y cinco figuras PNG a 300 DPI. Datos sintéticos,
+  diagnósticos y capturas físicas se identifican y no se mezclan.
+- Objetivos Make: `setup_perf`, `profile_fast`, `profile_perf`, `profile_on/off`,
+  `profile_plot`, `test_profiles`; alias `profile`/`perfilado`. Guía completa en
+  [docs/profiling.md](docs/profiling.md), enlazada desde las guías anteriores.
+- Validación Release local (`/tmp/fractal-stage7-release`): compilación completa y
+  CTest **18 aprobadas, 3 físicas omitidas de 21**, sin fallos. Las omisiones son CMP,
+  SMT y Perf por requerir la máquina de evaluación; no equivalen a pruebas físicas.
+  Nuevos contratos: seis pruebas de lector/captura (incluye compresores reales con Perf
+  sintético) y tres de análisis/figuras; disponibilidad, permisos, multiplexación,
+  unidades, cero/ausencia, timeout y compatibilidad con `cProfile`.
+- `make profile_plot` ejecutado realmente desde dos CSV sintéticos ON/OFF; cinco figuras,
+  estadísticas y comparación guardadas en `/tmp/fractal-stage8-plots/`. Dashboard
+  inspeccionado visualmente; ninguna figura se presenta como resultado del Ryzen.
+  Comprobado el rechazo de WSL y de campañas formales con menos de 200 repeticiones.
+- Marcada únicamente la implementación de etapa 8. Siguen pendientes la captura física
+  y el análisis experimental de contadores/modelos/SMT, además de los pendientes de
+  etapas anteriores que requieren esa misma máquina. No se implementa el backlog.

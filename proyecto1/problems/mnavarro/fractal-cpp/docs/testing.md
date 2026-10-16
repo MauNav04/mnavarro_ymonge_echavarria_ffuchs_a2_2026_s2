@@ -28,7 +28,8 @@ make help
 make all JOBS=2
 ```
 
-No se instala ni se configura Perf en esta etapa. El modelo exacto de Ryzen y la versión
+Estos comandos funcionales no configuran Perf; su preparación y capturas están en
+[docs/profiling.md](profiling.md). El modelo exacto de Ryzen y la versión
 de Ubuntu deben conservarse junto con los registros de evaluación. CMP/SMT verifican
 Ubuntu/AMD Ryzen, 8 núcleos y topología 8/16 según el estado real de SMT.
 
@@ -213,3 +214,11 @@ las 2 pruebas físicas. La matriz completa de los tres modelos portables aprobó
 FRC/PNG. Demostraciones Make de seq/fine/coarse dieron archivos idénticos; `verify_all`
 falló correctamente por falta del Ryzen y conservó un registro con `success: false`.
 No se ejecutó aquí la matriz nueva CMP/SMT.
+
+
+## Pruebas de perfilado
+
+`make test_profiles PYTHON=.venv/bin/python` ejecuta los contratos de contadores y
+análisis, y el diagnóstico físico opcional. Sus omisiones se informan explícitamente.
+La [guía de etapa 8](profiling.md) documenta `setup_perf`, las capturas de 200
+repeticiones por modelo/grupo y las cinco figuras complementarias.

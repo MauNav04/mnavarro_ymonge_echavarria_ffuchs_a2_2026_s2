@@ -133,8 +133,17 @@ si solo se ejecutó en WSL. Esta regla no autoriza implementar etapas futuras.
   modifica SMT. CMP no se sobresuscribe a 16 trabajadores para completar una curva.
 - Estadísticas: Student-t para IC de medias y método de incertidumbre del speedup
   documentado; no eliminar outliers ni inventar intervalos con una sola muestra.
-- Los contadores cooperativos son de software. IPC, caché y contexto del SO requieren
-  etapa 8/Perf; no llenar esos campos con estimaciones ni ceros supuestamente medidos.
+- Los contadores cooperativos son de software. IPC, caché y contexto del SO se capturan
+  con etapa 8/Perf; no llenar esos campos con estimaciones ni ceros supuestamente medidos.
+- Perf: conservar `setup_perf`, `profile_fast`, `profile_perf` y `profile_plot`, captura
+  incremental y estado físico verificado. No cambiar permisos, capacidades ni SMT desde
+  scripts. La campaña formal exige 200 repeticiones por modelo/grupo de contadores.
+- Contar parejas PMU simultáneamente y separar grupos. Distinguir alcance del comando
+  completo de Perf frente al tiempo exclusivo del algoritmo. CPU efectivas usa task-clock
+  dividido por duration_time de la misma pasada; si falta un evento, registrar N/D.
+- Guardar unidad, runtime y porcentaje efectivo; excluir muestras inválidas o de runtime
+  insuficiente sin borrarlas. No sustituir LLC por caché genérica. Conservar ceros medidos.
+  Tests sintéticos y diagnósticos no validan las mediciones físicas del Ryzen.
 - Mantener entradas y parámetros comparables.
 - Utilizar la versión secuencial como referencia.
 - Guardar resultados individuales antes de calcular estadísticas.

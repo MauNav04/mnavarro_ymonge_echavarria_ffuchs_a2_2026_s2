@@ -19,10 +19,10 @@ def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def invoke(argv, timeout):
+def invoke(argv, timeout, env=None):
     """Un timeout cancela el grupo del proceso; ningún trabajador queda ejecutándose."""
     process = subprocess.Popen(list(map(str, argv)), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                               text=True, start_new_session=True)
+                               text=True, start_new_session=True, env=env)
     timed_out = False
     try:
         stdout, stderr = process.communicate(timeout=timeout)
