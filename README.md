@@ -36,12 +36,12 @@ Cada problema seleccionado cuenta con su propio módulo independiente, código f
 | :--- | :--- | :--- |
 | **Ray Tracing** | Emanuel Chavarría Hernández | [`RayTracing/`](proyecto1/problems/echavarria/RayTracing/) |
 | **Fractales C++** | Mauricio Navarro Obando | [`fractal-cpp/`](proyecto1/problems/mnavarro/fractal-cpp/) |
-| **Heat 2D** | Yonathan Monge Sanabria | [`heat2d/`](proyecto1/problems/heat2d/) |
-| **Gray-Scott** | Fernando Fuchs Mora | [`gray-scott/`](proyecto1/problems/gray-scott/) |
+| **Heat 2D** | Fernando Fuchs Mora | [`heat2d/`](proyecto1/problems/heat2d/) |
+| **Gray-Scott** |Yonathan Monge Sanabria | [`gray-scott/`](proyecto1/problems/gray-scott/) |
 
 ---
 
-## anco de Pruebas Dummy Multithreading (`test_cases/`)
+## Banco de Pruebas Dummy Multithreading (`test_cases/`)
 
 PS implementó en [`test_cases/main.cpp`](test_cases/main.cpp) un banco de pruebas experimental sobre el algoritmo de **criba segmentada de números primos**.
 
