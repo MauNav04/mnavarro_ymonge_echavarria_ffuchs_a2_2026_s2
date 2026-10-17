@@ -1,0 +1,122 @@
+{
+  "cycles": {
+    "count": 1409172491.0,
+    "unit": "",
+    "runtime_ns": 321951468.0,
+    "running_pct": 100.0,
+    "status": "ok",
+    "raw_event": "cycles"
+  },
+  "instructions": {
+    "count": 3736994599.0,
+    "unit": "",
+    "runtime_ns": 321951468.0,
+    "running_pct": 100.0,
+    "status": "ok",
+    "raw_event": "instructions"
+  },
+  "cache-references": {
+    "count": 17315696.0,
+    "unit": "",
+    "runtime_ns": 323176271.0,
+    "running_pct": 100.0,
+    "status": "ok",
+    "raw_event": "cache-references"
+  },
+  "cache-misses": {
+    "count": 2924999.0,
+    "unit": "",
+    "runtime_ns": 323176271.0,
+    "running_pct": 100.0,
+    "status": "ok",
+    "raw_event": "cache-misses"
+  },
+  "L1-dcache-loads": {
+    "count": 490455365.0,
+    "unit": "",
+    "runtime_ns": 322756692.0,
+    "running_pct": 100.0,
+    "status": "ok",
+    "raw_event": "L1-dcache-loads"
+  },
+  "L1-dcache-load-misses": {
+    "count": 8655076.0,
+    "unit": "",
+    "runtime_ns": 322756692.0,
+    "running_pct": 100.0,
+    "status": "ok",
+    "raw_event": "L1-dcache-load-misses"
+  },
+  "LLC-loads": {
+    "count": null,
+    "unit": "",
+    "runtime_ns": null,
+    "running_pct": null,
+    "status": "not_supported",
+    "raw_event": "LLC-loads"
+  },
+  "LLC-load-misses": {
+    "count": null,
+    "unit": "",
+    "runtime_ns": null,
+    "running_pct": null,
+    "status": "not_supported",
+    "raw_event": "LLC-load-misses"
+  },
+  "branches": {
+    "count": 494414793.0,
+    "unit": "",
+    "runtime_ns": 319526219.0,
+    "running_pct": 100.0,
+    "status": "ok",
+    "raw_event": "branches"
+  },
+  "branch-misses": {
+    "count": 2981751.0,
+    "unit": "",
+    "runtime_ns": 319526219.0,
+    "running_pct": 100.0,
+    "status": "ok",
+    "raw_event": "branch-misses"
+  },
+  "task-clock": {
+    "count": 319.535085,
+    "unit": "ms",
+    "runtime_ns": 319535085.0,
+    "running_pct": 100.0,
+    "status": "ok",
+    "raw_event": "task-clock"
+  },
+  "context-switches": {
+    "count": 9.0,
+    "unit": "",
+    "runtime_ns": 319535085.0,
+    "running_pct": 100.0,
+    "status": "ok",
+    "raw_event": "context-switches"
+  },
+  "cpu-migrations": {
+    "count": 1.0,
+    "unit": "",
+    "runtime_ns": 319535085.0,
+    "running_pct": 100.0,
+    "status": "ok",
+    "raw_event": "cpu-migrations"
+  },
+  "page-faults": {
+    "count": 4648.0,
+    "unit": "",
+    "runtime_ns": 319535085.0,
+    "running_pct": 100.0,
+    "status": "ok",
+    "raw_event": "page-faults"
+  },
+  "duration_time": {
+    "count": 323688176.0,
+    "unit": "ns",
+    "runtime_ns": null,
+    "running_pct": null,
+    "status": "ok",
+    "raw_event": "duration_time"
+  }
+}

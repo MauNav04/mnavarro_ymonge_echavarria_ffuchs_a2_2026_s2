@@ -1,7 +1,8 @@
 # SMT — Etapa 5
 
 Destino: Ubuntu nativo, AMD Ryzen de 8 núcleos físicos y 16 hilos lógicos con SMT
-habilitado. El modelo exacto sigue pendiente. La topología de WSL no valida este destino.
+habilitado. Los diagnósticos recibidos confirman Ryzen 7 7730U y Ubuntu 25.10.
+La topología de WSL no valida este destino. Revisión en [ryzen_diagnostics.md](ryzen_diagnostics.md).
 
 ## Ejecución y referencia
 
@@ -33,7 +34,10 @@ y se reúnen todos los pthreads; no hay fallback silencioso ni espera activa glo
 A diferencia del modo `sw` del ejemplo, fijar afinidad sobre núcleos físicos mientras
 SMT sigue activo no se acepta como evidencia de SMT OFF. Es necesario desactivarlo
 realmente mediante la intervención del usuario en BIOS/UEFI o la configuración Linux
-del equipo, y comprobarlo antes de correr. Este código no cambia SMT ni necesita sudo.
+del equipo, y comprobarlo antes de correr. El ejecutable SMT no cambia el estado ni
+necesita sudo. El orquestador [`make run`](running.md) automatiza ON/OFF/ON mediante
+sysfs con un ayudante privilegiado y restauración; las recetas individuales siguientes
+siguen exigiendo intervención externa.
 
 ## Prueba en la computadora de evaluación
 
@@ -45,7 +49,7 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_APP=ON
 cmake --build build -j2
 ctest --test-dir build --output-on-failure
 ./build/fractal_smt --list-cpus --smt-state on
-python3 SMT/verify_smt.py run --state on --input sequential/examples/color128.png --output-dir SMT/results/on
+python3 SMT/verify_smt.py run --state on --input assets/color128.png --output-dir SMT/results/on
 ```
 
 Tras desactivar SMT realmente y reiniciar si corresponde, sin recompilar ni cambiar
@@ -54,7 +58,7 @@ entrada/parámetros, repetir en la misma máquina:
 ```bash
 ./build/fractal_smt --list-cpus --smt-state off
 ctest --test-dir build -R smt_hardware_tests --output-on-failure
-python3 SMT/verify_smt.py run --state off --input sequential/examples/color128.png --output-dir SMT/results/off
+python3 SMT/verify_smt.py run --state off --input assets/color128.png --output-dir SMT/results/off
 python3 SMT/verify_smt.py compare --on SMT/results/on --off SMT/results/off --output SMT/results/comparison.json
 ```
 
@@ -77,7 +81,7 @@ Ejecución manual equivalente:
 
 ```bash
 mkdir -p SMT/results/manual
-./build/fractal_smt compress sequential/examples/color128.png SMT/results/manual/color.frc --smt-state on --teams 4 --threads-per-team 4 --report-affinity SMT/results/manual/affinity.csv
+./build/fractal_smt compress assets/color128.png SMT/results/manual/color.frc --smt-state on --teams 4 --threads-per-team 4 --report-affinity SMT/results/manual/affinity.csv
 ./build/fractal_seq decompress SMT/results/manual/color.frc SMT/results/manual/color.png --iterations 80
 ```
 

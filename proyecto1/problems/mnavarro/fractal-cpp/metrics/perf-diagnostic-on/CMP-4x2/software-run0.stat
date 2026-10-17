@@ -1,0 +1,5 @@
+# started on Fri Oct 16 19:08:01 2026
+
+2449;;context-switches;412049173;100.00;;
+18;;cpu-migrations;412049173;100.00;;
+4722;;page-faults;412049173;100.00;;

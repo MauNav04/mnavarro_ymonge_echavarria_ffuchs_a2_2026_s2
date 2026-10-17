@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "scope": "whole-command-including-startup-io-and-threads",
+  "strategy": "paired-groups-separate-passes-v1",
+  "sources": [
+    {
+      "csv": "/home/emalinux/Desktop/TEC_2026_II/Arqui2/Proyecto1/mnavarro_ymonge_echavarria_ffuchs_a2_2026_s2/proyecto1/problems/mnavarro/fractal-cpp/metrics/automatic/quick-on-20261017T100835Z-9467ac/perf/events.csv",
+      "csv_sha256": "209f36248abcdea810274f8b5ca85c6cef49cc246c5e427de02ce9130d8281fd",
+      "metadata_sha256": "99ddc0446747a4fa7ae10a8367dc3cc58e4b2e8aad7b728e2ae53da02bc3d124",
+      "campaign_id": "520b93968dc048f49e03f3f82dc1d306",
+      "success": true
+    }
+  ],
+  "execution_complete": true,
+  "all_events_measured": false,
+  "measurement_kinds": [
+    "diagnostic"
+  ],
+  "configurations": 5
+}

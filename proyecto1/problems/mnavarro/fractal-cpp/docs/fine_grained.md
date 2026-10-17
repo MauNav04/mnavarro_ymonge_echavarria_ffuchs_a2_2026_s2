@@ -61,9 +61,9 @@ Desde la raíz de `fractal-cpp`, tras compilar:
 
 ```bash
 mkdir -p fine-grained/results
-./build/fractal_fine compress sequential/examples/color128.png fine-grained/results/color.frc --teams 5 --threads-per-team 2 --quantum-domains 1
+./build/fractal_fine compress assets/color128.png fine-grained/results/color.frc --teams 5 --threads-per-team 2 --quantum-domains 1
 ./build/fractal_seq decompress fine-grained/results/color.frc fine-grained/results/color.png --iterations 80
-./build/fractal_seq compare sequential/examples/color128.png fine-grained/results/color.png
+./build/fractal_seq compare assets/color128.png fine-grained/results/color.png
 ```
 
 Para inspeccionar los turnos, agregar `--trace-schedule fine-grained/results/schedule.csv`

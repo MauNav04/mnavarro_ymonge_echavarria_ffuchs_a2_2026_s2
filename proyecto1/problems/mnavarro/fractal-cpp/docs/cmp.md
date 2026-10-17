@@ -10,7 +10,8 @@ de evaluación el 2026-10-16 y solicitó retirar la variante local.
 La selección exige el destino de evaluación: rechaza WSL, hipervisores/contenedores
 reconocidos, otras distribuciones/familias de CPU y topologías fuera del contrato.
 La ausencia de señales de virtualización no demuestra por sí sola hardware físico.
-El modelo exacto de Ryzen y la versión de Ubuntu siguen pendientes de registrar.
+Los diagnósticos recibidos confirman Ryzen 7 7730U y Ubuntu 25.10; las campañas
+formales ON/OFF permanecen pendientes. Revisión en [ryzen_diagnostics.md](ryzen_diagnostics.md).
 
 Se adapta el reparto contiguo y afinidad de [RayTracing CMP](../../../echavarria/RayTracing/CMP/main.cpp).
 Sysfs proporciona CPU online, `physical_package_id` y `core_id`; `sched_getaffinity`
@@ -46,9 +47,9 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_APP=ON
 cmake --build build --target fractal_cmp fractal_seq -j2
 ./build/fractal_cmp --list-cpus
 mkdir -p CMP/results
-./build/fractal_cmp compress sequential/examples/color128.png CMP/results/color.frc --teams 4 --threads-per-team 2 --report-affinity CMP/results/affinity.csv
+./build/fractal_cmp compress assets/color128.png CMP/results/color.frc --teams 4 --threads-per-team 2 --report-affinity CMP/results/affinity.csv
 ./build/fractal_seq decompress CMP/results/color.frc CMP/results/color.png 80
-./build/fractal_seq compare sequential/examples/color128.png CMP/results/color.png
+./build/fractal_seq compare assets/color128.png CMP/results/color.png
 ```
 
 Se puede configurar desde `CMP/` con `cmake -S CMP -B build-cmp`. `--teams` por

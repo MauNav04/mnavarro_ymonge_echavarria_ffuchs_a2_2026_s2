@@ -19,6 +19,10 @@ struct WorkerPlacement {
     std::size_t channel, worker, team;
     int cpu, socket, core, observed_before, observed_after;
 };
+// Contadores de planificación de software, no eventos de contexto del kernel.
+struct ExecutionCounters {
+    std::size_t turns=0, scheduler_switches=0, stalls=0;
+};
 struct ExecutionConfig {
     Model model = Model::Sequential;
     std::size_t teams = 1;
@@ -29,6 +33,7 @@ struct ExecutionConfig {
     // Añadido solo tras reunir los pthreads; cada trabajador verifica máscara y CPU efectiva.
     std::vector<WorkerPlacement>* worker_placements = nullptr;
     SmtState smt_state = SmtState::On;
+    ExecutionCounters* counters = nullptr;
 };
 Model parse_model(const std::string& name);
 const char* model_name(Model model);

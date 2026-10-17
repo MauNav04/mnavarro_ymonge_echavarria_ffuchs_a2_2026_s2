@@ -45,9 +45,9 @@ Desde `fractal-cpp/`, tras compilar:
 
 ```bash
 mkdir -p coarse-grained/results
-./build/fractal_coarse compress sequential/examples/color128.png coarse-grained/results/color.frc --teams 5 --threads-per-team 2
+./build/fractal_coarse compress assets/color128.png coarse-grained/results/color.frc --teams 5 --threads-per-team 2
 ./build/fractal_seq decompress coarse-grained/results/color.frc coarse-grained/results/color.png 80
-./build/fractal_seq compare sequential/examples/color128.png coarse-grained/results/color.png
+./build/fractal_seq compare assets/color128.png coarse-grained/results/color.png
 ```
 
 Agregar `--trace-schedule coarse-grained/results/schedule.csv` a la compresión permite examinar

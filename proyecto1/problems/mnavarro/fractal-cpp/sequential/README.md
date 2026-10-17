@@ -133,9 +133,9 @@ ctest --test-dir build --output-on-failure
 ### Demostración RGB
 
 ```bash
-./build/fractal_seq compress examples/color.png prueba_color.frc 8 8
+./build/fractal_seq compress ../assets/color.png prueba_color.frc 8 8
 ./build/fractal_seq decompress prueba_color.frc reconstruida_color.png 80
-./build/fractal_seq compare examples/color.png reconstruida_color.png
+./build/fractal_seq compare ../assets/color.png reconstruida_color.png
 ```
 
 - Los dos últimos argumentos de `compress` son range y stride; el dominio tiene el doble del lado del range.
@@ -146,9 +146,9 @@ ctest --test-dir build --output-on-failure
 ### Demostración en gris y compatibilidad
 
 ```bash
-./build/fractal_seq compress-gray examples/color.png prueba_gris.frc 8 8
+./build/fractal_seq compress-gray ../assets/color.png prueba_gris.frc 8 8
 ./build/fractal_seq decompress prueba_gris.frc reconstruida_gris.png 80
-./build/fractal_seq compare-gray examples/color.png reconstruida_gris.png
+./build/fractal_seq compare-gray ../assets/color.png reconstruida_gris.png
 ```
 
 RGB usa `FRC2`; gris conserva `FRC1`. El decodificador nuevo reconoce ambos formatos. La extensión es `.frc` en los dos casos. OpenCV convierte su representación BGR a los planos RGB propios, y revierte ese orden al guardar.
@@ -182,7 +182,7 @@ Imágenes de 8 bits por canal al cargar; sin conservación de alfa ni metadatos.
 | `../tests/test_codec.cpp` | Pruebas del núcleo gris. |
 | `../tests/test_color.cpp` | Pruebas RGB y compatibilidad de archivos. |
 | `../tests/test_image_io.cpp` | Verificación del orden de canales con OpenCV. |
-| `examples/` | Imágenes y códigos de referencia. |
+| `../assets/` | Imágenes de entrada compartidas por todos los modelos. |
 | `../docs/Propuestas.md` | Diseños de paralelización y comparación. |
 
 ## 5. Próxima etapa

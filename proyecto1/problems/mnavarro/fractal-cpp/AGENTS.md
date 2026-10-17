@@ -19,6 +19,8 @@ reintroducir una variante local ni un perfil que omita la verificación del dest
 Cada main fija su modelo; no permite ejecutar otro mediante `--model`.
 El núcleo único compartido está en `src/` e `include/`. Argumentos, E/S y mediciones se
 reutilizan desde `app/`; los main deben mantenerse pequeños, sin copiar el controlador.
+Las imágenes de entrada compartidas viven en `assets/`; no guardarlas dentro de
+un modelo, `app/` ni `src/`. Las salidas y campañas conservan sus directorios de resultados.
 Conservar el algoritmo matemático y los formatos FRC1/FRC2.
 Diseño aprobado: equipos de hilos por range; cada hilo evalúa dominios distintos y el equipo
 reduce mínimos para publicar una única regla. En empates conservar el orden dominio/simetría
@@ -111,15 +113,75 @@ La desactivación de SMT en BIOS/UEFI y las pruebas físicas correspondientes re
 
 ## 6. Benchmarking y profiling
 
+Automatización vigente: Makefile raíz incluye `scripts/Makefile`; CMake sigue siendo
+la única definición de compilación. Conservar objetivos `all`, `run_*`, `verify_*` y
+`test` similares a RayTracing/gray-scott. `scripts/test_models.py` es una suite funcional,
+no un benchmark. La suite completa debe fallar si falta CMP/SMT o el estado solicitado;
+`test_local` prueba únicamente lo permitido por el entorno. Los objetivos individuales
+no modifican SMT; `make run` es la excepción autorizada para la campaña ON/OFF/ON.
+Guardar registros por corrida y propagar errores/timeouts. No marcar la matriz nueva
+validada en Ryzen hasta ejecutarla allí, aunque los modelos individuales ya se hayan probado.
+
+La entrada habitual es `make setup`, `make quick`, `make run` y `make report`,
+documentada en `docs/running.md`. Conservar la ayuda principal breve y las opciones
+previas en `help_advanced`. `workflow.py` reutiliza los motores de captura/análisis;
+no duplicar algoritmos ni sustituir CMake. `quick` siempre es diagnóstico y `run`
+exige 200 repeticiones para benchmark/escalabilidad y 20 para Perf por modelo/grupo
+(mínimo aceptado de Perf: 15). Por autorización explícita del usuario (2026-10-17),
+`run` debe activar SMT, capturar ON, desactivarlo mediante sysfs, capturar OFF y
+restaurarlo a ON antes del informe. Usar un ayudante privilegiado limitado a ON/OFF,
+con exclusión mutua y restauración ante EOF/error/interrupción; verificar el estado
+real. Pedir sudo sólo al inicio y mantener los compresores y sus salidas sin privilegios.
+`quick`, los motores individuales y `report` no cambian SMT. No ejecutar cambios
+físicos durante tests locales: utilizar archivos temporales y contratos.
+Compartir la paleta institucional en `scripts/plot_style.py`, conservando 300 DPI.
+Detectar el estado y
+comprobar Perf antes de iniciar campañas largas. Conservar datos parciales ante
+errores y usar nombres únicos para nuevas campañas e informes. `report` analiza
+CSV existentes compatibles sin recapturar ni mezclar cargas/estados inválidos.
+El directorio predeterminado sigue siendo `build`; Make prefiere el Python de
+`.venv` cuando existe, sin exigir activación manual.
+
+
 El destino de SMT y Linux Perf es la computadora de evaluación de RayTracing: Ubuntu,
-AMD Ryzen (modelo exacto pendiente), topología 8/16 confirmada por el usuario. Las
+AMD Ryzen 7 7730U (diagnósticos recibidos: Ubuntu 25.10), topología 8/16 confirmada. Las
 pruebas locales de contratos no sustituyen la ejecución física. No dar por medido SMT/Perf sobre esa máquina
 si solo se ejecutó en WSL. Esta regla no autoriza implementar etapas futuras.
 
+- Automatización de etapa 7: `benchmark_full`/`benchmark_fast`, `scalability` y `plot`.
+  Conservar CSV individuales antes de analizar, hashes/metadatos y etiquetas físicas,
+  diagnósticas o sintéticas. No mezclar estados SMT ni campañas incompatibles.
+- Campañas formales: Release, Ryzen real, 200 corridas mínimas para benchmark y
+  escalabilidad; Perf usa 20 por modelo/grupo (mínimo 15, autorizado por el usuario).
+  Los diagnósticos cortos se etiquetan y no sustituyen la campaña formal. Sólo el
+  orquestador `make run` cambia SMT. CMP no se sobresuscribe a 16 trabajadores.
+- Estadísticas: Student-t para IC de medias y método de incertidumbre del speedup
+  documentado; no eliminar outliers ni inventar intervalos con una sola muestra.
+- Los contadores cooperativos son de software. IPC, caché y contexto del SO se capturan
+  con etapa 8/Perf; no llenar esos campos con estimaciones ni ceros supuestamente medidos.
+- Perf: conservar `setup_perf`, `profile_fast`, `profile_perf` y `profile_plot`, captura
+  incremental y estado físico verificado. No cambiar permisos ni capacidades; los
+  motores Perf no modifican SMT (lo gestiona exclusivamente el orquestador autorizado).
+  El perfilado usa 20 repeticiones por modelo/grupo de contadores (mínimo 15).
+- Contar parejas PMU simultáneamente y separar grupos. Distinguir alcance del comando
+  completo de Perf frente al tiempo exclusivo del algoritmo. CPU efectivas usa task-clock
+  dividido por duration_time de la misma pasada; si falta un evento, registrar N/D.
+- Guardar unidad, runtime y porcentaje efectivo; excluir muestras inválidas o de runtime
+  insuficiente sin borrarlas. No sustituir LLC por caché genérica. Conservar ceros medidos.
+  Los tests sintéticos no validan hardware; los diagnósticos físicos no sustituyen
+  las campañas de benchmark/escalabilidad de 200 repeticiones ni el perfilado de 20.
+- Perf conserva por defecto cada salida cruda en `perf-stat.jsonl`, con ruta original y
+  texto íntegro, y flush tras cada pasada. `PERF_RAW_STORAGE=files` conserva la disposición
+  anterior. No borrar ni corregir retroactivamente campañas recibidas para ocultar fallos.
+  Una unidad vacía de task-clock/duration_time en Perf 6.17 representa conteos crudos ns;
+  normalizar a ms/ns respectivamente. Unidades explícitas desconocidas siguen siendo N/D.
+- Exportar campañas terminadas con `archive_metrics`; incluir CSV aunque Git los ignore,
+  conservar originales y no sobrescribir archivos de exportación existentes.
 - Mantener entradas y parámetros comparables.
 - Utilizar la versión secuencial como referencia.
 - Guardar resultados individuales antes de calcular estadísticas.
-- Cumplir el mínimo de 200 repeticiones por configuración experimental.
+- Cumplir el mínimo de 200 repeticiones por configuración de benchmark/escalabilidad;
+  para Perf, usar 20 por defecto y mínimo 15 por modelo/grupo.
 - Evitar incluir compilación u operaciones externas dentro del tiempo de cómputo cuando se mida exclusivamente el algoritmo.
 - No ejecutar los benchmarks principales en entornos virtualizados.
 - No asumir que todos los eventos de Linux Perf están disponibles.

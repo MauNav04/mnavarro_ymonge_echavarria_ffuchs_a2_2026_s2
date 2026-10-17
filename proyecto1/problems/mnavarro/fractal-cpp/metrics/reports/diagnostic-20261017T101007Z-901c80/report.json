@@ -1,0 +1,13 @@
+{
+  "success": true,
+  "measurement_kind": "diagnostic",
+  "states": [
+    "on"
+  ],
+  "sources": [
+    "/home/emalinux/Desktop/TEC_2026_II/Arqui2/Proyecto1/mnavarro_ymonge_echavarria_ffuchs_a2_2026_s2/proyecto1/problems/mnavarro/fractal-cpp/metrics/automatic/quick-on-20261017T100835Z-9467ac/benchmark/raw.csv",
+    "/home/emalinux/Desktop/TEC_2026_II/Arqui2/Proyecto1/mnavarro_ymonge_echavarria_ffuchs_a2_2026_s2/proyecto1/problems/mnavarro/fractal-cpp/metrics/automatic/quick-on-20261017T100835Z-9467ac/scaling/raw.csv",
+    "/home/emalinux/Desktop/TEC_2026_II/Arqui2/Proyecto1/mnavarro_ymonge_echavarria_ffuchs_a2_2026_s2/proyecto1/problems/mnavarro/fractal-cpp/metrics/automatic/quick-on-20261017T100835Z-9467ac/perf/events.csv"
+  ],
+  "figures": 14
+}

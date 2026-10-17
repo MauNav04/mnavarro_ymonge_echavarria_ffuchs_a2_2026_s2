@@ -1,0 +1,1 @@
+campaign_id,measurement_kind,smt_state,model_key,modelo,teams,threads_per_team,hilos,quantum,run_id,pass_id,event,raw_event,count,unit,runtime_ns,running_pct,status,native_time_ms,wall_s,frc_sha256,expected_runs,timestamp

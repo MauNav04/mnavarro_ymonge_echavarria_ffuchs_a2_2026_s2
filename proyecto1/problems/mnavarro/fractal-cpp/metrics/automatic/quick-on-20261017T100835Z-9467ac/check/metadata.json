@@ -1,0 +1,261 @@
+{
+  "schema": 1,
+  "experiment": "perf",
+  "campaign_id": "978ab9629d144d78aaeb9a4c414677e7",
+  "success": true,
+  "state_verified": true,
+  "measurement_kind": "diagnostic",
+  "check_only": true,
+  "scope": "whole-command-including-startup-io-and-threads",
+  "strategy": "paired-groups-separate-passes-v1",
+  "runs": 1,
+  "warmups": 1,
+  "cooldown": 0.15,
+  "min_running_pct": 90.0,
+  "smt_state": "on",
+  "configurations": [
+    [
+      "sequential",
+      1,
+      1
+    ],
+    [
+      "fine-grained",
+      4,
+      2
+    ],
+    [
+      "coarse-grained",
+      4,
+      2
+    ],
+    [
+      "CMP",
+      4,
+      2
+    ],
+    [
+      "SMT",
+      4,
+      4
+    ]
+  ],
+  "events": [
+    "cycles",
+    "instructions",
+    "cache-references",
+    "cache-misses",
+    "L1-dcache-loads",
+    "L1-dcache-load-misses",
+    "LLC-loads",
+    "LLC-load-misses",
+    "branches",
+    "branch-misses",
+    "task-clock",
+    "context-switches",
+    "cpu-migrations",
+    "page-faults",
+    "duration_time"
+  ],
+  "raw_storage": "jsonl",
+  "raw_stats_file": "perf-stat.jsonl",
+  "input_sha256": "cdd3f04ec5f8a330e0a58549485e2d9a4126cce1e69921c5c58f6130b63a0035",
+  "machine_sha256": "920092c0781b912b2ff4aa1270ef3438767d7cd56ede995cf1b64a49ddc13ae6",
+  "kernel": "6.17.0-41-generic",
+  "os_release": "PRETTY_NAME=\"Ubuntu 25.10\"\nNAME=\"Ubuntu\"\nVERSION_ID=\"25.10\"\nVERSION=\"25.10 (Questing Quokka)\"\nVERSION_CODENAME=questing\nID=ubuntu\nID_LIKE=debian\nHOME_URL=\"https://www.ubuntu.com/\"\nSUPPORT_URL=\"https://help.ubuntu.com/\"\nBUG_REPORT_URL=\"https://bugs.launchpad.net/ubuntu/\"\nPRIVACY_POLICY_URL=\"https://www.ubuntu.com/legal/terms-and-policies/privacy-policy\"\nUBUNTU_CODENAME=questing\nLOGO=ubuntu-logo\n",
+  "range": 8,
+  "stride": 8,
+  "gray": false,
+  "quantum": 1,
+  "binaries_sha256": {
+    "sequential": "b5a343535022b0065bf19093090147463ace86579ad1a27411b0456f5672210a",
+    "fine-grained": "2b8278ca1b204ec86967e37e1cad7e1dc94d552338b042f02e6086cf93e62708",
+    "coarse-grained": "e5d4ff1d6cb2ad996e7d80a5c607209f567c4689f810b8d858abc4d94e85b296",
+    "CMP": "635144b5a4a22dceb6cde49cd1c7e95ee8011aa7e9e5cda62ecd01499526919b",
+    "SMT": "0cf681df62029f4bed1f0880ee397f273900ea65b8887042bdd3a9b5c18f09e9"
+  },
+  "script_sha256": "d246d7d038ba2b7a3be317cfad859b1f24cd2606f625c9c1d72662b1b607e6d9",
+  "support_sha256": "5c2c16a2d4a81ab142da225709da8832be05c0f470846b640fa9b509dd8dee1c",
+  "CMP_topology": "environment=native-or-unknown profile=target distribution=ubuntu online_cpus=16 online_cores=8 allowed_cores=8\nprocessor= AMD Ryzen 7 7730U with Radeon Graphics\nlogical_cpu,socket,core\n0,0,0\n2,0,1\n4,0,2\n6,0,3\n8,0,4\n10,0,5\n12,0,6\n14,0,7\n",
+  "SMT_topology": "environment=native-or-unknown profile=target distribution=ubuntu online_cpus=16 online_cores=8 allowed_cores=8 smt_control=on smt_active=1\nprocessor= AMD Ryzen 7 7730U with Radeon Graphics\nlogical_cpu,socket,core\n0,0,0\n1,0,0\n2,0,1\n3,0,1\n4,0,2\n5,0,2\n6,0,3\n7,0,3\n8,0,4\n9,0,4\n10,0,5\n11,0,5\n12,0,6\n13,0,6\n14,0,7\n15,0,7\n",
+  "topology": {
+    "control": "on",
+    "active": "1",
+    "online": "0-15",
+    "allowed": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ]
+  },
+  "build_flags": [
+    "CMAKE_BUILD_TYPE:STRING=Release",
+    "CMAKE_CXX_FLAGS:STRING=",
+    "CMAKE_CXX_FLAGS_RELEASE:STRING=-O3 -DNDEBUG"
+  ],
+  "perf_version": "perf version 6.17.13",
+  "perf_event_paranoid": "-1",
+  "reference_sha256": "96fbcfa5b94c9a6cfa33c587eee7e027115d3e098c80095ce95049366e944ba0",
+  "availability": {
+    "cycles": {
+      "count": 1411747208.0,
+      "unit": "",
+      "runtime_ns": 318375407.0,
+      "running_pct": 100.0,
+      "status": "ok",
+      "raw_event": "cycles"
+    },
+    "instructions": {
+      "count": 3737214563.0,
+      "unit": "",
+      "runtime_ns": 318375407.0,
+      "running_pct": 100.0,
+      "status": "ok",
+      "raw_event": "instructions"
+    },
+    "cache-references": {
+      "count": 17959847.0,
+      "unit": "",
+      "runtime_ns": 321035707.0,
+      "running_pct": 100.0,
+      "status": "ok",
+      "raw_event": "cache-references"
+    },
+    "cache-misses": {
+      "count": 3446619.0,
+      "unit": "",
+      "runtime_ns": 321035707.0,
+      "running_pct": 100.0,
+      "status": "ok",
+      "raw_event": "cache-misses"
+    },
+    "L1-dcache-loads": {
+      "count": 488732145.0,
+      "unit": "",
+      "runtime_ns": 316000391.0,
+      "running_pct": 100.0,
+      "status": "ok",
+      "raw_event": "L1-dcache-loads"
+    },
+    "L1-dcache-load-misses": {
+      "count": 8685796.0,
+      "unit": "",
+      "runtime_ns": 316000391.0,
+      "running_pct": 100.0,
+      "status": "ok",
+      "raw_event": "L1-dcache-load-misses"
+    },
+    "LLC-loads": {
+      "count": null,
+      "unit": "",
+      "runtime_ns": null,
+      "running_pct": null,
+      "status": "not_supported",
+      "raw_event": "LLC-loads"
+    },
+    "LLC-load-misses": {
+      "count": null,
+      "unit": "",
+      "runtime_ns": null,
+      "running_pct": null,
+      "status": "not_supported",
+      "raw_event": "LLC-load-misses"
+    },
+    "branches": {
+      "count": 494436717.0,
+      "unit": "",
+      "runtime_ns": 316876548.0,
+      "running_pct": 100.0,
+      "status": "ok",
+      "raw_event": "branches"
+    },
+    "branch-misses": {
+      "count": 2997879.0,
+      "unit": "",
+      "runtime_ns": 316876548.0,
+      "running_pct": 100.0,
+      "status": "ok",
+      "raw_event": "branch-misses"
+    },
+    "task-clock": {
+      "count": 317.930201,
+      "unit": "ms",
+      "runtime_ns": 317930201.0,
+      "running_pct": 100.0,
+      "status": "ok",
+      "raw_event": "task-clock"
+    },
+    "context-switches": {
+      "count": 8.0,
+      "unit": "",
+      "runtime_ns": 317930201.0,
+      "running_pct": 100.0,
+      "status": "ok",
+      "raw_event": "context-switches"
+    },
+    "cpu-migrations": {
+      "count": 3.0,
+      "unit": "",
+      "runtime_ns": 317930201.0,
+      "running_pct": 100.0,
+      "status": "ok",
+      "raw_event": "cpu-migrations"
+    },
+    "page-faults": {
+      "count": 4653.0,
+      "unit": "",
+      "runtime_ns": 317930201.0,
+      "running_pct": 100.0,
+      "status": "ok",
+      "raw_event": "page-faults"
+    },
+    "duration_time": {
+      "count": 322294873.0,
+      "unit": "ns",
+      "runtime_ns": null,
+      "running_pct": null,
+      "status": "ok",
+      "raw_event": "duration_time"
+    }
+  },
+  "active_groups": {
+    "cpu": [
+      "cycles",
+      "instructions"
+    ],
+    "cache": [
+      "cache-references",
+      "cache-misses"
+    ],
+    "l1": [
+      "L1-dcache-loads",
+      "L1-dcache-load-misses"
+    ],
+    "llc": [],
+    "branch": [
+      "branches",
+      "branch-misses"
+    ],
+    "software": [
+      "task-clock",
+      "context-switches",
+      "cpu-migrations",
+      "page-faults",
+      "duration_time"
+    ]
+  },
+  "all_requested_events_available": false
+}

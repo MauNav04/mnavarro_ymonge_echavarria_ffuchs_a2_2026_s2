@@ -5,8 +5,30 @@ Este README es la **única fuente de verdad del progreso, arquitectura y validac
 están en [AGENTS.md](AGENTS.md) y la guía académica de la versión base en
 [sequential/README.md](sequential/README.md).
 
-Alcance autorizado: **limpieza de CMP local y actualización documental tras validar los modelos**, con equipos de hilos por range como diseño aprobado.
-Las etapas 6–8 continúan pendientes y requieren solicitud explícita.
+Alcance autorizado: **etapa 8 — profiling con Linux Perf**, con equipos de hilos por range como diseño aprobado.
+La automatización está implementada; se recibieron diagnósticos físicos ON del Ryzen.
+La validación de campañas formales ON/OFF y la recaptura de los contadores de tiempo
+siguen pendientes de revisar con sus datos completos.
+
+Para el uso habitual en la Ryzen, desde esta carpeta:
+
+```bash
+make setup    # Una vez: preparar Python y dependencias científicas
+make quick    # Prueba corta completa, con gráficas y ZIP
+make run      # Benchmark/escalabilidad: 200; Perf: 20; análisis y ZIP
+```
+
+Si ya se hicieron las mediciones, `make report` encuentra los CSV compatibles y
+genera el informe sin repetir las pruebas. No hace falta listar rutas CSV ni
+activar el entorno Python. `make run` ejecuta las campañas SMT ON y OFF cambiando el
+estado mediante el kernel con `sudo`, y al final restaura y verifica ON, incluso
+ante errores o interrupciones controlables. `make quick` conserva el estado actual.
+Las rutas del último informe
+y ZIP quedan en `metrics/latest.json`.
+
+La [guía de ejecución automática](docs/running.md) explica preparación, resultados
+y recuperación de campañas anteriores. Las recetas detalladas siguientes siguen
+disponibles para usos avanzados.
 
 ## 1. Descripción del proyecto
 
@@ -26,7 +48,7 @@ funcionan en la computadora de evaluación, incluida la prueba SMT. Esta confirm
 se registra como prueba realizada por el usuario; no como una ejecución del asistente.
 CMP y SMT conservan únicamente el destino Ubuntu/AMD Ryzen. Los registros detallados,
 la escalabilidad y las mediciones estadísticas/Perf se documentan por separado cuando
-exista evidencia; las etapas 6–8 no se adelantan con esta limpieza.
+exista evidencia; la confirmación funcional no sustituye las campañas experimentales.
 
 ## 2. Tecnologías y entorno
 
@@ -37,8 +59,8 @@ exista evidencia; las etapas 6–8 no se adelantan con esta limpieza.
 - **Profiling:** Linux Perf
 - **Sistema operativo:** Linux
 - **Hardware local:** Intel Core i5-1335U bajo WSL2; el kernel reporta 12 CPU lógicas/6 núcleos.
-- **Destino de evaluación confirmado por el usuario:** Ubuntu, AMD Ryzen (modelo exacto
-  pendiente; Ryzen 7 aún no confirmado), 8 núcleos físicos/16 hilos lógicos con SMT activo.
+- **Destino de evaluación confirmado por los diagnósticos del usuario:** Ubuntu 25.10,
+  AMD Ryzen 7 7730U, 8 núcleos físicos/16 hilos lógicos con SMT activo.
   Con SMT inactivo se admiten 8 CPU online. CMP, SMT y Linux Perf se preparan para este destino.
 
 La topología real de núcleos físicos, P-cores, E-cores e hilos SMT debe verificarse antes de configurar afinidad y realizar benchmarks.
@@ -48,6 +70,7 @@ La topología real de núcleos físicos, P-cores, E-cores e hilos SMT debe verif
 Estructura vigente tras la extracción de la etapa 1:
 
 - `sequential/`: punto de entrada secuencial (nombre actualizado por solicitud del usuario).
+- `assets/`: imágenes de entrada compartidas por todos los modelos.
 - `app/`: controlador CLI, entrada/salida, mediciones y serialización FRC1/FRC2 compartidos.
 - `tests/`: pruebas del núcleo, ejecución y entrada/salida.
 - `fine-grained/`: simulación de planificación de grano fino.
@@ -57,6 +80,9 @@ Estructura vigente tras la extracción de la etapa 1:
 - `src/`: implementación compartida de compresión fractal.
 - `include/`: interfaces y declaraciones compartidas.
 - `scripts/`: automatización de compilación, pruebas, benchmarks, métricas y profiling.
+- `scripts/workflow.py`: encadena los motores existentes para ejecutar la campaña y generar su informe.
+- `scripts/smt_control.py`: ayudante de control ON/OFF con restauración a ON y exclusión entre campañas.
+- `scripts/plot_style.py`: paleta institucional compartida por las figuras de rendimiento y Perf.
 - `metrics/`: resultados experimentales y gráficas.
 - `docs/`: documentación técnica complementaria.
 
@@ -152,35 +178,63 @@ sustituye sus artefactos ni las mediciones verificadas del criterio experimental
 
 ### Etapa 6 — Integración y pruebas
 
-- [ ] Configurar CMake para todos los ejecutables.
-- [ ] Integrar Makefile para automatización.
-- [ ] Implementar `test_models.py`.
+- [x] Configurar CMake para todos los ejecutables.
+- [x] Integrar Makefile para automatización.
+- [x] Implementar `test_models.py`.
 - [ ] Validar resultados para diferentes cantidades de trabajadores.
 - [ ] Comprobar errores, sincronización y ausencia de bloqueos.
 
-**Aceptación:** Todos los modelos compilan, ejecutan y superan sus pruebas funcionales.
+**Estado:** automatización preparada con Makefile raíz y `scripts/Makefile`, CMake y
+`scripts/test_models.py`. La nueva matriz completa con CMP/SMT debe ejecutarse en el
+Ryzen; las últimas dos tareas mantienen pendiente esa validación. Los modelos ya fueron
+confirmados funcionales por el usuario antes de integrar esta suite.
+Ver [docs/testing.md](docs/testing.md) para el protocolo, comandos y artefactos.
+
+**Aceptación pendiente de la nueva suite en destino:** todos los modelos compilan,
+ejecutan y superan las pruebas integradas de etapa 6.
 
 ### Etapa 7 — Benchmarking y métricas
 
-- [ ] Implementar `benchmark.py`.
+- [x] Implementar `benchmark.py`.
 - [ ] Ejecutar al menos 200 repeticiones por configuración experimental.
-- [ ] Guardar resultados individuales en CSV.
-- [ ] Calcular tiempo, speedup, eficiencia y escalabilidad.
-- [ ] Calcular media, desviación estándar e intervalos de confianza del 95 %.
-- [ ] Implementar `metrics.py` para generar gráficas automáticamente.
+- [x] Guardar resultados individuales en CSV.
+- [x] Calcular tiempo, speedup, eficiencia y escalabilidad.
+- [x] Calcular media, desviación estándar e intervalos de confianza del 95 %.
+- [x] Implementar `metrics.py` para generar gráficas automáticamente.
 - [ ] Generar boxplots y analizar convergencia.
 
-**Aceptación:** Resultados estadísticos y gráficas reproducibles desde los CSV.
+**Estado:** recolección, estadísticas y gráficas implementadas; pruebas numéricas,
+figuras sintéticas y campañas diagnósticas locales validadas. Las 200 repeticiones físicas
+y el análisis experimental de convergencia en el Ryzen continúan pendientes.
+Cobertura y equivalencia de métricas con RayTracing/gray-scott, comandos y metodología
+en [docs/benchmarking.md](docs/benchmarking.md).
+
+**Aceptación física pendiente:** campañas reproducibles en el Ryzen y revisión de sus
+CSV/gráficas. No se presentan los diagnósticos locales como resultados de evaluación.
 
 ### Etapa 8 — Profiling
 
-- [ ] Implementar `profile.py` utilizando Linux Perf.
+- [x] Implementar `profile.py` utilizando Linux Perf.
 - [ ] Recolectar contadores de hardware disponibles.
 - [ ] Analizar ciclos, instrucciones, fallos de caché y cambios de contexto.
 - [ ] Comparar el comportamiento de los modelos.
 - [ ] Analizar el impacto de SMT habilitado/deshabilitado.
 
-**Aceptación:** Resultados de profiling organizados y comparables.
+**Software validado:** captura por grupos, detección de eventos/permisos, CSV individuales,
+metadatos y trazas, comparación FRC con secuencial, análisis estadístico y cinco figuras
+adicionales equivalentes a las referencias. `make setup_perf`, `profile_fast`,
+`profile_perf` y `profile_plot`; receta ON/OFF de 20 repeticiones por modelo/grupo en
+[docs/profiling.md](docs/profiling.md).
+
+**Aceptación física pendiente:** recolectar los contadores disponibles en Ubuntu/Ryzen,
+revisar cobertura y comparar realmente los cinco modelos y SMT ON/OFF. Las otras
+cuatro casillas requieren esas mediciones; las pruebas sintéticas no las completan.
+
+**Diagnóstico físico recibido — 2026-10-16:** cinco muestras por modelo en benchmarking
+y una por grupo en Perf, sólo SMT ON. FRC finales equivalentes y registros coherentes.
+Corregido el lector de unidades vacías de Perf 6.17; repetir el diagnóstico de tiempo.
+La copia recibida no contiene CSV, por lo que su revisión completa sigue pendiente.
+Revisión y límites en [docs/ryzen_diagnostics.md](docs/ryzen_diagnostics.md).
 
 ### Backlog
 
@@ -217,16 +271,79 @@ Documentar los comandos reales y verificados para:
 
 Desde `proyecto1/problems/mnavarro/fractal-cpp/`:
 
+La interfaz de automatización recomendada para etapa 6 es:
+
+```bash
+make help
+make all
+make test_local                         # CTest y tres modelos portables; permite WSL
+make topology SMT_STATE=on              # En Ubuntu/AMD Ryzen de evaluación
+make test QUICK=1 SMT_STATE=on          # Comprobación breve de todos los modelos
+make test SMT_STATE=on                  # Matriz completa en el destino
+# Tras desactivar SMT realmente mediante intervención del usuario:
+make test SMT_STATE=off
+```
+
+La suite completa falla si falta el hardware/estado requerido; no omite CMP/SMT
+silenciosamente. `make -C scripts <objetivo>` ofrece los mismos comandos.
+`run_seq`, `run_fine`, `run_coarse`, `run_cmp`, `run_smt_on` y `run_smt_off`
+comprimen y reconstruyen una imagen demostrativa. Los `verify_*` comparan contra
+secuencial; `record_smt_on/off` y `compare_smt` conservan la comparación ON/OFF.
+Guía detallada de ejecución, parámetros y resultados: [docs/testing.md](docs/testing.md).
+Para realizar las 200 repeticiones por modelo/configuración y generar todas las
+figuras de rendimiento, seguir la [receta completa de etapa 7](docs/benchmarking.md#receta-completa-200-corridas-y-todas-las-figuras-de-etapa-7):
+preparación, campañas fijas y escalabilidad ON/OFF, y un único `make plot` para combinarlo.
+Las figuras Perf de RayTracing y gray-scott se generan por separado con la
+[receta de etapa 8](docs/profiling.md).
+
+La entrada predeterminada es `assets/color128.png`. Para elegir otra imagen,
+usar `INPUT=assets/mirrors512.png` (también en benchmarks y Perf). Las salidas
+demostrativas siguen en `results/demo/<modelo>/`; las imágenes de entrada no se redimensionan.
+
+Para etapa 7, después de instalar `scripts/requirements.txt` en un entorno virtual:
+
+```bash
+make benchmark_fast BUILD_DIR=build-evaluation FAST_DIR=metrics/check-on
+make plot BENCH_DIR=metrics/check-on
+make benchmark_full BUILD_DIR=build-evaluation SMT_STATE=on BENCH_DIR=metrics/benchmark-on
+make scalability BUILD_DIR=build-evaluation SMT_STATE=on SCALING_DIR=metrics/scaling-on
+```
+
+Repetir las campañas en OFF tras la intervención real de SMT. Los objetivos formales
+requieren Release, hardware de evaluación y al menos 200 corridas; no cambian SMT.
+Gráficas ON/OFF, parámetros y rutas en [docs/benchmarking.md](docs/benchmarking.md).
+Las figuras de contadores Perf corresponden a etapa 8 y no se inventan en estos CSV.
+
+Para añadir las métricas y figuras de Perf (Ubuntu/Ryzen; no modifica SMT):
+
+```bash
+make setup_perf BUILD_DIR=build-evaluation PYTHON=.venv/bin/python SMT_STATE=on
+make profile_fast BUILD_DIR=build-evaluation PYTHON=.venv/bin/python SMT_STATE=on
+make profile_perf BUILD_DIR=build-evaluation PYTHON=.venv/bin/python SMT_STATE=on PERF_DIR=metrics/perf-on
+# Tras desactivar SMT realmente:
+make profile_perf BUILD_DIR=build-evaluation PYTHON=.venv/bin/python SMT_STATE=off PERF_DIR=metrics/perf-off
+make profile_plot PYTHON=.venv/bin/python PERF_CSV_FILES="metrics/perf-on/events.csv metrics/perf-off/events.csv" PERF_PLOT_DIR=metrics/perf-plots
+```
+
+Por defecto Perf captura 20 repeticiones por modelo **y por cada uno de seis grupos**
+(mínimo aceptado: 15): hasta 600 compresiones medidas por estado.
+Benchmark y escalabilidad conservan 200 repeticiones por configuración.
+La guía de [profiling](docs/profiling.md)
+explica instalación, permisos, eventos N/D, archivos, cinco figuras y diferencia entre
+el tiempo del algoritmo y el alcance de Perf sobre todo el proceso.
+
+Los comandos CMake directos continúan disponibles:
+
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_APP=ON
 cmake --build build -j2
 ctest --test-dir build --output-on-failure
-mkdir -p sequential/examples/results
+mkdir -p results/demo/seq
 ./build/fractal_seq --help
 ./build/fractal_fine --help
-./build/fractal_seq compress sequential/examples/color128.png sequential/examples/results/color.frc --teams 1 --threads-per-team 1 --range 8 --stride 8
-./build/fractal_seq decompress sequential/examples/results/color.frc sequential/examples/results/color.png --iterations 80
-./build/fractal_seq compare sequential/examples/color128.png sequential/examples/results/color.png
+./build/fractal_seq compress assets/color128.png results/demo/seq/color.frc --teams 1 --threads-per-team 1 --range 8 --stride 8
+./build/fractal_seq decompress results/demo/seq/color.frc results/demo/seq/color.png --iterations 80
+./build/fractal_seq compare assets/color128.png results/demo/seq/color.png
 ```
 Rebuild de un directirio/modo específico.
 ```
@@ -237,9 +354,9 @@ Fine-Grained, con 10 trabajadores organizados en 5 equipos de 2:
 
 ```bash
 mkdir -p fine-grained/results
-./build/fractal_fine compress sequential/examples/color128.png fine-grained/results/color.frc --teams 5 --threads-per-team 2 --quantum-domains 1
+./build/fractal_fine compress assets/color128.png fine-grained/results/color.frc --teams 5 --threads-per-team 2 --quantum-domains 1
 ./build/fractal_seq decompress fine-grained/results/color.frc fine-grained/results/color.png --iterations 80
-./build/fractal_seq compare sequential/examples/color128.png fine-grained/results/color.png
+./build/fractal_seq compare assets/color128.png fine-grained/results/color.png
 ```
 
 Cuantum por defecto: 1 dominio y sus ocho simetrías; se configura con `--quantum-domains N`.
@@ -252,9 +369,9 @@ Coarse-Grained, con 5 equipos de 2 trabajadores:
 ```bash
 cmake --build build --target fractal_coarse -j2
 mkdir -p coarse-grained/results
-./build/fractal_coarse compress sequential/examples/color128.png coarse-grained/results/color.frc --teams 5 --threads-per-team 2
+./build/fractal_coarse compress assets/color128.png coarse-grained/results/color.frc --teams 5 --threads-per-team 2
 ./build/fractal_seq decompress coarse-grained/results/color.frc coarse-grained/results/color.png --iterations 80
-./build/fractal_seq compare sequential/examples/color128.png coarse-grained/results/color.png
+./build/fractal_seq compare assets/color128.png coarse-grained/results/color.png
 ```
 
 Agregar `--trace-schedule coarse-grained/results/schedule.csv` registra una fila por ráfaga,
@@ -268,9 +385,9 @@ CMP de evaluación, **en Ubuntu nativo con AMD Ryzen 8/16**:
 cmake --build build --target fractal_cmp -j2
 ./build/fractal_cmp --list-cpus
 mkdir -p CMP/results
-./build/fractal_cmp compress sequential/examples/color128.png CMP/results/color.frc --teams 4 --threads-per-team 2 --report-affinity CMP/results/affinity.csv
+./build/fractal_cmp compress assets/color128.png CMP/results/color.frc --teams 4 --threads-per-team 2 --report-affinity CMP/results/affinity.csv
 ./build/fractal_seq decompress CMP/results/color.frc CMP/results/color.png 80
-./build/fractal_seq compare sequential/examples/color128.png CMP/results/color.png
+./build/fractal_seq compare assets/color128.png CMP/results/color.png
 ```
 
 El perfil de evaluación rechaza WSL/virtualización detectada, sistemas distintos de Ubuntu,
@@ -287,7 +404,7 @@ SMT de evaluación, en la misma máquina Ubuntu/AMD Ryzen de CMP:
 cmake --build build --target fractal_smt -j2
 ./build/fractal_smt --help
 ./build/fractal_smt --list-cpus --smt-state on
-python3 SMT/verify_smt.py run --state on --input sequential/examples/color128.png --output-dir SMT/results/on
+python3 SMT/verify_smt.py run --state on --input assets/color128.png --output-dir SMT/results/on
 ```
 
 Después de que el usuario desactive SMT realmente en la computadora de evaluación,
@@ -296,7 +413,7 @@ conservando los mismos binarios y entrada:
 ```bash
 ./build/fractal_smt --list-cpus --smt-state off
 ctest --test-dir build -R smt_hardware_tests --output-on-failure
-python3 SMT/verify_smt.py run --state off --input sequential/examples/color128.png --output-dir SMT/results/off
+python3 SMT/verify_smt.py run --state off --input assets/color128.png --output-dir SMT/results/off
 python3 SMT/verify_smt.py compare --on SMT/results/on --off SMT/results/off --output SMT/results/comparison.json
 ```
 
@@ -393,7 +510,8 @@ Cada decisión debe incluir:
   cancelables y mínimos deterministas. Se conserva el algoritmo matemático.
 - CSV y diagnósticos conservan la etiqueta `target` para mantener compatibilidad con los
   registros SMT; no corresponde a un perfil seleccionable.
-- Linux Perf continúa destinado a la misma máquina Ubuntu y pendiente de su etapa.
+- Linux Perf conserva el mismo destino Ubuntu/Ryzen; las campañas formales de etapa 8 siguen pendientes.
+- Se recibieron diagnósticos físicos ON; las campañas formales y OFF siguen pendientes.
 
 **Decisiones iniciales:**
 
@@ -413,17 +531,25 @@ Registrar problemas conocidos, tareas bloqueadas y validaciones que requieren in
   Las dos ejecuciones locales fallaron antes de iniciar la prueba con
   `FATAL: ThreadSanitizer: unexpected memory mapping`; no se afirma validación con TSan.
 
-- Implementar las etapas 6–8 únicamente cuando se soliciten explícitamente.
+- Ejecutar `setup_perf`, el diagnóstico y las campañas Perf de 20 repeticiones por
+  grupo/modelo en ON/OFF; conservar CSV/metadatos y revisar cobertura y gráficas.
+  Se recibieron diagnósticos físicos ON; faltan sus CSV y repetir Perf con el lector
+  corregido antes de las campañas formales.
 - La configuración secuencial rechaza varios equipos/hilos para evitar informar
   paralelismo inexistente. `10 hilos = 5 equipos × 2` ya está disponible para Fine-Grained y Coarse-Grained.
 
 
+- Ejecutar la nueva suite de etapa 6 con `make test SMT_STATE=on` y, tras la intervención
+  de SMT, `make test SMT_STATE=off`; conservar los dos `report.json`.
+- Ejecutar las campañas de etapa 7 en ON/OFF con 200 repeticiones por configuración,
+  conservar raw.csv y revisar escalabilidad/convergencia; diagnóstico local no equivale a medición física.
 - Documentar la escalabilidad de CMP con diferentes cantidades de trabajadores en Ubuntu/AMD Ryzen.
-- Registrar el modelo Ryzen exacto y la versión de Ubuntu en esa máquina antes de medir.
+- Conservar junto con las campañas el entorno confirmado: Ryzen 7 7730U y Ubuntu 25.10.
 - Incorporar los registros ON/OFF del Ryzen mediante `SMT/verify_smt.py` y su comparación.
   La prueba funcional satisfactoria ya fue confirmada por el usuario; no se han adjuntado
   aquí los artefactos experimentales detallados.
-- Confirmar el modelo exacto de Ryzen. No ejecutar aún benchmarks estadísticos ni Perf.
+- Conservar el modelo exacto de Ryzen, versión de Perf y kernel junto con las campañas;
+  no presentar diagnósticos locales o datos sintéticos como mediciones físicas.
 - Establecer configuraciones equivalentes de comparación.
 - Verificar los requisitos académicos adicionales de la especificación.
 
@@ -444,7 +570,7 @@ Mantener este historial breve. Git conserva el historial detallado de modificaci
 ### 2026-10-13 — Etapa 1 — Arquitectura y punto de entrada completados
 
 - Extraído el núcleo único a `src/` e `include/` y la E/S compartida a `app/`.
-  `sequential/main.cpp` conserva el controlador base; ejemplos permanecen en `sequential/examples/`.
+  `sequential/main.cpp` conserva el controlador base; las imágenes compartidas están actualmente en `assets/`.
 - `include/fractal/search.hpp` permite preparar dominios y ranges, buscar un intervalo
   de dominios y combinar mínimos con desempate determinista. Se conserva la aritmética
   original y el formato/orden de reglas FRC1/FRC2. `rules` se dimensiona por adelantado.
@@ -736,3 +862,286 @@ Mantener este historial breve. Git conserva el historial detallado de modificaci
   los comandos vigentes y el estado actual están en las secciones 4, 6 y 8.
 - Pendientes: incorporar registros ON/OFF, documentar escalabilidad y abordar etapas
   6–8 únicamente bajo solicitud explícita.
+
+
+### 2026-10-16 — Etapa 6 — Automatización preparada; matriz Ryzen pendiente
+
+- Makefile raíz y `scripts/Makefile` con interfaz `all`, modelos individuales,
+  `run_*`, `verify_*`, `test`, `test_unit`, `test_local` y registro/comparación SMT.
+  Revisadas las referencias de RayTracing y gray-scott; CMake continúa definiendo la
+  compilación única. Ningún objetivo cambia SMT ni implementa benchmarking/Perf.
+- `scripts/test_models.py`: 176 casos completos o 18 rápidos para cinco modelos,
+  RGB/gris, constantes/patrones, geometrías y equipos variados, FRC/PNG exactos,
+  afinidad, errores, protección de archivos, timeouts y registros JSON por corrida.
+  Un destino incompatible produce fallo y registro parcial, nunca una validación omitida.
+- CTest incorpora integración portátil, cinco pruebas del orquestador (incluidos
+  contratos sintéticos SMT ON/OFF) y fallos reales de `pthread_create` limitando solo
+  la memoria del subproceso. Se verificó salida controlada de Fine-Grained/Coarse-Grained.
+- Validación WSL2 con GNU C++ 13.3.0, OpenCV 4.6.0 y Python3:
+  `make -C scripts test_local BUILD_DIR=/tmp/fractal-stage6-release JOBS=2`: **13/13**.
+  `ctest --test-dir /tmp/fractal-stage6-release --output-on-failure`: **13 aprobadas,
+  2 físicas omitidas de 15**. Los cinco ejecutables compilan.
+- Matriz completa de secuencial/Fine-Grained/Coarse-Grained: **88 casos** FRC/PNG
+  exactos, sin fallos ni timeouts. Registro:
+  `/tmp/fractal-stage6-matrix/run-20261016-123832-6ead4e0a/report.json`.
+- Make raíz: `run_seq`, `run_fine` y `run_coarse` con imagen pequeña 16×24,
+  range=4, stride=3 y equipos 2×2; FRC/PNG idénticos. `verify_all QUICK=1` rechazó WSL,
+  devolvió error a Make y conservó `success: false`. Objetivos CMP/SMT revisados con
+  `make -n`, sin atribuirles ejecución física en esta sesión.
+- README: tres tareas de preparación completadas; validación de la nueva matriz con
+  múltiples trabajadores y comprobaciones completas en Ryzen pendientes. La confirmación
+  anterior de modelos individuales no se confunde con haber corrido esta suite nueva.
+- Guía de instalación, objetivos, parámetros, resultados y protocolo ON/OFF en
+  [docs/testing.md](docs/testing.md). Enlaces locales y `git diff --check` revisados.
+  Próximo paso: ejecutar los comandos de etapa 6 en el Ryzen y conservar sus registros.
+
+
+### 2026-10-16 — Etapa 7 — Benchmarks y métricas preparados; campañas físicas pendientes
+
+- Comparados RayTracing y gray-scott: tiempos individuales, media/mediana/extremos,
+  desviación muestral, IC 95 %, speedup, eficiencia, CV, estabilidad, escalabilidad
+  fuerte y Amdahl. Añadida convergencia acumulada exigida por este roadmap.
+- `scripts/benchmark.py`: CSV incremental, warmups excluidos, cooldown, timeouts,
+  referencia FRC secuencial, verificación de afinidad y estado real, hashes/metadatos,
+  campañas diagnósticas explícitas y mínimo formal de 200 corridas/configuración en Release.
+- `scripts/metrics.py`, alias `plot_metrics.py` y `scalability.py`: estadísticas y nueve
+  figuras posibles a 300 DPI desde CSV y metadata, sin ejecutar modelos al graficar.
+  Rechazan mezclas incompatibles y duplicados; los análisis parciales quedan identificados.
+  SciPy calcula Student-t y Welch; Matplotlib genera figuras, sin dependencia de pandas.
+- Makefile: `benchmark_full`, `benchmark_fast`, `benchmark_on/off`, `scalability`,
+  `benchmark_scaling`, `benchmark_scaling_fast`, `metrics`, `plot` y sus alias.
+  El intérprete `PYTHON` también se transmite a CMake/CTest para usar el entorno científico.
+- C++: `--report-metrics` emite tiempo exclusivo de codificación con precisión completa
+  y contadores cooperativos opcionales, sin acumular trazas. Se conservan búsqueda,
+  desempates, equipos y FRC1/FRC2. Eventos de software no se etiquetan como contexto del SO.
+- Validación Release en WSL2, GNU C++ 13.3.0 y OpenCV 4.6.0:
+  `/tmp/fractal-stage7-release`, CTest con Python científico: **16 aprobadas y 2 físicas
+  omitidas de 18**. Solo núcleo (`/tmp/fractal-stage7-core`, `BUILD_APP=OFF`):
+  **7 aprobadas y 2 físicas omitidas de 9**.
+- Nuevas pruebas: seis codificaciones RGB/gris con contadores contrastados contra las
+  trazas, tiempos positivos, archivos protegidos; pipeline real diagnóstico en tres
+  modelos; rechazo de campañas formales cortas y protección de directorios existentes.
+  Estadísticas con valores conocidos y 200 muestras sintéticas, incompatibilidades,
+  faltantes/duplicados y nueve figuras sintéticas identificadas.
+- Comandos reales Make: `benchmark_fast` con tres corridas de seq/fine/coarse sobre
+  imagen 16×24 produjo **9 mediciones diagnósticas**; `benchmark_scaling_fast` con dos
+  corridas por configuración produjo **22 mediciones diagnósticas**. Resúmenes y
+  gráficas generados y combinados desde sus CSV. Artefactos en
+  `/tmp/fractal-stage7-make-fast/`, `/tmp/fractal-stage7-make-scaling/` y
+  `/tmp/fractal-stage7-combined-plots/`. Inspeccionado el dashboard y verificados 300 DPI.
+  Estas comprobaciones no son benchmarks físicos ni permiten concluir rendimiento del Ryzen.
+- Las pruebas detectaron una comprobación de equivalencia de rutas que fallaba si un
+  reporte todavía no existía; se corrigió y se repitieron satisfactoriamente las pruebas
+  afectadas. Enlaces y `git diff --check` revisados.
+- Cinco tareas de software marcadas. Pendientes: campañas físicas de 200 corridas por
+  configuración ON/OFF y revisión experimental de convergencia/escalabilidad. La figura
+  de convergencia y sus tablas ya están preparadas; no se inventa ese análisis físico.
+  IPC, caché, ciclos, instrucciones y contexto del kernel corresponden a etapa 8 pendiente.
+- Guía completa y correspondencia de métricas: [docs/benchmarking.md](docs/benchmarking.md).
+
+
+### 2026-10-16 — Receta de 200 corridas y gráficas combinadas
+
+- Añadida al inicio de `docs/benchmarking.md` la secuencia completa para medir todos
+  los modelos y escalabilidad en ON/OFF, y generar figuras desde los cuatro CSV.
+- Aclarados automatización de repeticiones, número de mediciones, resultados esperados
+  y diferencia respecto a las figuras que necesitan Perf en etapa 8.
+- Validación documental: objetivos y argumentos contrastados con Makefile, enlaces y
+  `git diff --check`. No se ejecutaron campañas físicas ni se cambiaron estados de avance.
+
+
+### 2026-10-16 — Etapa 8: Linux Perf, contadores y figuras
+
+- Implementada la entrada `scripts/profile.py`, alias `profile_perf.py`, motor
+  `perf_runner.py`, lector `perf_support.py` y análisis `profile_metrics.py`.
+  Se reutilizan ejecución con timeout, configuración de modelos, afinidad y hashes;
+  no se modifica C++ ni la arquitectura de equipos por range.
+- Revisión de los perfiladores de RayTracing y gray-scott: IPC, ciclos, instrucciones,
+  caché genérica/L1/LLC, predicción, contexto del SO, migraciones, fallos de página,
+  task-clock y CPU efectivas. Se añade `duration_time` para calcular CPU efectivas
+  sobre la misma pasada. Se conserva el alcance de comando completo, explícitamente
+  separado del tiempo de codificación de etapa 7.
+- Seis grupos con parejas PMU simultáneas, contadores heredados por los trabajadores,
+  disponibilidad sondeada y salida cruda por pasada. No se cambian permisos ni SMT.
+  Eventos ausentes, no contados o de runtime insuficiente quedan excluidos y visibles;
+  nunca se presentan ceros inventados ni se sustituye LLC por caché genérica.
+- CSV incremental, metadatos con hashes/versiones/topología, estado verificado,
+  comparación FRC y afinidad CMP/SMT en cada pasada. Un fallo conserva registros y
+  `success=false`; las campañas incompatibles, duplicadas o truncadas se rechazan.
+- Estadísticas Student-t con ceros válidos, cobertura por evento, comparación ON/OFF
+  de configuraciones iguales y cinco figuras PNG a 300 DPI. Datos sintéticos,
+  diagnósticos y capturas físicas se identifican y no se mezclan.
+- Objetivos Make: `setup_perf`, `profile_fast`, `profile_perf`, `profile_on/off`,
+  `profile_plot`, `test_profiles`; alias `profile`/`perfilado`. Guía completa en
+  [docs/profiling.md](docs/profiling.md), enlazada desde las guías anteriores.
+- Validación Release local (`/tmp/fractal-stage7-release`): compilación completa y
+  CTest **18 aprobadas, 3 físicas omitidas de 21**, sin fallos. Las omisiones son CMP,
+  SMT y Perf por requerir la máquina de evaluación; no equivalen a pruebas físicas.
+  Nuevos contratos: seis pruebas de lector/captura (incluye compresores reales con Perf
+  sintético) y tres de análisis/figuras; disponibilidad, permisos, multiplexación,
+  unidades, cero/ausencia, timeout y compatibilidad con `cProfile`.
+- `make profile_plot` ejecutado realmente desde dos CSV sintéticos ON/OFF; cinco figuras,
+  estadísticas y comparación guardadas en `/tmp/fractal-stage8-plots/`. Dashboard
+  inspeccionado visualmente; ninguna figura se presenta como resultado del Ryzen.
+  Comprobado el rechazo de WSL y de campañas formales con menos de 200 repeticiones.
+- Marcada únicamente la implementación de etapa 8. Siguen pendientes la captura física
+  y el análisis experimental de contadores/modelos/SMT, además de los pendientes de
+  etapas anteriores que requieren esa misma máquina. No se implementa el backlog.
+
+### 2026-10-16 — Imágenes de entrada compartidas
+
+- Trasladadas originalmente con `git mv` las cinco imágenes a una carpeta compartida;
+  sus hashes SHA-256 se conservan. Esta carpeta sirve a todos los modelos.
+- Actualizadas las entradas predeterminadas de Make, benchmarking y Perf, las guías
+  de los modelos y la guía secuencial. Las salidas demostrativas conservan sus rutas
+  en `results/demo/<modelo>/`. Se preservan los resultados locales anteriores.
+- Compilación Release completa y demostraciones `run_seq`, `run_fine`, `run_coarse`
+  ejecutadas usando la nueva entrada predeterminada: FRC idénticos y reconstrucciones
+  de 128×128. Artefactos diagnósticos en `/tmp/fractal-images-demo/`.
+- `benchmark.py` ejecutado sin `--input`, en modo diagnóstico con seq/fine/coarse:
+  tres mediciones y equivalencia FRC verificadas; CSV en `/tmp/fractal-images-benchmark/`.
+- CTest: **18 aprobadas y 3 físicas omitidas de 21**, sin fallos. CMP, SMT y Perf
+  físicos siguen pendientes en el Ryzen; este traslado no modifica su estado de avance.
+- Revisadas las referencias de entrada y `git diff --check`. No se alteran el algoritmo,
+  los formatos ni los parámetros de carga. Los comandos habituales mantienen `build`
+  como directorio predeterminado de compilación.
+
+### 2026-10-16 — Entradas directamente en assets
+
+- Por solicitud del usuario, las rutas de entrada apuntan directamente a `assets/`.
+  Actualizados Make, los CLI de benchmarking/Perf, AGENTS y las guías de los modelos.
+  La entrada predeterminada sigue siendo `assets/color128.png`; el ejemplo de carga
+  usa el archivo actual `assets/mirrors512.png`.
+- Comprobadas todas las referencias de imágenes contra los archivos existentes,
+  incluidas las rutas relativas de la guía secuencial. Se respetan las imágenes
+  trasladadas y renombradas por el usuario, entre ellas `color480.png` y `mirrors512.png`.
+- Compilación Release y demostraciones seq/fine/coarse correctas con la entrada
+  predeterminada nueva: FRC idénticos y reconstrucciones de 128×128. Diagnóstico real
+  de benchmarking sin `--input`: tres mediciones correctas y equivalencia FRC.
+  Artefactos en `/tmp/fractal-assets-flat-demo/` y `/tmp/fractal-assets-flat-benchmark/`.
+- CTest: **18 aprobadas y 3 físicas omitidas de 21**, sin fallos. Comprobados también
+  los valores predeterminados de entrada de los CLI de benchmarking y Perf.
+  Las capturas físicas CMP/SMT/Perf siguen pendientes en el Ryzen; no se modifican
+  los checkboxes de esas validaciones. `git diff --check` revisado.
+
+### 2026-10-16 — Revisión del Ryzen, unidades Perf y archivos de métricas
+
+- Revisados los diagnósticos físicos ON aportados por el usuario: Ryzen 7 7730U,
+  Ubuntu 25.10, 8/16, Perf 6.17.13 y Release. Benchmark con 25 mediciones declaradas,
+  cinco modelos, FRC finales idénticos y comandos sin errores; Perf con una repetición
+  por grupo y sondeo LLC no soportado. No se presentan como campañas de 200 muestras.
+- Revisadas las 13 figuras y las salidas crudas disponibles; IPC recalculado desde
+  las pasadas medidas. Faltan todos los CSV en la copia recibida, incluidos datos
+  crudos y afinidad; no se inventaron reemplazos desde textos de consola redondeados.
+  Informe: [docs/ryzen_diagnostics.md](docs/ryzen_diagnostics.md).
+- Corregida la clasificación `unknown_unit` de task-clock/duration_time cuando Perf
+  emite conteos crudos ns sin unidad. Normalización a ms/ns y regresión con las líneas
+  reales del Ryzen. LLC sigue N/D y las unidades explícitas desconocidas se rechazan.
+  La gráfica de CPU efectivas necesita un nuevo diagnóstico físico: los eventos fueron
+  excluidos de las pasadas antiguas, no basta con regenerar sus gráficas.
+- Las capturas nuevas conservan cada salida cruda en `perf-stat.jsonl`, con ruta y texto
+  íntegro y flush por pasada. Evita miles de `.stat` permanentes sin omitir evidencias;
+  `PERF_RAW_STORAGE=files` mantiene la disposición anterior. No se modificaron los datos
+  recibidos, CMake, el algoritmo ni la arquitectura de hilos.
+- Añadido `make archive_metrics`: ZIP completo con verificación de integridad, CSV
+  incluidos, sin borrar originales ni sobrescribir exportaciones. Corregida la regla
+  de Git que excluía CSV en este módulo. Las campañas podrán transferirse en un archivo.
+- Validación local: compilación Release, CTest **18 aprobadas y 3 físicas omitidas de
+  21**. Nueve casos de lector/captura/exportación, incluidas unidades del Ryzen,
+  conservación del texto ante error de parseo y CSV presentes en ZIP. Captura sintética
+  integrada con compresores reales: 18 salidas crudas en un JSONL y ningún `.stat`
+  permanente. `make archive_metrics` exportó los 116 archivos recibidos a
+  `/tmp/fractal-ryzen-diagnostics.zip` y avisó correctamente que contienen cero CSV.
+- Pendientes: recibir CSV, repetir diagnóstico Perf corregido y validar las campañas
+  formales ON/OFF y escalabilidad. No se marcan nuevos checkboxes experimentales.
+
+### 2026-10-16 — Archivos de campañas completas y todas las figuras
+
+- El usuario informa ejecuciones ON de 200 repeticiones y aporta capturas con miles
+  de `.stat`. Se pudieron leer las dos capturas de pantalla desde la ruta Windows.
+  Los CSV/metadatos de esas campañas completas no están todavía en esta copia;
+  no se afirma que sus 200 muestras hayan sido auditadas ni se marcan casillas físicas.
+- Documentado que el formato anterior crea alrededor de 5.000 `.stat` para cinco
+  modelos y cinco grupos disponibles con 200 repeticiones, más sondeos/calentamientos.
+  Los scripts JSONL actualizados deben trasladarse también a la computadora Ryzen.
+- Validado `compact_perf.py` y el objetivo `make compact_perf`: consolidación a JSONL
+  con hashes por salida y manifiesto, retirada de originales sólo con
+  `REMOVE_STAT_FILES=1`, rechazo de capturas no exitosas y protección contra sobrescritura.
+  En una copia temporal del diagnóstico real se consolidaron 63 `.stat`, recuperables
+  byte por byte, sin modificar el resto de archivos ni el diagnóstico original.
+- Validado `make plot_all`, que llama a los dos analizadores desde CSV: nueve figuras
+  01–09 de benchmarking/escalabilidad y cinco 10–14 de Perf. Las tablas se guardan en
+  directorios separados para evitar sobrescribir `summary.csv`/`analysis.json`.
+- Pruebas: once casos de lector/captura/exportación/compactación aprobados.
+  `plot_all` ejecutado con diagnósticos locales y datos Perf sintéticos identificados:
+  14 figuras generadas en `/tmp/fractal-all-figures-check/`, sin repetir compresiones.
+  No es una nueva campaña física ni una validación de los 200 datos del Ryzen.
+- Comandos exactos para compactar y graficar sólo las campañas ON disponibles en
+  [docs/profiling.md](docs/profiling.md). El build predeterminado sigue siendo `build`.
+
+### 2026-10-16 — Ejecución automática con Make
+
+- Añadidos `make setup`, `make quick`, `make run` y `make report`, con ayuda breve
+  y guía en [docs/running.md](docs/running.md). Se conservan los objetivos anteriores
+  en `help_advanced`, CMake y la arquitectura de los cinco modelos.
+- `run` encadena comprobación previa, benchmark, escalabilidad y Perf con 200
+  repeticiones por configuración/grupo, análisis y ZIP. Detecta SMT sin modificarlo,
+  usa `build` y el Python de `.venv` automáticamente. `quick` identifica sus pocas
+  repeticiones como diagnósticas. Se usan nombres únicos y salidas Perf JSONL.
+- `report` descubre CSV/metadatos compatibles, genera figuras 01–14, tablas y ZIP;
+  incorpora ON/OFF cuando ambos estados están completos. No repite las mediciones.
+- Validación: compilación Release y CTest con **20 pruebas aprobadas y 3 físicas
+  omitidas de 23**. Pruebas de selección de campañas, presets, errores y preparación;
+  integración con CSV sintéticos ON/OFF: 14 figuras y ZIP con CSV, manifiesto final
+  y referencia actual. Se conserva la etiqueta sintética y no se alteran los CSV.
+- La ejecución real del nuevo CLI en WSL rechazó correctamente CMP/SMT durante la
+  comprobación previa, conservando el error y sin iniciar las campañas largas.
+  Pendiente: ejecutar `make quick` y luego `make run` en la Ryzen para validar el
+  encadenamiento físico completo. No se marcan casillas experimentales pendientes.
+
+### 2026-10-16 — Perfilado aproximado con 20 repeticiones
+
+- Por solicitud del usuario, Perf pasa de 200 a **20 repeticiones por modelo/grupo**,
+  con mínimo aceptado de 15. Benchmark y escalabilidad conservan sus 200 repeticiones.
+  Esta decisión sustituye el requisito anterior de 200 para etapa 8; las entradas
+  históricas anteriores describen el comportamiento previo.
+- Actualizados `make run`, `profile_perf`, el CLI directo, la validación del analizador,
+  la ayuda y las guías. Se conserva la captura por grupos y las mismas métricas/figuras.
+  Los datos anteriores de 200 repeticiones siguen siendo válidos; no hay que repetirlos.
+- Validación local: cuatro suites CTest aprobadas (`perf_parser_tests`,
+  `perf_metrics_tests`, `workflow_tests`, `workflow_report_tests`), incluidos valores
+  predeterminados, rechazo de 14 muestras, aceptación de 15/20/200 y generación del
+  informe completo con datos sintéticos. `git diff --check` sin errores.
+- Pendiente: captura física con el nuevo número de repeticiones en la Ryzen.
+  No se marcaron checkboxes físicos ni se modificaron las campañas existentes.
+
+### 2026-10-17 — Paleta institucional y campaña automática ON/OFF/ON
+
+- Por autorización explícita del usuario, `make run` ahora activa SMT y ejecuta la
+  campaña ON, desactiva SMT por sysfs y ejecuta OFF, restaura/verifica ON y genera
+  el informe conjunto y ZIP. En cada estado se conservan 200 repeticiones para
+  benchmark/escalabilidad y 20 para Perf por modelo/grupo. No cambió el núcleo C++.
+- El destino nativo y Release se verifican antes de solicitar sudo. Sólo el ayudante
+  ON/OFF recibe privilegios; los compresores mantienen el usuario normal. El ayudante
+  conserva la autorización durante toda la campaña, impide otro controlador con un
+  lock y restaura ON al cerrar el canal, ante error o señales controlables. Un fallo
+  de restauración impide declarar éxito. El manifiesto registra ambos estados y la
+  restauración; el informe usa exclusivamente la pareja nueva.
+- `make quick` y los motores individuales conservan el estado actual. Actualizadas
+  las reglas permanentes y las guías para distinguirlos de `make run`; el cambio
+  autorizado sustituye la prohibición previa del orquestador de modificar SMT.
+- Paleta compartida en `scripts/plot_style.py`: secuencial `#64748b`, CMP `#1f77b4`,
+  SMT `#059669`, Coarse `#7c3aed` y Fine `#0891b2`. Se aplica a benchmarking,
+  convergencia, estabilidad y Perf. OFF se distingue con líneas discontinuas o barras
+  rayadas en Perf. Se conservan las 14 figuras y 300 DPI.
+- Validación: CTest **20 pruebas aprobadas y 3 físicas omitidas de 23**, sin fallos.
+  Los contratos ejercitan orden ON/OFF/restauración, errores en ambas campañas,
+  interrupción y fallo de restauración. El ayudante real se ejecutó contra archivos
+  temporales: comprobados protocolo, exclusión mutua, EOF, Ctrl+C y SIGTERM, sin
+  modificar sysfs. La integración generó 14 PNG, verificó sus 300 DPI y los colores
+  en píxeles, además del ZIP y la conservación de datos originales.
+- El CLI `run` rechazó WSL antes de solicitar sudo o cambiar SMT. Pendiente: ejecutar
+  `make run` en la Ryzen y validar allí el cambio físico ON/OFF/ON. No se marcan
+  checkboxes físicos; un corte de energía o SIGKILL del propio ayudante no permite
+  garantizar restauración. Recuperación manual documentada en
+  [docs/running.md](docs/running.md).

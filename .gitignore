@@ -15,6 +15,7 @@ __pycache__/
 
 # Compilation
 build/
+build-evaluation/
 bin/
 
 # Benchmark output
@@ -36,6 +37,9 @@ results/
 !proyecto1/problems/heat2d/benchmark_results/heat2d_perf_metrics.csv
 !proyecto1/problems/heat2d/metricas/*.csv
 !proyecto1/problems/heat2d/metricas/graficas/*.png
+
+# Fractal: conservar los CSV de campañas junto con sus metadatos y figuras.
+!proyecto1/problems/mnavarro/fractal-cpp/metrics/**/*.csv
 
 # Gray-Scott compilation output
 proyecto1/problems/gray-scott/scripts/gray_scott_seq
