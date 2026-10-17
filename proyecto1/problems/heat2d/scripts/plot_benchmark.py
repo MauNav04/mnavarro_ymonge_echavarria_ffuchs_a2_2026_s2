@@ -67,7 +67,9 @@ plt.rcParams.update({
 PALETA_MODELOS = {
     "sequential": "#64748b",      # Slate Gray
     "cmp": "#1f77b4",             # Azul institucional
-    "smt": "#059669",             # Verde esmeralda
+    "smt_hw": "#059669",          # Verde esmeralda (HW Real)
+    "smt": "#059669",             # Verde esmeralda (Fallback)
+    "smt_sw": "#d97706",          # Ámbar / Naranja (Sobre-suscripción SW)
     "coarse_grained": "#7c3aed",  # Púrpura
     "fine_grained": "#0891b2",    # Teal / Cian
 }
@@ -75,17 +77,21 @@ PALETA_MODELOS = {
 NOMBRES_ESPANOL = {
     "sequential": "Secuencial",
     "cmp": "CMP",
+    "smt_hw": "SMT (HW Real)",
     "smt": "SMT",
+    "smt_sw": "SMT (Sobre-suscripción SW)",
     "coarse_grained": "Coarse-Grained",
     "fine_grained": "Fine-Grained",
 }
 
 MODEL_ORDER = {
     "sequential": 0,
-    "fine_grained": 1,
-    "coarse_grained": 2,
-    "cmp": 3,
+    "cmp": 1,
+    "smt_hw": 2,
+    "smt_sw": 3,
     "smt": 4,
+    "coarse_grained": 5,
+    "fine_grained": 6,
 }
 
 
@@ -332,7 +338,7 @@ def save_efficiency_plot(rows: list[SummaryRow], output_dir: Path):
 # ==============================================================================
 def save_scalability_amdahl_plot(rows: list[SummaryRow], output_dir: Path):
     # Filtrar corridas de barrido de hilos (típicamente SMT o CMP)
-    smt_rows = sorted([r for r in rows if r.model in ("smt", "cmp")], key=lambda r: r.logical_threads)
+    smt_rows = sorted([r for r in rows if r.model in ("smt", "smt_hw", "cmp")], key=lambda r: r.logical_threads)
     if not smt_rows:
         smt_rows = rows
 

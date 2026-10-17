@@ -13,10 +13,12 @@ from scipy.stats import t as student_t
 
 MODEL_ORDER = {
     "sequential": 0,
-    "fine_grained": 1,
-    "coarse_grained": 2,
-    "cmp": 3,
+    "cmp": 1,
+    "smt_hw": 2,
+    "smt_sw": 3,
     "smt": 4,
+    "coarse_grained": 5,
+    "fine_grained": 6,
 }
 
 SUPPORTED_MODELS = set(MODEL_ORDER)

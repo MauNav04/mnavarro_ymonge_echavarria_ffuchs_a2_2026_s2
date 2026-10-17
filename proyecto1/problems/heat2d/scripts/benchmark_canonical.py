@@ -82,7 +82,22 @@ def parse_arguments():
         default=8,
         help="Hilos / contextos para el modelo Fine-Grained",
     )
+    parser.add_argument(
+        "--skip-smt-sw",
+        action="store_true",
+        help="Omitir el modelo SMT (Sobre-suscripción SW)",
+    )
     return parser.parse_args()
+
+
+def controlar_smt_kernel(estado: str) -> bool:
+    """Habilita ('on') o deshabilita ('off') SMT en el kernel de Linux."""
+    try:
+        cmd = f"echo {estado} | sudo tee /sys/devices/system/cpu/smt/control > /dev/null"
+        return os.system(cmd) == 0
+    except Exception as e:
+        print(f"[ADVERTENCIA] No se pudo cambiar estado SMT en kernel a '{estado}': {e}", file=sys.stderr)
+        return False
 
 
 def extraer_tiempo(salida_stdout: str, fallback_tiempo: float) -> float:
@@ -127,39 +142,54 @@ def main():
         except Exception:
             pass
 
-    # Catálogo canónico de los 5 modelos de ejecución
+    # Catálogo canónico de modelos de ejecución (incluyendo SMT HW y SMT SW)
     modelos = [
         {
             "id": "sequential",
             "nombre": "Secuencial",
             "threads": 1,
             "cmd": [str(bin_dir / "heat2d_sequential")],
+            "requiere_smt_off": False,
         },
         {
             "id": "cmp",
             "nombre": "CMP",
             "threads": args.cmp_threads,
             "cmd": [str(bin_dir / "heat2d_cmp"), str(args.cmp_threads)],
+            "requiere_smt_off": False,
         },
         {
-            "id": "smt",
-            "nombre": "SMT",
+            "id": "smt_hw",
+            "nombre": "SMT (HW Real)",
             "threads": args.smt_threads,
             "cmd": [str(bin_dir / "heat2d_smt"), str(args.smt_threads)],
+            "requiere_smt_off": False,
+        },
+        {
+            "id": "smt_sw",
+            "nombre": "SMT (Sobre-suscripción SW)",
+            "threads": args.smt_threads,
+            "cmd": [str(bin_dir / "heat2d_smt"), str(args.smt_threads)],
+            "requiere_smt_off": True,
         },
         {
             "id": "coarse_grained",
             "nombre": "Coarse-Grained",
             "threads": args.coarse_threads,
             "cmd": [str(bin_dir / "heat2d_coarse_grained"), str(args.coarse_threads), "100", "8"],
+            "requiere_smt_off": False,
         },
         {
             "id": "fine_grained",
             "nombre": "Fine-Grained",
             "threads": args.fine_threads,
             "cmd": [str(bin_dir / "heat2d_fine_grained"), str(args.fine_threads)],
+            "requiere_smt_off": False,
         },
     ]
+
+    if args.skip_smt_sw:
+        modelos = [m for m in modelos if not m["requiere_smt_off"]]
 
     # Verificar existencia previa de binarios
     for m in modelos:
@@ -170,7 +200,7 @@ def main():
             sys.exit(1)
 
     print("=" * 78)
-    print("      BENCHMARK CANÓNICO UNIFICADO (5 MODELOS) - Heat2D")
+    print("      BENCHMARK CANÓNICO UNIFICADO - Heat2D")
     print("=" * 78)
     print(f"Corridas por modelo : {args.runs}")
     print(f"Grilla              : {DEFAULT_ROWS} x {DEFAULT_COLS} ({CELL_UPDATES:,} celdas/paso)")
@@ -181,50 +211,66 @@ def main():
     raw_records = []
 
     # Ejecución de cada modelo
-    for m in modelos:
-        print(f"[*] Ejecutando: {m['nombre']} ({m['threads']} hilos) [{args.runs} corridas]...")
+    try:
+        for m in modelos:
+            smt_off_requerido = m.get("requiere_smt_off", False)
+            if smt_off_requerido:
+                print("    --> [SMT SW] Deshabilitando SMT en el kernel (/sys/devices/system/cpu/smt/control)...")
+                controlar_smt_kernel("off")
+                time.sleep(0.5)
 
-        # 1 warmup descartado
-        subprocess.run(m["cmd"], cwd=repo_root, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            try:
+                print(f"[*] Ejecutando: {m['nombre']} ({m['threads']} hilos) [{args.runs} corridas]...")
 
-        for run_idx in range(1, args.runs + 1):
-            t_start = time.perf_counter()
-            proc = subprocess.run(
-                m["cmd"],
-                cwd=repo_root,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-            t_end = time.perf_counter()
+                # 1 warmup descartado
+                subprocess.run(m["cmd"], cwd=repo_root, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-            if proc.returncode != 0:
-                print(f"[ERROR] Corrida falló para {m['nombre']}:\n{proc.stderr}", file=sys.stderr)
-                sys.exit(1)
+                for run_idx in range(1, args.runs + 1):
+                    t_start = time.perf_counter()
+                    proc = subprocess.run(
+                        m["cmd"],
+                        cwd=repo_root,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                    )
+                    t_end = time.perf_counter()
 
-            elapsed_sec = extraer_tiempo(proc.stdout, t_end - t_start)
-            throughput = CELL_UPDATES / elapsed_sec if elapsed_sec > 0 else 0.0
+                    if proc.returncode != 0:
+                        print(f"[ERROR] Corrida falló para {m['nombre']}:\n{proc.stderr}", file=sys.stderr)
+                        sys.exit(1)
 
-            raw_records.append({
-                "run": run_idx,
-                "model": m["id"],
-                "logical_threads": m["threads"],
-                "rows": DEFAULT_ROWS,
-                "cols": DEFAULT_COLS,
-                "steps": DEFAULT_STEPS,
-                "alpha": DEFAULT_ALPHA,
-                "dt": DEFAULT_DT,
-                "cell_updates": CELL_UPDATES,
-                "elapsed_seconds": elapsed_sec,
-                "cell_updates_per_second": throughput,
-            })
+                    elapsed_sec = extraer_tiempo(proc.stdout, t_end - t_start)
+                    throughput = CELL_UPDATES / elapsed_sec if elapsed_sec > 0 else 0.0
 
-            # Imprimir progreso cada 20%
-            salto = max(1, args.runs // 5)
-            if run_idx % salto == 0 or run_idx == args.runs:
-                print(f"    Progreso {m['nombre']}: {run_idx}/{args.runs} (último: {elapsed_sec:.4f} s)")
+                    raw_records.append({
+                        "run": run_idx,
+                        "model": m["id"],
+                        "logical_threads": m["threads"],
+                        "rows": DEFAULT_ROWS,
+                        "cols": DEFAULT_COLS,
+                        "steps": DEFAULT_STEPS,
+                        "alpha": DEFAULT_ALPHA,
+                        "dt": DEFAULT_DT,
+                        "cell_updates": CELL_UPDATES,
+                        "elapsed_seconds": elapsed_sec,
+                        "cell_updates_per_second": throughput,
+                    })
 
-        print()
+                    # Imprimir progreso cada 20%
+                    salto = max(1, args.runs // 5)
+                    if run_idx % salto == 0 or run_idx == args.runs:
+                        print(f"    Progreso {m['nombre']}: {run_idx}/{args.runs} (último: {elapsed_sec:.4f} s)")
+
+                print()
+            finally:
+                if smt_off_requerido:
+                    print("    --> [SMT SW] Restaurando SMT a 'on' en el kernel...")
+                    controlar_smt_kernel("on")
+                    time.sleep(0.5)
+    finally:
+        # Garantizar que el sistema siempre quede con SMT encendido
+        controlar_smt_kernel("on")
 
     # Escribir heat2d_benchmark.csv
     fieldnames = [

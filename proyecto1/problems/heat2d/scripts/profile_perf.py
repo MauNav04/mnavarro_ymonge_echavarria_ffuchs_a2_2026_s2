@@ -27,6 +27,7 @@ Genera:
 
 import os
 import sys
+import time
 
 # Evitar advertencias de permisos en Linux para matplotlib
 os.environ["MPLCONFIGDIR"] = "/tmp/matplotlib_heat2d"
@@ -67,10 +68,11 @@ plt.rcParams.update({
 })
 
 PALETA_MODELOS = {
-    "Secuencial": "#64748b",                  # Slate Gray
-    "CMP": "#1f77b4",                         # Azul institucional
-    "SMT (HW Real)": "#059669",               # Verde esmeralda
-    "Coarse-Grained": "#7c3aed",              # Púrpura
+    "Secuencial": "#64748b",                          # Slate Gray
+    "CMP": "#1f77b4",                                 # Azul institucional
+    "SMT (HW Real)": "#059669",                       # Verde esmeralda
+    "SMT (Sobre-suscripción SW)": "#d97706",          # Ámbar / Naranja
+    "Coarse-Grained": "#7c3aed",                      # Púrpura
     "Fine-Grained": "#0891b2",                # Teal / Cian
 }
 
@@ -78,6 +80,7 @@ ORDEN_CANONICO = [
     "Secuencial",
     "CMP",
     "SMT (HW Real)",
+    "SMT (Sobre-suscripción SW)",
     "Coarse-Grained",
     "Fine-Grained",
 ]
@@ -95,6 +98,16 @@ EVENTOS_PERF = [
     "cpu-migrations",
     "page-faults",
 ]
+
+
+def controlar_smt_kernel(estado: str) -> bool:
+    """Habilita ('on') o deshabilita ('off') SMT en el kernel de Linux."""
+    try:
+        cmd = f"echo {estado} | sudo tee /sys/devices/system/cpu/smt/control > /dev/null"
+        return os.system(cmd) == 0
+    except Exception as e:
+        print(f"[ADVERTENCIA] No se pudo cambiar estado SMT en kernel a '{estado}': {e}", file=sys.stderr)
+        return False
 
 
 def ejecutar_comando_perf(comando, cwd, usar_sudo=False):
@@ -323,11 +336,12 @@ def main():
         return
 
     catalogo = [
-        ("Secuencial", [str(bin_dir / "heat2d_sequential")], 1),
-        ("CMP", [str(bin_dir / "heat2d_cmp"), "8"], 8),
-        ("SMT (HW Real)", [str(bin_dir / "heat2d_smt"), "16"], 16),
-        ("Coarse-Grained", [str(bin_dir / "heat2d_coarse_grained"), "8", "100", "8"], 8),
-        ("Fine-Grained", [str(bin_dir / "heat2d_fine_grained"), "8"], 8),
+        ("Secuencial", [str(bin_dir / "heat2d_sequential")], 1, False),
+        ("CMP", [str(bin_dir / "heat2d_cmp"), "8"], 8, False),
+        ("SMT (HW Real)", [str(bin_dir / "heat2d_smt"), "16"], 16, False),
+        ("SMT (Sobre-suscripción SW)", [str(bin_dir / "heat2d_smt"), "16"], 16, True),
+        ("Coarse-Grained", [str(bin_dir / "heat2d_coarse_grained"), "8", "100", "8"], 8, False),
+        ("Fine-Grained", [str(bin_dir / "heat2d_fine_grained"), "8"], 8, False),
     ]
 
     print("==============================================================================")
@@ -339,54 +353,68 @@ def main():
 
     metricas_consolidadas = {}
 
-    for nombre, cmd, hilos in catalogo:
-        print(f"[*] Perfilando: {nombre} ({hilos} hilos)...")
-        corridas_data = []
-        for r in range(args.runs):
-            data = ejecutar_comando_perf(cmd, base_dir, usar_sudo=args.sudo)
-            if data:
-                corridas_data.append(data)
+    try:
+        for nombre, cmd, hilos, smt_off_req in catalogo:
+            if smt_off_req:
+                print("    --> [SMT SW] Deshabilitando SMT en el kernel (/sys/devices/system/cpu/smt/control)...")
+                controlar_smt_kernel("off")
+                time.sleep(0.5)
 
-        if not corridas_data:
-            print(f"  [ERROR] No se obtuvieron métricas para {nombre}. Verifique permisos de perf.", file=sys.stderr)
-            continue
+            try:
+                print(f"[*] Perfilando: {nombre} ({hilos} hilos)...")
+                corridas_data = []
+                for r in range(args.runs):
+                    data = ejecutar_comando_perf(cmd, base_dir, usar_sudo=args.sudo)
+                    if data:
+                        corridas_data.append(data)
 
-        promedios = {}
-        for ev in EVENTOS_PERF:
-            vals = [c[ev] for c in corridas_data if ev in c]
-            promedios[ev] = statistics.mean(vals) if vals else 0.0
+                if not corridas_data:
+                    print(f"  [ERROR] No se obtuvieron métricas para {nombre}. Verifique permisos de perf.", file=sys.stderr)
+                    continue
 
-        cycles = promedios.get("cycles", 1.0)
-        instructions = promedios.get("instructions", 0.0)
-        ipc = (instructions / cycles) if cycles > 0 else 0.0
+                promedios = {}
+                for ev in EVENTOS_PERF:
+                    vals = [c[ev] for c in corridas_data if ev in c]
+                    promedios[ev] = statistics.mean(vals) if vals else 0.0
 
-        l1_loads = promedios.get("L1-dcache-loads", 1.0)
-        l1_misses = promedios.get("L1-dcache-load-misses", 0.0)
-        l1_miss_rate = (l1_misses / l1_loads * 100.0) if l1_loads > 0 else 0.0
+                cycles = promedios.get("cycles", 1.0)
+                instructions = promedios.get("instructions", 0.0)
+                ipc = (instructions / cycles) if cycles > 0 else 0.0
 
-        llc_refs = promedios.get("cache-references", 1.0)
-        llc_misses = promedios.get("cache-misses", 0.0)
-        llc_miss_rate = (llc_misses / llc_refs * 100.0) if llc_refs > 0 else 0.0
+                l1_loads = promedios.get("L1-dcache-loads", 1.0)
+                l1_misses = promedios.get("L1-dcache-load-misses", 0.0)
+                l1_miss_rate = (l1_misses / l1_loads * 100.0) if l1_loads > 0 else 0.0
 
-        context_switches = promedios.get("context-switches", 0.0)
+                llc_refs = promedios.get("cache-references", 1.0)
+                llc_misses = promedios.get("cache-misses", 0.0)
+                llc_miss_rate = (llc_misses / llc_refs * 100.0) if llc_refs > 0 else 0.0
 
-        metricas_consolidadas[nombre] = {
-            "modelo": nombre,
-            "hilos": hilos,
-            "corridas": len(corridas_data),
-            "cycles": cycles,
-            "instructions": instructions,
-            "ipc": ipc,
-            "l1_loads": l1_loads,
-            "l1_misses": l1_misses,
-            "l1_miss_rate_pct": l1_miss_rate,
-            "llc_loads": llc_refs,
-            "llc_misses": llc_misses,
-            "llc_miss_rate_pct": llc_miss_rate,
-            "context_switches": context_switches,
-        }
+                context_switches = promedios.get("context-switches", 0.0)
 
-        print(f"    -> IPC: {ipc:.2f} | L1-D Miss: {l1_miss_rate:.2f}% | LLC Miss: {llc_miss_rate:.2f}% | CS: {int(context_switches)}\n")
+                metricas_consolidadas[nombre] = {
+                    "modelo": nombre,
+                    "hilos": hilos,
+                    "corridas": len(corridas_data),
+                    "cycles": cycles,
+                    "instructions": instructions,
+                    "ipc": ipc,
+                    "l1_loads": l1_loads,
+                    "l1_misses": l1_misses,
+                    "l1_miss_rate_pct": l1_miss_rate,
+                    "llc_loads": llc_refs,
+                    "llc_misses": llc_misses,
+                    "llc_miss_rate_pct": llc_miss_rate,
+                    "context_switches": context_switches,
+                }
+
+                print(f"    -> IPC: {ipc:.2f} | L1-D Miss: {l1_miss_rate:.2f}% | LLC Miss: {llc_miss_rate:.2f}% | CS: {int(context_switches)}\n")
+            finally:
+                if smt_off_req:
+                    print("    --> [SMT SW] Restaurando SMT a 'on' en el kernel...")
+                    controlar_smt_kernel("on")
+                    time.sleep(0.5)
+    finally:
+        controlar_smt_kernel("on")
 
     if not metricas_consolidadas:
         print("[ERROR] No se pudo recopilar métricas para ningún modelo. Abortando guardado y graficación.", file=sys.stderr)

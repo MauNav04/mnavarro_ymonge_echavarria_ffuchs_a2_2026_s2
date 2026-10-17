@@ -317,9 +317,14 @@ SmtStats runSmt(
             topology
         );
 
+    const std::size_t physicalCores = physicalCoreCount(topology);
+    const std::size_t maxSupportedWorkers = config.allowOversubscription
+        ? std::max(smtCpuOrder.size(), physicalCores * 4)
+        : smtCpuOrder.size();
+
     if (
         config.threadCount >
-        smtCpuOrder.size()
+        maxSupportedWorkers
     ) {
         throw std::invalid_argument(
             "SMT worker count exceeds the number of logical CPUs "
@@ -347,14 +352,14 @@ SmtStats runSmt(
 
     /*
      * Record the exact CPU placement chosen for this execution.
+     * When oversubscribing, workers are mapped across the available CPUs in round-robin.
      */
-    stats.logicalCpuIds.assign(
-        smtCpuOrder.begin(),
-        smtCpuOrder.begin() +
-            static_cast<std::ptrdiff_t>(
-                config.threadCount
-            )
-    );
+    stats.logicalCpuIds.reserve(config.threadCount);
+    for (std::size_t workerId = 0; workerId < config.threadCount; ++workerId) {
+        stats.logicalCpuIds.push_back(
+            smtCpuOrder[workerId % smtCpuOrder.size()]
+        );
+    }
 
     /*
      * A zero-step run performs no numerical computation and does not
