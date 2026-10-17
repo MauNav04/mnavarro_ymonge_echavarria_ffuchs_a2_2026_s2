@@ -1,5 +1,6 @@
 """Formato Perf y disponibilidad: sin convertir eventos ausentes en ceros medidos."""
 import csv
+import json
 import math
 from pathlib import Path
 
@@ -43,14 +44,17 @@ def parse_stat(text, requested, min_running=90.0):
             if not math.isfinite(value) or value < 0:
                 raise ValueError("Valor no finito o negativo")
             row["count"] = value
+            # Perf 6.17 del Ryzen también emite estos dos eventos sin unidad:
+            # son conteos crudos en ns. No inferir unidades de otros eventos.
+            time_unit = row["unit"] or "ns"
             if event == "task-clock":
-                multiplier = {"msec": 1., "ms": 1., "usec": .001, "us": .001, "nsec": .000001, "ns": .000001, "sec": 1000., "s": 1000.}.get(row["unit"])
+                multiplier = {"msec": 1., "ms": 1., "usec": .001, "us": .001, "nsec": .000001, "ns": .000001, "sec": 1000., "s": 1000.}.get(time_unit)
                 if multiplier is None:
                     row["status"] = "unknown_unit"
                     continue
                 row.update(count=value * multiplier, unit="ms")
             if event == "duration_time":
-                multiplier = {"ns": 1., "nsec": 1., "us": 1000., "usec": 1000., "ms": 1e6, "msec": 1e6, "s": 1e9, "sec": 1e9}.get(row["unit"])
+                multiplier = {"ns": 1., "nsec": 1., "us": 1000., "usec": 1000., "ms": 1e6, "msec": 1e6, "s": 1e9, "sec": 1e9}.get(time_unit)
                 if multiplier is None:
                     row["status"] = "unknown_unit"
                     continue
@@ -82,9 +86,14 @@ def permission_error(text):
     return any(word in text for word in ("permission", "access denied", "operation not permitted", "perf_event_paranoid"))
 
 
-def stat_run(perf, events, command, output, timeout, runner, min_running):
+def stat_run(perf, events, command, output, timeout, runner, min_running, raw_log=None):
     result = runner(perf_command(perf, events, command, output), timeout)
     text = Path(output).read_text() if Path(output).exists() else ""
+    if raw_log is not None:
+        # Persistir antes de interpretar: incluso un CSV inválido queda auditable.
+        raw_log.write(json.dumps({"path": str(output), "text": text}) + "\n")
+        raw_log.flush()
+        Path(output).unlink(missing_ok=True)  # Sólo el temporal creado por esta pasada.
     parsed = parse_stat(text, events, min_running)
     if result["returncode"] != 0:
         status = "permission_denied" if permission_error(result["stderr"] + text) else "command_error"
@@ -93,16 +102,16 @@ def stat_run(perf, events, command, output, timeout, runner, min_running):
     return result, parsed
 
 
-def discover(perf, command, directory, timeout, runner, min_running):
+def discover(perf, command, directory, timeout, runner, min_running, raw_log=None):
     """Sondear parejas; si falla una pareja, separar los eventos para localizar el motivo."""
     availability = {}
     for name, events in GROUPS.items():
-        result, parsed = stat_run(perf, events, command, directory / f"probe-{name}.stat", timeout, runner, min_running)
+        result, parsed = stat_run(perf, events, command, directory / f"probe-{name}.stat", timeout, runner, min_running, raw_log)
         if result["timeout"]:
             raise ValueError("Timeout sondeando eventos Perf")
         if result["returncode"] != 0 or any(row["status"] != "ok" for row in parsed.values()):
             for event in events:
-                single, item = stat_run(perf, [event], command, directory / f"probe-{event}.stat", timeout, runner, min_running)
+                single, item = stat_run(perf, [event], command, directory / f"probe-{event}.stat", timeout, runner, min_running, raw_log)
                 if single["timeout"]:
                     raise ValueError("Timeout sondeando " + event)
                 availability[event] = item[event]

@@ -1,5 +1,9 @@
 # Etapa 7 — Benchmarks, métricas y gráficas
 
+Para el uso habitual, la [guía automática](running.md) reduce el proceso a
+`make quick`, `make run` y `make report`. Esta página conserva las opciones
+individuales y los detalles metodológicos.
+
 ## Receta completa: 200 corridas y todas las figuras de etapa 7
 
 Esta es la secuencia para obtener CSV, tablas y gráficas de rendimiento equivalentes
@@ -76,6 +80,12 @@ benchmarking; para añadir las cinco figuras de contadores ejecutar
 cíclico de las referencias: se conserva el cooperativo aprobado para fractales.
 
 ## Correspondencia con RayTracing y gray-scott
+
+Para generar las figuras 01–09 junto con las 10–14 de Perf, existe `make plot_all`.
+La [receta para las campañas ON ya ejecutadas](profiling.md#las-figuras-0109-y-1014-pertenecen-a-conjuntos-distintos)
+explica las dos listas de CSV y los directorios de salida. `plot` y `profile_plot`
+siguen disponibles por separado. Los comandos de captura no generan automáticamente
+ambos conjuntos de figuras, y el barrido de hilos es necesario para la figura 06.
 
 Se revisaron `scripts/benchmark.py`, `scripts/plot_metrics.py` y los Makefile de
 [RayTracing](../../../echavarria/RayTracing/scripts/benchmark.py) y
@@ -188,8 +198,10 @@ make scalability BUILD_DIR=build-evaluation SMT_STATE=off SCALING_DIR=metrics/sc
 make plot CSV_FILES="metrics/scaling-off/raw.csv" PLOT_DIR=metrics/scaling-off/plots
 ```
 
-Ningún objetivo cambia SMT ni ejecuta sudo para modificar el kernel. `SMT_STATE` exige
-el estado esperado. Restaurar después la configuración del equipo. Cerrar aplicaciones
+Los objetivos individuales descritos aquí no cambian SMT. `SMT_STATE` exige
+el estado esperado. `make run` automatiza ON/OFF/ON con sudo; véase
+[ejecución automática](running.md). Si se usan comandos individuales, restaurar
+después la configuración del equipo. Cerrar aplicaciones
 ajenas a la medición y conservar las condiciones de energía/refrigeración. El cooldown
 no garantiza por sí solo ausencia de thermal throttling.
 

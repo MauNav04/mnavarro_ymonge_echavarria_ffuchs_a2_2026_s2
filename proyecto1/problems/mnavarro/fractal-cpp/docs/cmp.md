@@ -10,7 +10,8 @@ de evaluación el 2026-10-16 y solicitó retirar la variante local.
 La selección exige el destino de evaluación: rechaza WSL, hipervisores/contenedores
 reconocidos, otras distribuciones/familias de CPU y topologías fuera del contrato.
 La ausencia de señales de virtualización no demuestra por sí sola hardware físico.
-El modelo exacto de Ryzen y la versión de Ubuntu siguen pendientes de registrar.
+Los diagnósticos recibidos confirman Ryzen 7 7730U y Ubuntu 25.10; las campañas
+formales ON/OFF permanecen pendientes. Revisión en [ryzen_diagnostics.md](ryzen_diagnostics.md).
 
 Se adapta el reparto contiguo y afinidad de [RayTracing CMP](../../../echavarria/RayTracing/CMP/main.cpp).
 Sysfs proporciona CPU online, `physical_package_id` y `core_id`; `sched_getaffinity`

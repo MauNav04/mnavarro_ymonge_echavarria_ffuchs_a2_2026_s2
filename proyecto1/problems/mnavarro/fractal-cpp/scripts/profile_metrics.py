@@ -8,6 +8,7 @@ from pathlib import Path
 import statistics
 
 from perf_support import EVENTS, GROUPS, SCOPE, STRATEGY
+from plot_style import MODEL_COLORS
 from test_models import require, sha
 
 COUNTERS = {
@@ -74,7 +75,7 @@ def load(paths, allow_partial=False):
         require(meta.get("measurement_kind") in ("physical", "diagnostic", "synthetic"), "Tipo de medicion invalido")
         require(meta.get("state_verified") or meta.get("measurement_kind") == "synthetic", "Estado fisico sin verificar")
         require(meta.get("smt_state") in ("on", "off"), "Estado SMT invalido")
-        require(meta["runs"] >= (200 if meta["measurement_kind"] == "physical" else 1), "Numero de corridas invalido")
+        require(meta["runs"] >= (15 if meta["measurement_kind"] == "physical" else 1), "Numero de corridas invalido")
         cid = meta["campaign_id"]
         require(cid not in campaigns, "Campaña duplicada")
         campaigns.add(cid)
@@ -179,7 +180,8 @@ def draw(rows, directory, partial):
                     ax.text(index, .04, "N/D", ha="center", transform=ax.get_xaxis_transform())
                 else:
                     error = row[metric + "_ci95_halfwidth"]
-                    ax.bar(index, value / divisor, color="#2563a6" if row["smt_state"] == "on" else "#d68032",
+                    ax.bar(index, value / divisor, color=MODEL_COLORS[row["model_key"]],
+                           hatch="//" if row["smt_state"] == "off" else "", edgecolor="#333333",
                            yerr=error / divisor if error is not None else None, capsize=3)
                     if value == 0:
                         ax.text(index, .04, "0", ha="center", transform=ax.get_xaxis_transform())

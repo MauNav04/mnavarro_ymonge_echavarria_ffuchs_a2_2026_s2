@@ -1,7 +1,8 @@
 # SMT — Etapa 5
 
 Destino: Ubuntu nativo, AMD Ryzen de 8 núcleos físicos y 16 hilos lógicos con SMT
-habilitado. El modelo exacto sigue pendiente. La topología de WSL no valida este destino.
+habilitado. Los diagnósticos recibidos confirman Ryzen 7 7730U y Ubuntu 25.10.
+La topología de WSL no valida este destino. Revisión en [ryzen_diagnostics.md](ryzen_diagnostics.md).
 
 ## Ejecución y referencia
 
@@ -33,7 +34,10 @@ y se reúnen todos los pthreads; no hay fallback silencioso ni espera activa glo
 A diferencia del modo `sw` del ejemplo, fijar afinidad sobre núcleos físicos mientras
 SMT sigue activo no se acepta como evidencia de SMT OFF. Es necesario desactivarlo
 realmente mediante la intervención del usuario en BIOS/UEFI o la configuración Linux
-del equipo, y comprobarlo antes de correr. Este código no cambia SMT ni necesita sudo.
+del equipo, y comprobarlo antes de correr. El ejecutable SMT no cambia el estado ni
+necesita sudo. El orquestador [`make run`](running.md) automatiza ON/OFF/ON mediante
+sysfs con un ayudante privilegiado y restauración; las recetas individuales siguientes
+siguen exigiendo intervención externa.
 
 ## Prueba en la computadora de evaluación
 

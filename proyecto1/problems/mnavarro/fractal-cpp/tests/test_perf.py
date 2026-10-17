@@ -3,6 +3,7 @@ import argparse
 import copy
 import csv
 import json
+import io
 import os
 from pathlib import Path
 import shutil
@@ -17,6 +18,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from perf_support import EVENTS, GROUPS, SCOPE, STRATEGY, discover, parse_stat, perf_command, stat_run
 from perf_runner import FIELDS, main as profile_main
 from test_models import invoke
+BUILD = None
 
 
 def line(event, value=100, unit="", runtime=1000000, pct=100):
@@ -24,6 +26,101 @@ def line(event, value=100, unit="", runtime=1000000, pct=100):
 
 
 class ParserTests(unittest.TestCase):
+    def test_profile_default_and_minimum_runs(self):
+        from perf_runner import campaign
+        with patch("sys.argv", ["profile.py", "--output-dir", "unused"]), patch("perf_runner.campaign", return_value=0) as capture:
+            self.assertEqual(profile_main(), 0)
+            self.assertEqual(capture.call_args.args[0].runs, 20)
+        with self.assertRaisesRegex(ValueError, "15 repeticiones"):
+            campaign(argparse.Namespace(diagnostic=False, check=False, runs=14))
+
+    def test_compact_legacy_stats_without_changing_measurements(self):
+        from compact_perf import compact
+        import hashlib
+        for remove in (False, True):
+            with tempfile.TemporaryDirectory() as temporary:
+                directory = Path(temporary)
+                metadata = directory / "metadata.json"
+                metadata.write_text('{"experiment":"perf","success":true,"campaign_id":"legacy-test"}')
+                source_meta = metadata.read_bytes()
+                original = {"probe.stat": b"# probe\r\n10;;cycles;1;100\r\n", "model/cpu-run1.stat": b"20;;instructions;1;100\n"}
+                for name, content in original.items():
+                    path = directory / name
+                    path.parent.mkdir(exist_ok=True)
+                    path.write_bytes(content)
+                (directory / "events.csv").write_text("run,event\n1,cycles\n")
+                result = compact(directory, remove)
+                self.assertTrue(result["verified"] and result["complete"])
+                self.assertEqual(result["removed_count"], 2 if remove else 0)
+                self.assertEqual(metadata.read_bytes(), source_meta)
+                self.assertTrue((directory / "events.csv").is_file())
+                self.assertEqual(len(list(directory.rglob("*.stat"))), 0 if remove else 2)
+                records = [json.loads(line) for line in (directory / "perf-stat.jsonl").read_text().splitlines()]
+                recovered = {Path(row["path"]).relative_to(directory).as_posix(): row["text"].encode("utf-8") for row in records}
+                self.assertEqual(recovered, original)
+                for name, data in original.items():
+                    self.assertEqual(result["source_sha256"][name], hashlib.sha256(data).hexdigest())
+                with self.assertRaises(ValueError):
+                    compact(directory, remove)
+
+    def test_compaction_rejects_active_capture(self):
+        from compact_perf import compact
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            (directory / "metadata.json").write_text('{"experiment":"perf","success":false}')
+            (directory / "raw.stat").write_text("original")
+            with self.assertRaises(ValueError):
+                compact(directory, True)
+            self.assertEqual((directory / "raw.stat").read_text(), "original")
+            self.assertFalse((directory / "perf-stat.jsonl").exists())
+
+    def test_ryzen_perf_617_raw_nanoseconds(self):
+        # Líneas de la captura real del Ryzen: unidad vacía, conteos crudos en ns.
+        text = "327532597;;task-clock;327532597;100.00;0.985;CPUs utilized\n332559518;;duration_time;1;100.00;1.015;G/sec\n"
+        result = parse_stat(text, ["task-clock", "duration_time"])
+        self.assertEqual(result["task-clock"]["status"], "ok")
+        self.assertEqual(result["duration_time"]["status"], "ok")
+        self.assertAlmostEqual(result["task-clock"]["count"], 327.532597)
+        self.assertEqual(result["task-clock"]["unit"], "ms")
+        self.assertEqual(result["duration_time"]["count"], 332559518)
+        self.assertEqual(result["duration_time"]["unit"], "ns")
+        cpus = result["task-clock"]["count"] / (result["duration_time"]["count"] / 1e6)
+        self.assertAlmostEqual(cpus, .985, places=3)
+        self.assertEqual(parse_stat(line("task-clock", 1, "unknown"), ["task-clock"])["task-clock"]["status"], "unknown_unit")
+
+    def test_raw_jsonl_preserves_output_before_parse_error(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "cpu-run1.stat"
+            raw = io.StringIO()
+            text = line("cycles") * 2  # El lector rechaza el duplicado; la evidencia sobrevive.
+            def fake(argv, timeout):
+                output.write_text(text)
+                return dict(returncode=0, stderr="", timeout=False)
+            with self.assertRaises(ValueError):
+                stat_run("perf", ["cycles"], ["true"], output, 2, fake, 90, raw)
+            self.assertFalse(output.exists())
+            record = json.loads(raw.getvalue())
+            self.assertEqual(record, dict(path=str(output), text=text))
+
+    def test_metrics_archive_includes_csv_and_preserves_sources(self):
+        from archive_metrics import archive
+        import zipfile
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "metrics"
+            (source / "campaign").mkdir(parents=True)
+            (source / "campaign/raw.csv").write_text("run,value\n1,2\n")
+            (source / "campaign/metadata.json").write_text('{"success": true}')
+            output = root / "export.zip"
+            self.assertEqual(archive(source, output), (2, 1))
+            with zipfile.ZipFile(output) as stream:
+                self.assertEqual(stream.read("metrics/campaign/raw.csv"), b"run,value\n1,2\n")
+            self.assertTrue((source / "campaign/raw.csv").is_file())
+            with self.assertRaises(ValueError):
+                archive(source, output)
+            with self.assertRaises(ValueError):
+                archive(source, source / "inside.zip")
+
     def test_zero_unavailable_and_multiplex(self):
         result = parse_stat(line("context-switches", 0) + line("cycles", "<not supported>") + line("instructions", 500, pct=20), ["context-switches", "cycles", "instructions", "branches"])
         self.assertEqual(result["context-switches"]["count"], 0)
@@ -111,6 +208,11 @@ class ParserTests(unittest.TestCase):
             self.assertEqual(len(rows), 2 * len(EVENTS))
             self.assertTrue(all(row["status"] == "ok" for row in rows))
             self.assertEqual(len({row["frc_sha256"] for row in rows}), 1)
+            self.assertEqual(metadata["raw_storage"], "jsonl")
+            raw_records = [json.loads(line) for line in (folder / "perf-stat.jsonl").read_text().splitlines()]
+            self.assertEqual(len(raw_records), 18)  # 6 sondeos + 2 modelos × 6 grupos.
+            self.assertFalse(list(folder.rglob("*.stat")))
+            self.assertTrue(all(record["text"] for record in raw_records))
             # No conservar un artefacto que parezca validación física.
             metadata.update(measurement_kind="synthetic", state_verified=False)
             (folder / "metadata.json").write_text(json.dumps(metadata))
@@ -136,11 +238,11 @@ raise SystemExit(child.returncode)
 """
 
 
-def fixture(directory, state="on", kind="synthetic"):
+def fixture(directory, state="on", kind="synthetic", runs=2):
     directory.mkdir()
     meta = dict(schema=1, experiment="perf", campaign_id=state, success=True, state_verified=False,
                 measurement_kind=kind, check_only=False, scope=SCOPE, strategy=STRATEGY,
-                runs=2, smt_state=state, configurations=[["sequential", 1, 1]], quantum=1,
+                runs=runs, smt_state=state, configurations=[["sequential", 1, 1]], quantum=1,
                 input_sha256="test-input", machine_sha256="test-machine", range=8, stride=8, gray=False,
                 binaries_sha256={"sequential": "test-binary"}, reference_sha256="test-output", min_running_pct=90)
     (directory / "metadata.json").write_text(json.dumps(meta))
@@ -148,7 +250,7 @@ def fixture(directory, state="on", kind="synthetic"):
     values = {event: 100 for event in EVENTS}
     values.update({"cycles": 200, "instructions": 400, "context-switches": 0, "task-clock": 20, "duration_time": 10000000,
                    "cache-misses": 10, "L1-dcache-load-misses": 5, "branch-misses": 3})
-    for run in (1, 2):
+    for run in range(1, runs + 1):
         for group, events in GROUPS.items():
             for event in events:
                 missing = event.startswith("LLC-")
@@ -156,7 +258,7 @@ def fixture(directory, state="on", kind="synthetic"):
                                  teams=1, threads_per_team=1, hilos=1, quantum=0, run_id=run, pass_id=group, event=event, raw_event=event,
                                  count="" if missing else values[event], unit="ms" if event == "task-clock" else "ns" if event == "duration_time" else "",
                                  runtime_ns=1000000, running_pct=100, status="not_supported" if missing else "ok", native_time_ms=1,
-                                 wall_s=.1, frc_sha256="test-output", expected_runs=2, timestamp="fixture"))
+                                 wall_s=.1, frc_sha256="test-output", expected_runs=runs, timestamp="fixture"))
     path = directory / "events.csv"
     with path.open("w", newline="") as stream:
         writer = csv.DictWriter(stream, FIELDS)
@@ -166,6 +268,21 @@ def fixture(directory, state="on", kind="synthetic"):
 
 
 class MetricsTests(unittest.TestCase):
+    def test_profile_sample_policy_and_legacy_campaigns(self):
+        from profile_metrics import load
+        # Contratos con filas fabricadas; no son capturas físicas.
+        with tempfile.TemporaryDirectory() as temporary:
+            for runs in (14, 15, 20, 200):
+                path, meta, _ = fixture(Path(temporary) / str(runs), kind="physical", runs=runs)
+                meta["state_verified"] = True
+                path.with_name("metadata.json").write_text(json.dumps(meta))
+                if runs < 15:
+                    with self.assertRaisesRegex(ValueError, "corridas"):
+                        load([path])
+                else:
+                    groups, _ = load([path])
+                    self.assertTrue(all(group["complete"] for group in groups.values()))
+
     def test_statistics_and_all_figures(self):
         from profile_metrics import analyze
         with tempfile.TemporaryDirectory() as temporary:

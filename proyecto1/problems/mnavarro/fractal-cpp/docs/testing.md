@@ -1,5 +1,9 @@
 # Etapa 6 — Integración y pruebas
 
+Para ejecutar los experimentos completos con un comando, consultar la
+[guía automática](running.md). Esta página describe las pruebas funcionales y
+los objetivos individuales; `make test` no sustituye una campaña experimental.
+
 ## Organización
 
 `Makefile` en la raíz incluye `scripts/Makefile`. Ambos ofrecen la misma interfaz,
@@ -58,11 +62,11 @@ make test QUICK=1 SMT_STATE=off
 make test SMT_STATE=off
 ```
 
-Ningún objetivo cambia SMT, ejecuta sudo automáticamente ni emula SMT OFF mediante
-pinning con el hardware todavía activo. Restaurar después la configuración del equipo.
+Estos objetivos de pruebas no cambian SMT ni emulan OFF mediante pinning.
+La [campaña `make run`](running.md) sí automatiza ON/OFF/ON con sudo.
+Al usar objetivos individuales, restaurar después la configuración del equipo.
 Los comandos `run_smt_off`, `verify_smt_off` y `record_smt_off` **exigen** SMT realmente
-inactivo. A diferencia de los Makefile de referencia, aquí la intervención es externa
-para conservar las reglas aprobadas y la trazabilidad de ambos estados.
+inactivo. En estas pruebas individuales la intervención sigue siendo externa.
 
 ## Objetivos disponibles
 

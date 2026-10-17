@@ -164,7 +164,8 @@ def plot_all(groups, summary, convergence, directory):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    colors = {"sequential": "#5c6b73", "CMP": "#2563eb", "SMT": "#059669", "coarse-grained": "#7c3aed", "fine-grained": "#d62728"}
+    from plot_style import MODEL_COLORS
+    colors = MODEL_COLORS
     plt.rcParams.update({"font.size": 9, "axes.grid": True, "grid.alpha": 0.25, "savefig.dpi": 300})
     kind = summary[0]["measurement_kind"]
     watermark = {"physical": "Mediciones físicas", "diagnostic": "DIAGNÓSTICO — no benchmark formal", "synthetic": "DATOS SINTÉTICOS — prueba de gráficas"}[kind]
@@ -240,10 +241,10 @@ def plot_all(groups, summary, convergence, directory):
             ax.axvline(8, linestyle="-.", color="#555555", label="8 núcleos físicos")
         axes[0].plot(points, points, "k--", label="Ideal S=p")
         axes[1].axhline(100, color="black", linestyle="--", label="Ideal 100 %")
-        for fraction in (0.90, 0.95, 0.98):
+        for fraction, style in zip((0.90, 0.95, 0.98), (":", "--", "-.")):
             theory = [1 / (1 - fraction + fraction / n) for n in points]
-            axes[0].plot(points, theory, ":", label=f"Amdahl f={fraction}")
-            axes[1].plot(points, [100 * s / n for s, n in zip(theory, points)], ":", label=f"Amdahl f={fraction}")
+            axes[0].plot(points, theory, linestyle=style, color="#64748b", label=f"Amdahl f={fraction}")
+            axes[1].plot(points, [100 * s / n for s, n in zip(theory, points)], linestyle=style, color="#64748b", label=f"Amdahl f={fraction}")
         families = defaultdict(list)
         for row in scaling:
             families[(row["campaign_id"], row["model_key"], row["smt_state"])].append(row)
@@ -264,11 +265,12 @@ def plot_all(groups, summary, convergence, directory):
     for key, rows in groups.items():
         first = rows[0]
         name = label(first).replace("\n", " ")
+        style = dict(color=colors[first["model_key"]], linestyle="-" if first["smt_state"] == "on" else "--")
         series = [r for r in convergence if (r["campaign_id"], r["model_key"], r["teams"], r["threads_per_team"], r["quantum"]) == (key[0], key[3], key[4], key[5], key[6])]
-        axes[0].plot([r["samples"] for r in series], [r["running_mean_ms"] for r in series], label=name)
+        axes[0].plot([r["samples"] for r in series], [r["running_mean_ms"] for r in series], label=name, **style)
         valid = [r for r in series if r["relative_ci95_pct"] is not None]
-        axes[1].plot([r["samples"] for r in valid], [r["relative_ci95_pct"] for r in valid], label=name)
-        ax_stability.plot([r["run_id"] for r in rows], [r["tiempo_ms"] for r in rows], label=name)
+        axes[1].plot([r["samples"] for r in valid], [r["relative_ci95_pct"] for r in valid], label=name, **style)
+        ax_stability.plot([r["run_id"] for r in rows], [r["tiempo_ms"] for r in rows], label=name, **style)
     axes[0].set_title("Convergencia: media acumulada (ms)")
     axes[1].set_title("Convergencia: semiancho IC 95 % / media (%)")
     for ax in axes:

@@ -5,7 +5,7 @@ SHELL := /bin/bash
 ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 BUILD_DIR ?= $(ROOT)/build
 RESULTS_DIR ?= $(ROOT)/results
-PYTHON ?= python3
+PYTHON ?= $(if $(wildcard $(ROOT)/.venv/bin/python),$(ROOT)/.venv/bin/python,python3)
 JOBS ?= 2
 BUILD_TYPE ?= Release
 INPUT ?= $(ROOT)/assets/color128.png
@@ -85,10 +85,21 @@ compare_smt:
 clean:
 	cmake --build "$(BUILD_DIR)" --target clean
 help:
+	@echo 'Uso habitual desde fractal-cpp/:'
+	@echo '  make setup   Preparar .venv y dependencias Python (una vez).'
+	@echo '  make quick   Diagnostico completo: modelos, escalabilidad, Perf, graficas y ZIP.'
+	@echo '  make run     SMT ON y OFF automaticos; benchmark/escalabilidad: 200; Perf: 20. Graficas y ZIP.'
+	@echo '  make report  Detectar CSV existentes y generar todas las graficas y el ZIP.'
+	@echo 'make run solicita sudo para cambiar SMT y restaurarlo a ON; quick conserva el estado actual.'
+	@echo 'Build: build/. Entrada: assets/color128.png. Referencia del ultimo informe: metrics/latest.json.'
+	@echo 'Los comandos anteriores siguen disponibles: make help_advanced.'
+help_advanced:
 	@echo 'Build: all seq fine coarse cmp smt | Tests: test test_unit test_local verify_all verify_cmp verify_smt_on verify_smt_off'
 	@echo 'Run: run_seq run_fine run_coarse run_cmp run_smt_on run_smt_off | SMT records: record_smt_on record_smt_off compare_smt'
 	@echo 'Options: JOBS BUILD_DIR INPUT RANGE STRIDE ITERATIONS TEAMS THREADS_PER_TEAM SMT_TEAMS SMT_THREADS_PER_TEAM QUANTUM GRAY QUICK TIMEOUT RESULTS_DIR TEST_INPUT'
-	@echo 'SMT_STATE=on|off verifica el estado; ningun target cambia SMT. Perf: setup_perf profile_fast profile_perf profile_plot test_profiles. Benchmark y graficas: benchmark_full benchmark_fast scalability plot.'
+	@echo 'SMT_STATE=on|off verifica el estado en objetivos individuales; make run automatiza ON/OFF/ON con sudo. Perf: setup_perf profile_fast profile_perf profile_plot test_profiles. Benchmark y graficas: benchmark_full benchmark_fast scalability plot.'
+	@echo 'Exportar todos los resultados: archive_metrics (ZIP nuevo en results/exports/metrics.zip; incluye CSV). Perf guarda salida cruda en JSONL; PERF_RAW_STORAGE=files conserva .stat individuales.'
+	@echo 'Graficas completas: plot_all (CSV_FILES y PERF_CSV_FILES; directorios de salida distintos). Capturas antiguas: compact_perf PERF_DIR=... REMOVE_STAT_FILES=1 verifica y consolida .stat sin repetir mediciones.'
 
 # Etapa 7: mediciones -> CSV individuales -> tablas/figuras desde CSV.
 RUNS ?= 200
@@ -132,6 +143,10 @@ plot_metrics:
 plot: plot_metrics
 graficas: plot_metrics
 
+# Generar ambos conjuntos desde CSV; no ejecuta compresiones ni mezcla sus estadísticas.
+.PHONY: plot_all
+plot_all: plot_metrics profile_plot
+
 .PHONY: test_benchmarks
 test_benchmarks: all
 	$(PYTHON) -c 'import scipy, matplotlib'
@@ -140,17 +155,18 @@ test_benchmarks: all
 
 # Etapa 8: Perf por proceso, pares de eventos y estado SMT verificado.
 PERF ?= perf
-PERF_RUNS ?= 200
+PERF_RUNS ?= 20
 PERF_FAST_RUNS ?= 1
 PERF_MODELS ?= all
 PERF_MIN_RUNNING ?= 90
 PERF_TIMEOUT ?= 600
+PERF_RAW_STORAGE ?= jsonl
 PERF_DIR ?= $(ROOT)/metrics/perf-$(SMT_STATE)
 PERF_FAST_DIR ?= $(ROOT)/metrics/perf-diagnostic-$(SMT_STATE)
 PERF_CHECK_DIR ?= $(ROOT)/metrics/perf-check-$(SMT_STATE)
 PERF_CSV_FILES ?= "$(PERF_DIR)/events.csv"
 PERF_PLOT_DIR ?= $(ROOT)/metrics/perf-plots
-PERF_ARGS = --build-dir "$(BUILD_DIR)" --input "$(INPUT)" --perf "$(PERF)" --models "$(PERF_MODELS)" --smt-state $(SMT_STATE) --teams $(TEAMS) --members $(THREADS_PER_TEAM) --smt-teams $(SMT_TEAMS) --smt-members $(SMT_THREADS_PER_TEAM) --range $(RANGE) --stride $(STRIDE) --quantum $(QUANTUM) --cooldown $(COOLDOWN) --warmups $(WARMUPS) --timeout $(PERF_TIMEOUT) --min-running $(PERF_MIN_RUNNING) $(if $(filter 1,$(GRAY)),--gray,)
+PERF_ARGS = --build-dir "$(BUILD_DIR)" --input "$(INPUT)" --perf "$(PERF)" --raw-storage $(PERF_RAW_STORAGE) --models "$(PERF_MODELS)" --smt-state $(SMT_STATE) --teams $(TEAMS) --members $(THREADS_PER_TEAM) --smt-teams $(SMT_TEAMS) --smt-members $(SMT_THREADS_PER_TEAM) --range $(RANGE) --stride $(STRIDE) --quantum $(QUANTUM) --cooldown $(COOLDOWN) --warmups $(WARMUPS) --timeout $(PERF_TIMEOUT) --min-running $(PERF_MIN_RUNNING) $(if $(filter 1,$(GRAY)),--gray,)
 .PHONY: setup_perf profile profile_perf perfilado profile_fast profile_on profile_off profile_plot test_profiles
 setup_perf: all
 	$(PYTHON) "$(ROOT)/scripts/profile.py" $(PERF_ARGS) --check --output-dir "$(PERF_CHECK_DIR)"
@@ -171,3 +187,25 @@ profile_plot:
 test_profiles: all
 	$(PYTHON) -c 'import scipy, matplotlib'
 	ctest --test-dir "$(BUILD_DIR)" -R '^perf_' --output-on-failure
+
+# Exportar los resultados completos, incluso CSV ignorados por Git. No borra fuentes.
+METRICS_DIR ?= $(ROOT)/metrics
+METRICS_ARCHIVE ?= $(ROOT)/results/exports/metrics.zip
+.PHONY: archive_metrics
+archive_metrics:
+	$(PYTHON) "$(ROOT)/scripts/archive_metrics.py" --input-dir "$(METRICS_DIR)" --output "$(METRICS_ARCHIVE)"
+
+# Capturas antiguas: copiar primero; retirar .stat sólo por petición explícita.
+REMOVE_STAT_FILES ?= 0
+.PHONY: compact_perf
+compact_perf:
+	$(PYTHON) "$(ROOT)/scripts/compact_perf.py" --input-dir "$(PERF_DIR)" $(if $(filter 1,$(REMOVE_STAT_FILES)),--remove-originals,)
+
+# Entrada sencilla: el orquestador reutiliza los runners, validaciones y analizadores.
+.PHONY: setup quick run report help_advanced
+setup:
+	python3 "$(ROOT)/scripts/workflow.py" setup
+quick run: all
+	$(PYTHON) "$(ROOT)/scripts/workflow.py" $@ --build-dir "$(BUILD_DIR)" --input "$(INPUT)" --metrics-dir "$(METRICS_DIR)" --results-dir "$(RESULTS_DIR)"
+report:
+	$(PYTHON) "$(ROOT)/scripts/workflow.py" report --metrics-dir "$(METRICS_DIR)" --results-dir "$(RESULTS_DIR)"

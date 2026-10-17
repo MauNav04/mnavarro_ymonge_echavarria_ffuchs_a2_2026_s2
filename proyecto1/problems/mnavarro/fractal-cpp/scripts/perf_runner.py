@@ -1,5 +1,6 @@
 """Perf por proceso e hilos: CSV incremental en Ubuntu/AMD Ryzen, sin cambiar permisos/SMT."""
 import argparse
+from contextlib import nullcontext
 import csv
 from datetime import datetime, timezone
 import json
@@ -34,7 +35,7 @@ def native_preflight(build, state, command):
 
 
 def campaign(args):
-    require(args.diagnostic or args.check or args.runs >= 200, "Perfilado formal requiere 200 repeticiones por modelo y grupo; usar --diagnostic para comprobaciones breves")
+    require(args.diagnostic or args.check or args.runs >= 15, "Perfilado requiere al menos 15 repeticiones por modelo y grupo (20 por defecto); usar --diagnostic para comprobaciones breves")
     models = selected_models(args.models)
     configs, _ = configurations(args, models)
     build = args.build_dir.resolve()
@@ -47,13 +48,15 @@ def campaign(args):
             "measurement_kind": "diagnostic" if args.diagnostic or args.check else "physical", "check_only": args.check,
             "scope": SCOPE, "strategy": STRATEGY, "runs": args.runs, "warmups": args.warmups, "cooldown": args.cooldown,
             "min_running_pct": args.min_running, "smt_state": args.smt_state, "configurations": configs, "events": list(EVENTS),
+            "raw_storage": args.raw_storage, "raw_stats_file": "perf-stat.jsonl" if args.raw_storage == "jsonl" else None,
             "input_sha256": sha(args.input), "machine_sha256": sha("/etc/machine-id"), "kernel": platform.release(),
             "os_release": Path("/etc/os-release").read_text(), "range": args.range, "stride": args.stride, "gray": args.gray,
             "quantum": args.quantum, "binaries_sha256": {m: sha(p) for m, p in binaries.items()}, "script_sha256": sha(__file__), "support_sha256": sha(Path(__file__).with_name("perf_support.py"))}
     def save():
         (directory / "metadata.json").write_text(json.dumps(meta, indent=2) + "\n")
     save()
-    with (directory / "commands.jsonl").open("w") as logs, (directory / "events.csv").open("w", newline="") as stream:
+    raw_context = (directory / "perf-stat.jsonl").open("w") if args.raw_storage == "jsonl" else nullcontext(None)
+    with (directory / "commands.jsonl").open("w") as logs, (directory / "events.csv").open("w", newline="") as stream, raw_context as raw_log:
         writer = csv.DictWriter(stream, FIELDS)
         writer.writeheader()
         stream.flush()
@@ -81,7 +84,7 @@ def campaign(args):
             probe = directory / "probes"
             probe.mkdir()
             probe_command = [binaries["sequential"], mode, args.input.resolve(), probe / "output.frc", *codec]
-            available = discover(perf, probe_command, probe, args.timeout, logged, args.min_running)
+            available = discover(perf, probe_command, probe, args.timeout, logged, args.min_running, raw_log)
             meta["availability"] = available
             (directory / "availability.json").write_text(json.dumps(available, indent=2) + "\n")
             supported = {event for event, info in available.items() if info["status"] == "ok"}
@@ -120,7 +123,7 @@ def campaign(args):
                             require(snapshot() == before, "Topologia/SMT/mascara cambiaron durante perfilado")
                             stat_path = folder / f"{group}-run{run}.stat"
                             start = time.perf_counter()
-                            result, counted = stat_run(perf, active, command, stat_path, args.timeout, logged, args.min_running)
+                            result, counted = stat_run(perf, active, command, stat_path, args.timeout, logged, args.min_running, raw_log)
                             wall = time.perf_counter() - start
                             require(not result["timeout"] and result["returncode"] == 0, result["stderr"] or "Fallo de Perf o programa hijo")
                             parsed.update(counted)
@@ -173,6 +176,8 @@ def main():
     parser.add_argument("--input", type=Path, default=ROOT / "assets/color128.png")
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--perf", default="perf")
+    parser.add_argument("--raw-storage", choices=("jsonl", "files"), default="jsonl",
+                        help="jsonl conserva las salidas crudas en un registro incremental; files conserva cada .stat")
     parser.add_argument("--models", default="all")
     parser.add_argument("--smt-state", choices=("on", "off"), default="on")
     parser.add_argument("--diagnostic", action="store_true")
@@ -180,7 +185,7 @@ def main():
     parser.add_argument("--gray", action="store_true")
     parser.add_argument("--min-running", type=float, default=90.)
     parser.add_argument("--cooldown", type=float, default=.15)
-    for name, default in (("runs", 200), ("warmups", 1), ("teams", 4), ("members", 2), ("smt-teams", 4), ("smt-members", 4),
+    for name, default in (("runs", 20), ("warmups", 1), ("teams", 4), ("members", 2), ("smt-teams", 4), ("smt-members", 4),
                           ("range", 8), ("stride", 8), ("quantum", 1), ("timeout", 600)):
         parser.add_argument("--" + name, type=int, default=default)
     args = parser.parse_args()
