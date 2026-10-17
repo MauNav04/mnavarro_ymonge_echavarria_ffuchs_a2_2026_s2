@@ -173,8 +173,7 @@ El script maestro `scripts/benchmark.py` automatiza la recolección masiva de m�
 # Sobrescribe limpiamente los archivos oficiales para garantizar integridad estadística:
 make benchmark
 
-# Prueba rápida de validación de pipeline (3 corridas por modelo):
-# Exporta a gray_scott_benchmark_fast.csv para no alterar los datos oficiales de 200 corridas:
+# Prueba rápida de validación de pipeline (5 corridas por modelo):
 make benchmark_fast
 
 # Opciones avanzadas invocando directamente el script:
@@ -185,45 +184,45 @@ python3 benchmark.py --runs 10 --models "cmp" --append
 ```
 
 * **Archivos generados:**
-  * `metricas/gray_scott_benchmark.csv`: Muestras crudas oficiales de tiempo y configuración para las 1,400 corridas de la campaña de 200 repeticiones.
-  * `metricas/resumen_estadistico.csv`: Consolidado estadístico oficial con Media ($\mu$), Margen de Error ($ME_{95\%}$), Intervalo de Confianza al 95% ($[\text{IC}_{inf}, \text{IC}_{sup}]$), Desviación Estándar ($\sigma$), Mediana, Speedup ($S$) y Eficiencia ($E$).
-  * `metricas/gray_scott_benchmark_fast.csv` y `resumen_estadistico_fast.csv`: Generados únicamente por `make benchmark_fast` para pruebas preliminares aisladas sin tocar el dataset principal.
+  * `metricas/gray_scott_benchmark.csv`: Muestras crudas oficiales de tiempo y configuración para las corridas estadísticas.
+  * `metricas/resumen_estadistico.csv`: Consolidado estadístico oficial con Media ($\mu$), Margen de Error ($\pm \text{ME}$ al 95%), Intervalo de Confianza al 95% ($[\text{IC}_{\text{inf}}, \text{IC}_{\text{sup}}]$), Desviación Estándar ($\sigma$), Mediana, Speedup ($S$) y Eficiencia ($E$).
 
-#### Tabla Consolidada de Benchmarking Oficial ($N = 200$ corridas por modelo, AMD Ryzen 7 5700G):
+#### Tabla Consolidada de Benchmarking Oficial ($N = 200$ corridas por modelo, AMD Ryzen 7 7730U):
 
-| Modelo | Modo | Hilos | Media $\mu$ (ms) | Margen Error $\pm ME_{95\%}$ | Intervalo Confianza 95% (ms) | Speedup $S$ | Eficiencia $E$ |
+| Modelo | Modo | Hilos | Media $\mu$ (ms) | Margen Error $\pm \text{ME}$ (95%) | Intervalo Confianza 95% (ms) | Speedup $S$ | Eficiencia $E$ |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **SMT (HW Real)** | `hardware_smt` | 16 | **709.74** | $\pm 3.28$ | **[706.46, 713.02]** | **5.54x** | 34.6% |
-| **CMP** | `dedicated_cores` | 8 | **734.47** | $\pm 11.16$ | **[723.31, 745.62]** | **5.35x** | **66.9%** |
-| **Coarse-Grained** | `burst_block` | 8 | **863.16** | $\pm 3.94$ | **[859.23, 867.10]** | **4.55x** | 56.9% |
-| **SMT (Sobre-suscripción SW)** | `software_oversubscription` | 16 | **869.02** | $\pm 2.24$ | **[866.78, 871.26]** | **4.52x** | 28.3% |
-| **Fine-Grained (Paralelo Cíclico)** | `cyclic_threads` | 8 | **1044.98** | $\pm 7.93$ | **[1037.05, 1052.92]** | **3.76x** | 47.0% |
-| **Secuencial (Baseline)** | `baseline` | 1 | **3929.68** | $\pm 32.01$ | **[3897.67, 3961.68]** | **1.00x** | 100.0% |
-| **Fine-Grained (Cooperativo)** | `cooperative_quantum` | 8 | **3949.26** | $\pm 18.54$ | **[3930.71, 3967.80]** | **1.00x** | 12.4% |
+| **CMP** | `dedicated_cores` | 8 | **1061.94** | $\pm 6.69$ | **[1055.25, 1068.63]** | **4.09x** | **51.1%** |
+| **SMT (HW Real)** | `hardware_smt` | 16 | **1102.88** | $\pm 18.03$ | **[1084.85, 1120.91]** | **3.94x** | 24.6% |
+| **Coarse-Grained** | `burst_block` | 8 | **1269.43** | $\pm 8.07$ | **[1261.36, 1277.50]** | **3.42x** | 42.8% |
+| **SMT (Sobre-suscripción SW)** | `software_oversubscription` | 16 | **1443.01** | $\pm 42.97$ | **[1400.04, 1485.99]** | **3.01x** | 18.8% |
+| **Fine-Grained (Paralelo Cíclico)** | `cyclic_threads` | 8 | **1565.56** | $\pm 10.63$ | **[1554.93, 1576.18]** | **2.77x** | 34.7% |
+| **Secuencial (Baseline)** | `baseline` | 1 | **4344.25** | $\pm 14.41$ | **[4329.84, 4358.66]** | **1.00x** | 100.0% |
+| **Fine-Grained (Cooperativo)** | `cooperative_quantum` | 8 | **4482.44** | $\pm 16.81$ | **[4465.63, 4499.26]** | **0.97x** | 12.1% |
 
 ---
 
 ### 3.5 Generación de Gráficas de Rendimiento (Visualización Científica en 300 DPI)
-El script `scripts/plot_metrics.py` procesa los datos empíricos de `metricas/gray_scott_benchmark.csv` y genera automáticamente 7 gráficos de calidad de publicación:
+El conjunto de herramientas de visualización genera estrictamente el estándar unificado de **8 figuras científicas** con calidad de publicación (300 DPI):
 
 ```bash
-# Generar el set completo de gráficas (usa automáticamente el entorno virtual venv):
+# Generar el set completo de las 8 figuras (usa automáticamente el entorno virtual venv):
+make plot_all
+
+# o para actualizar las figuras de benchmarking y escalabilidad:
 make graficas
-# o equivalentemente:
-make plot
 ```
 
-* **Visualizaciones exportadas en `metricas/graficas/`:*
-  1. **`01_tiempos_ejecucion_boxplot.png`**: Distribución de tiempos y diagramas de caja (Tukey boxplots) de las 200 corridas por modelo con badges flotantes que detallan explícitamente la media ($\mu$), los Intervalos de Confianza al 95% ($\text{IC}_{95\%}$), el Margen de Error ($ME$) y la desviación estándar ($\sigma$).
-  2. **`02_speedup_comparativo.png`**: Aceleración relativa ($S = T_{sec}/T_{par}$) frente a la línea base secuencial (1.0x).
-  3. **`03_eficiencia_paralela.png`**: Eficiencia porcentual ($E = S/p \times 100\%$) focalizada en los modelos concurrentes ($p \ge 8$).
-  4. **`04_comparativas_microarquitectonicas.png`**: Comparativa de 3 paneles aislando fenómenos de bajo nivel:
-     - *Panel A (SMT HW vs. SW - 16 hilos):* Penalización de sobre-suscripción por software (+22.4% más lento).
-     - *Panel B (Fine-Grained HW vs. Emulación SW):* Penalización de simulación secuencial por corutinas (+277.9% más lento).
-     - *Panel C (Localidad de Caché - 8 hilos HW):* Coarse-Grained vs Fine-Grained cíclico (+21.1% más lento).
-  5. **`05_dashboard_consolidado.png`**: Tablero general de 4 cuadrantes con tiempos, speedup, eficiencia y evolución temporal de las 200 repeticiones consecutivas.
-  6. **`06_perfilado_hardware_perf.png`**: Perfilado microarquitectónico con Linux `perf` (IPC, CPUs activas, fallos de caché L1/L2/LLC y giga-ciclos).
-  7. **`07_escalabilidad_hilos.png`**: Curvas de escalabilidad fuerte ($p \in \{1, 2, 4, 8, 16\}$ hilos) contrastadas con aceleración lineal ideal y Ley de Amdahl ($f = 98\%$), junto con la curva de degradación de eficiencia paralela.
+* **Visualizaciones exportadas en `metricas/graficas/`:**
+  1. **`01_tiempos_ejecucion_boxplot.png`**: Distribución de tiempos y diagramas de caja (Tukey boxplots) de las 200 corridas por modelo con medianas y medias indicadas.
+  2. **`02_speedup_comparativo.png`**: Aceleración relativa ($S = T_{\text{sec}}/T_{\text{par}}$) con barras de error de Intervalos de Confianza al 95% ($\text{IC}_{95}$) y línea base secuencial (1.0x).
+  3. **`03_eficiencia_paralela.png`**: Eficiencia porcentual ($E = \frac{S_p}{p} \times 100$\%) con línea ideal (100%) y umbral típico (50%).
+  4. **`04_escalabilidad_hilos.png`**: Curvas de escalabilidad fuerte ($p \in \{1, 2, 4, 8, 16\}$ hilos) contrastadas con aceleración lineal ideal ($S(p) = p$) y curvas teóricas de la Ley de Amdahl (90%, 95%, 98%), con etiquetas anti-colisión en $p=16$.
+  5. **`05_perf_ipc_comparativo.png`**: Instrucciones retiradas por ciclo de reloj (IPC) de hardware medido con `perf stat` (promedio de 3 corridas).
+  6. **`06_perf_cache_miss_rates.png`**: Análisis de la jerarquía de memoria en dos paneles: Tasa de fallos en L1 Data Cache (%) y en Last-Level Cache (L3/LLC %).
+  7. **`07_perf_context_switches.png`**: Sobrecarga de cambios de contexto del sistema operativo (`context-switches`) por modelo.
+  8. **`08_dashboard_consolidado.png`**: Tablero general multipanel (2x2) que consolida: (A) Tiempos medios con IC 95%, (B) Speedup relativo, (C) Eficiencia paralela, (D) Coeficiente de variación ($CV = \sigma/\mu$, jitter e inestabilidad).
+  9. **`09_throughput_mupdates.png`**: Rendimiento computacional medido en Millones de Celdas actualizadas por segundo (MUpdates/s).
+  10. **`10_perf_resumen_microarquitectura.png`**: Tablero integral multipanel (2x2) de microarquitectura con contadores PMU: (A) IPC, (B) Tasa de fallos L1-D, (C) Tasa de fallos LLC, (D) Conmutaciones de contexto del kernel.
 
 ---
 
@@ -261,40 +260,52 @@ make run_fine_video       # Genera: videos/gray-scott-fine.mp4
 Permite analizar de forma explícita el comportamiento del pipeline, la contención en el subsistema de memoria y la concurrencia bajo SMT y los distintos modelos mediante contadores de rendimiento de hardware (PMU):
 
 ```bash
-# Desde la carpeta scripts/:
-make profile
-# o equivalentemente:
-make perfilado
+# Habilitar contadores PMU sin requerir root en cada comando:
+make setup_perf
+
+# Ejecución completa de perfilado (3 corridas por modelo para promedio):
+make profile_perf
+
+# Prueba rápida de perfilado (1 corrida por modelo):
+make profile_fast
+
+# Regenerar figuras 05, 06 y 07 directamente desde CSV sin invocar perf:
+make profile_plot
 ```
 
-* **Contadores evaluados:**
-  * **Ciclos de CPU e Instrucciones:** Cálculo del IPC (*Instructions Per Cycle*).
-  * **Saturación de CPU:** CPUs equivalentes activas ($\text{task-clock} / \text{tiempo real}$) para evidenciar el nivel de paralelismo real.
-  * **Jerarquía de Memoria:** Referencias y fallos de caché (`cache-references`, `cache-misses`, *cache miss rate* %) que justifican la diferencia entre Coarse-Grained y Fine-Grained.
-  * **Comportamiento del Kernel:** Cambios de contexto del SO (`context-switches`) y migraciones de CPU (`cpu-migrations`).
-
 * **Archivos generados:**
-  * `metricas/perf_hardware_counters.csv`: Tabla cuantitativa con todas las métricas de hardware extraídas por modelo.
-  * `metricas/graficas/06_perfilado_hardware_perf.png`: Gráfica científica de 4 cuadrantes con análisis de IPC, saturación de núcleos, tasa de fallos de caché y ciclos totales.
+  * `metricas/gray_scott_perf_metrics.csv`: Tabla cuantitativa con métricas de hardware extraídas por modelo (promedio de 3 corridas).
+  * `metricas/graficas/05_perf_ipc_comparativo.png`: Instrucciones retiradas por ciclo (IPC).
+  * `metricas/graficas/06_perf_cache_miss_rates.png`: Tasas de fallos en L1-D y LLC/L3 en doble panel.
+  * `metricas/graficas/07_perf_context_switches.png`: Cambios de contexto del sistema operativo.
 
 ---
 
-### 3.8 Estudio de Escalabilidad Fuerte (Strong Scaling) y Ley de Amdahl
-Evalúa la métrica (d) del enunciado oficial realizando un barrido sistemático del número de hilos de ejecución ($p \in \{1, 2, 4, 8, 16\}$) sobre una grilla constante de $512 \times 512$ y $16{,}000$ pasos temporales:
+### 3.8 Estudio de Escalabilidad Fuerte (Strong Scaling) y Validación Rápida
+Evalúa la escalabilidad realizando un barrido sistemático del número de hilos de ejecución ($p \in \{1, 2, 4, 8, 16\}$) sobre una grilla constante de $512 \times 512$ y $16{,}000$ pasos temporales:
 
 ```bash
-# Desde la carpeta scripts/:
+# Campaña formal completa de escalabilidad (200 corridas por hilo = 1,000 corridas en total):
 make scalability
-# o con parámetros personalizados (ej. 10 corridas por punto):
-make scalability RUNS_SCALING=10 THREADS_SCALING="1,2,4,8,16"
+
+# Prueba rápida de escalabilidad (3 corridas por hilo):
+make scalability_fast
+
+# Solo graficar figura 04 desde el CSV existente:
+make scalability_plot
+
+# Smoke test completo rápido (valida las 8 figuras de punta a punta con pocas corridas):
+make campaign_smoke
+
+# Campaña experimental completa de 200 corridas (200 corridas modelo + 1,000 corridas escalabilidad + perfilado):
+make campaign_200
 ```
 
 * **Modelos evaluados:** CMP, SMT (HW Real), Coarse-Grained y Fine-Grained (Paralelo Cíclico).
-* **Contraste teórico:** Aceleración Lineal Ideal ($S = p$) y Ley de Amdahl ($S(p) = \frac{1}{(1-f) + f/p}$) con fracción paralelizable estimada $f = 98\%$.
+* **Contraste teórico:** Aceleración Lineal Ideal ($S = p$) y Ley de Amdahl ($S(p) = \frac{1}{(1-f) + f/p}$) con fracciones paralelizable estimadas (90%, 95%, 98%).
 * **Archivos generados:**
-  * `metricas/escalabilidad_hilos.csv`: Resumen estadístico (media, mediana, speedup, eficiencia y referencias teóricas por hilo).
-  * `metricas/escalabilidad_hilos_crudo.csv`: Datos crudos corrida a corrida para trazabilidad.
-  * `metricas/graficas/07_escalabilidad_hilos.png`: Visualización de doble panel (Speedup vs. Hilos y Eficiencia Paralela vs. Hilos).
+  * `metricas/gray_scott_strong_scaling.csv`: Resumen cuantitativo de escalabilidad (compatible con `raytracing_strong_scaling.csv`).
+  * `metricas/graficas/04_escalabilidad_hilos.png`: Visualización con curvas de Amdahl y etiquetas anti-colisión en $p=16$.
 
 ---
 
@@ -311,17 +322,17 @@ proyecto1/
         ├── SMT/                # Variante para hilos simultáneos (HW real y sobre-suscripción SW)
         ├── docs/               # Documentación formal para evaluación
         ├── metricas/           # Salida de benchmarking y reproducibilidad experimental
-        │   ├── gray_scott_benchmark.csv    # Datos crudos de las 200 corridas estadísticas
-        │   ├── resumen_estadistico.csv     # Estadísticas agregadas con IC 95% (Media, StdDev, Margen Error)
-        │   ├── perf_hardware_counters.csv  # Contadores de hardware Linux PMU (IPC, ciclos, fallos caché)
-        │   ├── escalabilidad_hilos.csv     # Barrido de escalabilidad fuerte (p = 1, 2, 4, 8, 16)
-        │   └── graficas/                   # Visualizaciones comparativas 300 DPI (01 a 07)
+        │   ├── gray_scott_benchmark.csv        # Datos crudos de las corridas estadísticas
+        │   ├── resumen_estadistico.csv         # Estadísticas agregadas con IC 95% (Media, StdDev, Margen Error)
+        │   ├── gray_scott_perf_metrics.csv     # Contadores PMU Linux (IPC, ciclos, fallos caché, CS)
+        │   ├── gray_scott_strong_scaling.csv   # Barrido de escalabilidad fuerte (p = 1, 2, 4, 8, 16)
+        │   └── graficas/                       # Visualizaciones comparativas 300 DPI (01 a 08)
         ├── include/            # Encabezados del núcleo de reacción-difusión
         ├── scripts/            # Automatización de compilación y pruebas
         │   ├── benchmark.py    # Script maestro de benchmarking estadístico (200 corridas)
-        │   ├── profile_perf.py # Script de perfilado microarquitectónico con Linux perf
-        │   ├── scalability.py  # Script de barrido de escalabilidad fuerte
-        │   ├── plot_metrics.py # Generador integral de todas las figuras (01 a 07)
+        │   ├── profile_perf.py # Script de perfilado microarquitectónico con Linux perf (figuras 05, 06, 07)
+        │   ├── scalability.py  # Script de barrido de escalabilidad fuerte (figura 04)
+        │   ├── plot_metrics.py # Generador integral de figuras (01, 02, 03, 04, 08)
         │   └── Makefile        # Reglas para ejecución, videos, perfiles y benchmarks
         ├── sequential/         # Baseline de comparación secuencial
         ├── src/                # Implementación matemática del stencil FTCS

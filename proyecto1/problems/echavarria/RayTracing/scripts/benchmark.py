@@ -166,6 +166,8 @@ def parsear_argumentos():
                         help="Incluir SMT con apagado real en kernel (requiere sudo)")
     parser.add_argument("--strong-scaling", action="store_true", default=False,
                         help="Ejecutar barrido adicional de escalabilidad fuerte (p = 1, 2, 4, 8, 16 hilos)")
+    parser.add_argument("--scaling-runs", type=int, default=None,
+                        help="Cantidad de corridas por punto de hilos en strong scaling (defecto: igual a --runs)")
 
     # Archivos de salida
     parser.add_argument("--output-csv", type=str, default="../metricas/raytracing_benchmark.csv",
@@ -492,7 +494,7 @@ def main():
         print("           BARRIDO DE ESCALABILIDAD FUERTE (LEY DE AMDAHL)                    ")
         print("==============================================================================")
         hilos_sweep = [1, 2, 4, 8, 16]
-        scaling_runs = min(10, args.runs)
+        scaling_runs = args.scaling_runs if args.scaling_runs is not None else args.runs
         print(f"Hilos a evaluar    : {hilos_sweep}")
         print(f"Corridas por punto : {scaling_runs}")
         print(f"Archivo de Salida  : {scaling_output_path}\n")

@@ -9,12 +9,12 @@ Autor: Emanuel Chavarría
 
 Genera figuras científicas en alta resolución (300 DPI) a partir de los datos
 experimentales recolectados por benchmark.py:
-  1. Boxplot de distribución de tiempos de ejecución (ms) por modelo.
-  2. Gráfico de barras de Speedup con barras de error de Intervalo de Confianza (95%).
-  3. Gráfico de Eficiencia Paralela (%) con línea de referencia ideal (100%).
-  4. Comparativa microarquitectónica dual (SMT Real vs SW, Coarse vs Fine).
-  5. Dashboard científico consolidado (2x2 paneles ejecutivos).
-  6. Escalabilidad Fuerte (Strong Scaling) vs Ley de Amdahl (si existe el archivo).
+  01_tiempos_ejecucion_boxplot.png          - Boxplot de distribución de tiempos (ms) por modelo.
+  02_speedup_comparativo.png                - Gráfico de barras de Speedup con IC 95%.
+  03_eficiencia_paralela.png                - Eficiencia Paralela (%) con línea ideal (100%).
+  04_escalabilidad_hilos.png                - Escalabilidad Fuerte (Strong Scaling) vs Ley de Amdahl.
+  08_dashboard_consolidado.png              - Dashboard científico consolidado (2x2 multipanel).
+  09_comparativas_microarquitectonicas.png  - Comparativa dual (SMT HW vs SW, Coarse vs Fine).
 """
 
 import os
@@ -35,7 +35,10 @@ from matplotlib.ticker import MultipleLocator, FormatStrFormatter
 # ==============================================================================
 # CONFIGURACIÓN ESTÉTICA Y PALETA CIENTÍFICA
 # ==============================================================================
+plt.style.use("seaborn-v0_8-whitegrid" if "seaborn-v0_8-whitegrid" in plt.style.available else "default")
 plt.rcParams.update({
+    "font.family": "sans-serif",
+    "font.sans-serif": ["DejaVu Sans", "Helvetica", "Arial"],
     "font.size": 11,
     "axes.titlesize": 13,
     "axes.titleweight": "bold",
@@ -56,13 +59,13 @@ plt.rcParams.update({
 })
 
 PALETA_MODELOS = {
-    "Secuencial": "#5c6b73",                          # Gris pizarra
+    "Secuencial": "#64748b",                          # Slate Gray
     "CMP": "#1f77b4",                                 # Azul institucional
-    "SMT (HW Real)": "#2ca02c",                       # Verde esmeralda
-    "SMT (Sobre-suscripción SW)": "#e377c2",          # Magenta suave
-    "Coarse-Grained": "#9467bd",                      # Púrpura
-    "Fine-Grained (Paralelo Cíclico)": "#17becf",      # Cian / Turquesa
-    "Fine-Grained (Cooperativo)": "#d62728",          # Rojo óxido
+    "SMT (HW Real)": "#059669",                       # Verde esmeralda
+    "SMT (Sobre-suscripción SW)": "#d97706",          # Ámbar / Naranja
+    "Coarse-Grained": "#7c3aed",                      # Púrpura
+    "Fine-Grained (Paralelo Cíclico)": "#0891b2",      # Teal / Cian
+    "Fine-Grained (Cooperativo)": "#e11d48",          # Carmesí
 }
 
 ORDEN_CANONICO = [
@@ -558,20 +561,20 @@ def main():
     p3 = os.path.join(args.output_dir, "03_eficiencia_paralela.png")
     graficar_eficiencia(resumen, p3)
 
-    # 4. Comparativas Microarquitectónicas
-    p4 = os.path.join(args.output_dir, "04_comparativas_microarquitectonicas.png")
-    graficar_comparativas_microarquitectonicas(resumen, p4)
-
-    # 5. Dashboard Consolidado
-    p5 = os.path.join(args.output_dir, "05_dashboard_consolidado.png")
-    graficar_dashboard_consolidado(resumen, p5)
-
-    # 6. Strong Scaling (si existe)
-    p6 = os.path.join(args.output_dir, "06_strong_scaling_amdahl.png")
+    # 4. Escalabilidad de Hilos (Strong Scaling vs Ley de Amdahl)
+    p4 = os.path.join(args.output_dir, "04_escalabilidad_hilos.png")
     if os.path.exists(args.scaling_csv):
-        graficar_strong_scaling_amdahl(args.scaling_csv, p6)
+        graficar_strong_scaling_amdahl(args.scaling_csv, p4)
     else:
         print("  [-] Info: Archivo de Strong Scaling no detectado. Para generarlo ejecute 'make benchmark_scaling'.")
+
+    # 8. Dashboard Consolidado Ejecutivo (Multipanel 2x2)
+    p8 = os.path.join(args.output_dir, "08_dashboard_consolidado.png")
+    graficar_dashboard_consolidado(resumen, p8)
+
+    # 9. Comparativas Microarquitectónicas Duales (Especializada)
+    p9 = os.path.join(args.output_dir, "09_comparativas_microarquitectonicas.png")
+    graficar_comparativas_microarquitectonicas(resumen, p9)
 
     print("\n==============================================================================")
     print(f"[OK] Generación completada con éxito. Gráficas guardadas en:\n  -> {os.path.abspath(args.output_dir)}")

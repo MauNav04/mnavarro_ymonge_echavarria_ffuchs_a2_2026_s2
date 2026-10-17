@@ -19,9 +19,9 @@ Mide contadores de hardware del procesador (PMU) y del sistema operativo:
 Genera:
   - Archivo CSV consolidado: metricas/raytracing_perf_metrics.csv
   - Gráficas científicas a 300 DPI:
-      07_perf_ipc_comparativo.png
-      08_perf_cache_miss_rates.png
-      09_perf_context_switches.png
+      05_perf_ipc_comparativo.png
+      06_perf_cache_miss_rates.png
+      07_perf_context_switches.png
       10_perf_resumen_microarquitectura.png
 """
 
@@ -45,7 +45,10 @@ import matplotlib.pyplot as plt
 # ==============================================================================
 # CONFIGURACIÓN ESTÉTICA
 # ==============================================================================
+plt.style.use("seaborn-v0_8-whitegrid" if "seaborn-v0_8-whitegrid" in plt.style.available else "default")
 plt.rcParams.update({
+    "font.family": "sans-serif",
+    "font.sans-serif": ["DejaVu Sans", "Helvetica", "Arial"],
     "font.size": 11,
     "axes.titlesize": 13,
     "axes.titleweight": "bold",
@@ -66,13 +69,13 @@ plt.rcParams.update({
 })
 
 PALETA_MODELOS = {
-    "Secuencial": "#5c6b73",
-    "CMP": "#1f77b4",
-    "SMT (HW Real)": "#2ca02c",
-    "SMT (Sobre-suscripción SW)": "#e377c2",
-    "Coarse-Grained": "#9467bd",
-    "Fine-Grained (Paralelo Cíclico)": "#17becf",
-    "Fine-Grained (Cooperativo)": "#d62728",
+    "Secuencial": "#64748b",                          # Slate Gray
+    "CMP": "#1f77b4",                                 # Azul institucional
+    "SMT (HW Real)": "#059669",                       # Verde esmeralda
+    "SMT (Sobre-suscripción SW)": "#d97706",          # Ámbar / Naranja
+    "Coarse-Grained": "#7c3aed",                      # Púrpura
+    "Fine-Grained (Paralelo Cíclico)": "#0891b2",      # Teal / Cian
+    "Fine-Grained (Cooperativo)": "#e11d48",          # Carmesí
 }
 
 ORDEN_CANONICO = [
@@ -494,13 +497,13 @@ def main():
                     "page_faults": float(row["page_faults"]),
                 }
 
-        p_ipc = os.path.join(args.output_dir, "07_perf_ipc_comparativo.png")
+        p_ipc = os.path.join(args.output_dir, "05_perf_ipc_comparativo.png")
         graficar_ipc(metricas_consolidadas, p_ipc)
 
-        p_cache = os.path.join(args.output_dir, "08_perf_cache_miss_rates.png")
+        p_cache = os.path.join(args.output_dir, "06_perf_cache_miss_rates.png")
         graficar_cache_miss_rates(metricas_consolidadas, p_cache)
 
-        p_cs = os.path.join(args.output_dir, "09_perf_context_switches.png")
+        p_cs = os.path.join(args.output_dir, "07_perf_context_switches.png")
         graficar_context_switches(metricas_consolidadas, p_cs)
 
         p_dash = os.path.join(args.output_dir, "10_perf_resumen_microarquitectura.png")
@@ -636,13 +639,13 @@ def main():
     print("==============================================================================")
     print("                 GENERANDO GRÁFICAS DE MICROARQUITECTURA                      ")
     print("==============================================================================")
-    p_ipc = os.path.join(args.output_dir, "07_perf_ipc_comparativo.png")
+    p_ipc = os.path.join(args.output_dir, "05_perf_ipc_comparativo.png")
     graficar_ipc(metricas_consolidadas, p_ipc)
 
-    p_cache = os.path.join(args.output_dir, "08_perf_cache_miss_rates.png")
+    p_cache = os.path.join(args.output_dir, "06_perf_cache_miss_rates.png")
     graficar_cache_miss_rates(metricas_consolidadas, p_cache)
 
-    p_cs = os.path.join(args.output_dir, "09_perf_context_switches.png")
+    p_cs = os.path.join(args.output_dir, "07_perf_context_switches.png")
     graficar_context_switches(metricas_consolidadas, p_cs)
 
     p_dash = os.path.join(args.output_dir, "10_perf_resumen_microarquitectura.png")

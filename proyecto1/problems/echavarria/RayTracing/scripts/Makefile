@@ -197,16 +197,28 @@ verify_fine: $(TARGET_FINE)
 verify_fine_parallel: verify_fine
 
 # ==============================================================================
-# CAMPAÑA DE BENCHMARKING EXPERIMENTAL (Python Suite)
-# ==============================================================================
+# Variables de campaña experimental
+RUNS ?= 200
+SCALING_RUNS ?= 200
+
+# Campaña experimental completa de 200 corridas (Modelos + Barrido de Hilos)
+campaign_200: all
+	python3 benchmark.py --runs $(RUNS) --scaling-runs $(SCALING_RUNS) --width $(WIDTH) --samples $(SAMPLES) --depth $(DEPTH) --cooldown 0.15 --strong-scaling
+	$(MAKE) plot_all
+
+# Prueba de humo / desarrollo rápido (5 corridas para verificar que todo corra y grafique)
+campaign_smoke: all
+	python3 benchmark.py --runs 5 --scaling-runs 5 --width $(WIDTH) --samples $(SAMPLES) --depth $(DEPTH) --cooldown 0.05 --strong-scaling
+	$(MAKE) plot_all
+
 benchmark_fast: all
 	python3 benchmark.py --runs 5 --width $(WIDTH) --samples $(SAMPLES) --depth $(DEPTH) --cooldown 0.05
 
 benchmark_full: all
-	python3 benchmark.py --runs 200 --width $(WIDTH) --samples $(SAMPLES) --depth $(DEPTH) --cooldown 0.15
+	python3 benchmark.py --runs $(RUNS) --width $(WIDTH) --samples $(SAMPLES) --depth $(DEPTH) --cooldown 0.15
 
 benchmark_scaling: all
-	python3 benchmark.py --runs 10 --width $(WIDTH) --samples $(SAMPLES) --depth $(DEPTH) --strong-scaling
+	python3 benchmark.py --runs 10 --scaling-runs $(SCALING_RUNS) --width $(WIDTH) --samples $(SAMPLES) --depth $(DEPTH) --strong-scaling
 
 benchmark_scalling: benchmark_scaling
  
@@ -214,6 +226,8 @@ plot_metrics:
 	python3 plot_metrics.py
 
 plot: plot_metrics
+
+plot_all: plot_metrics profile_plot
  
 # ==============================================================================
 # PERFILADO MICROARQUITECTÓNICO DE HARDWARE (Linux perf / PMU)

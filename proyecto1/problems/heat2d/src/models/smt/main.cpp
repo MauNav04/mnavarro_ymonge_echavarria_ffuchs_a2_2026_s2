@@ -204,13 +204,24 @@ int main(
                 )
                 : availableLogicalCpus;
 
+        const std::size_t physicalCores =
+            heat2d::smt::physicalCoreCount(
+                topology
+            );
+
+        const std::size_t maxSupported =
+            std::max(
+                availableLogicalCpus,
+                physicalCores * 4
+            );
+
         if (
             requestedThreads >
-            availableLogicalCpus
+            maxSupported
         ) {
             throw std::invalid_argument(
-                "Requested SMT worker count exceeds the logical CPUs "
-                "available to this process."
+                "Requested SMT worker count exceeds maximum supported threads (" +
+                std::to_string(maxSupported) + ")."
             );
         }
 
@@ -224,6 +235,16 @@ int main(
         printTopology(
             topology
         );
+
+        const bool isHardwareSmt =
+            heat2d::smt::smtAvailable(topology) && requestedThreads <= availableLogicalCpus;
+
+        std::cout
+            << "Mode: "
+            << (isHardwareSmt
+                    ? "Hardware SMT Real (SMT ON)"
+                    : "Software Oversubscription (SMT OFF)")
+            << '\n';
 
         std::cout
             << "\n--- Simulation Configuration ---\n";
@@ -346,6 +367,9 @@ int main(
 
         smtConfig.threadCount =
             requestedThreads;
+
+        smtConfig.allowOversubscription =
+            true;
 
         const auto start =
             std::chrono::steady_clock::now();

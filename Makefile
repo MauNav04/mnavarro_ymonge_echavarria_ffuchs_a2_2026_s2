@@ -1039,8 +1039,33 @@ campaign-run: release python-deps
 	@echo
 
 # ============================================================
-# perf - software events
+# Heat2D Standardized Canonical Benchmarking Targets
 # ============================================================
+
+# Mini-prueba de desarrollo rápido (3 corridas por modelo, ~10 segundos)
+smoke-heat2d: release
+	python3 $(SCRIPTS)/benchmark_canonical.py --runs 3
+
+# Campaña experimental formal completa (200 corridas por modelo, ~3 minutos)
+campaign-200-heat2d: release
+	python3 $(SCRIPTS)/benchmark_canonical.py --runs 200
+
+# Perfilado microarquitectónico con Linux perf (3 corridas por modelo)
+profile-perf-heat2d: release
+	python3 $(SCRIPTS)/profile_perf.py --runs 3
+
+# Regenerar todas las gráficas estandarizadas a partir de los CSV en metricas/
+plot-heat2d:
+	python3 $(SCRIPTS)/plot_benchmark.py \
+		$(HEAT2D)/metricas/resumen_estadistico.csv \
+		--raw $(HEAT2D)/metricas/heat2d_benchmark.csv \
+		--output-dir $(HEAT2D)/metricas/graficas
+	python3 $(SCRIPTS)/profile_perf.py --plot-only
+
+plot-heat2d-200: plot-heat2d
+
+profile-plot-heat2d:
+	python3 $(SCRIPTS)/profile_perf.py --plot-only
 
 perf-soft-seq: $(SEQ_BIN)
 	sudo perf stat \

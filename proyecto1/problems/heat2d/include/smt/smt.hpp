@@ -19,6 +19,7 @@ namespace heat2d::smt {
  */
 struct SmtConfig {
     std::size_t threadCount{1};
+    bool allowOversubscription{false};
 };
 
 
