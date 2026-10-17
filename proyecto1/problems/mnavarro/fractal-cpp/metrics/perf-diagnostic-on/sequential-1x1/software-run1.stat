@@ -1,0 +1,5 @@
+# started on Fri Oct 16 19:07:38 2026
+
+6;;context-switches;328783767;100.00;;
+5;;cpu-migrations;328783767;100.00;;
+4646;;page-faults;328783767;100.00;;
