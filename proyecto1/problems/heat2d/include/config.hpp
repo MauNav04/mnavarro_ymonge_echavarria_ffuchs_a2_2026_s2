@@ -20,15 +20,15 @@ struct SimulationConfig {
 
     double lengthY = 1.0;  // Longitud física de la superficie sobre el eje Y, expresada en metros.
 
-    std::size_t rows = 101;  // Cantidad total de puntos discretos utilizados sobre el eje Y.
+    std::size_t rows = 801;  // Cantidad total de puntos discretos utilizados sobre el eje Y.
 
-    std::size_t cols = 101;  // Cantidad total de puntos discretos utilizados sobre el eje X.
+    std::size_t cols = 801;  // Cantidad total de puntos discretos utilizados sobre el eje X.
 
     double alpha = 0.05;  // Difusividad térmica utilizada por el modelo de difusión.
 
-    double dt = 0.0001;  // Tamaño de cada paso temporal, expresado en segundos.
+    double dt = 0.000005;  // Tamaño de cada paso temporal, expresado en segundos (estabilidad CFL).
 
-    double totalTime = 0.1;  // Tiempo físico total que se desea simular, expresado en segundos.
+    double totalTime = 0.005;  // Tiempo físico total para 1000 pasos (0.005 / 0.000005 = 1000).
 
     double maxTemperature = 100.0;  // Temperatura máxima de la distribución sinusoidal inicial.
 

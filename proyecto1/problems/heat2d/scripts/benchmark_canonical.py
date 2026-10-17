@@ -30,12 +30,12 @@ import argparse
 import subprocess
 from pathlib import Path
 
-# Dimensiones estándar del problema
-DEFAULT_ROWS = 101
-DEFAULT_COLS = 101
+# Dimensiones estándar del problema (801 x 801, estabilidad CFL dt=5e-6)
+DEFAULT_ROWS = 801
+DEFAULT_COLS = 801
 DEFAULT_STEPS = 1000
 DEFAULT_ALPHA = 0.05
-DEFAULT_DT = 0.0001
+DEFAULT_DT = 0.000005
 
 # Actualizaciones de celda interiores por corrida: (rows-2)*(cols-2)*steps = 99 * 99 * 1000 = 9,801,000
 CELL_UPDATES = (DEFAULT_ROWS - 2) * (DEFAULT_COLS - 2) * DEFAULT_STEPS

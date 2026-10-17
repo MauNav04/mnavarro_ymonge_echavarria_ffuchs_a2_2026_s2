@@ -68,8 +68,7 @@ proyecto1/problems/heat2d/benchmark_results/*
 # Generated benchmark executables / temporary CSVs
 heat2d_benchmark
 benchmark_test.csv
-benchmark_test_summary.csv
-heat2d_benchmark.csv
+# heat2d_benchmark.csv (permitido en metricas/)
 
 # perf profiling output
 perf.data
