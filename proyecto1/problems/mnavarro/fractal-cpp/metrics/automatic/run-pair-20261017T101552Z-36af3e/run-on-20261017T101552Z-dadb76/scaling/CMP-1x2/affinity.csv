@@ -1,0 +1,7 @@
+profile,channel,worker,team,cpu,socket,core,observed_before,observed_after
+target,0,0,0,0,0,0,0,0
+target,0,1,0,2,0,1,2,2
+target,1,0,0,0,0,0,0,0
+target,1,1,0,2,0,1,2,2
+target,2,0,0,0,0,0,0,0
+target,2,1,0,2,0,1,2,2

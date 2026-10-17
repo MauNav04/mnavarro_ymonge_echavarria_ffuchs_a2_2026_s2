@@ -1,0 +1,2 @@
+model,teams,threads_per_team,threads,quantum,range,stride,width,height,channels,time_ms,turns,scheduler_switches,stalls,frc_bytes
+coarse-grained,1,1,1,1,8,8,128,128,3,280.57239699999997,1147,0,379,13080

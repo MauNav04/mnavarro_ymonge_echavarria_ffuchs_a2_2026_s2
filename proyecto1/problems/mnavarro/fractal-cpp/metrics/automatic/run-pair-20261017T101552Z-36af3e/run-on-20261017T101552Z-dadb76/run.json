@@ -1,0 +1,14 @@
+{
+  "success": true,
+  "directory": "/home/emalinux/Desktop/TEC_2026_II/Arqui2/Proyecto1/mnavarro_ymonge_echavarria_ffuchs_a2_2026_s2/proyecto1/problems/mnavarro/fractal-cpp/metrics/automatic/run-pair-20261017T101552Z-36af3e/run-on-20261017T101552Z-dadb76",
+  "action": "run",
+  "smt_state": "on",
+  "input": "/home/emalinux/Desktop/TEC_2026_II/Arqui2/Proyecto1/mnavarro_ymonge_echavarria_ffuchs_a2_2026_s2/proyecto1/problems/mnavarro/fractal-cpp/assets/color128.png",
+  "measurement_kind": "physical",
+  "completed": [
+    "preflight",
+    "benchmark",
+    "scaling",
+    "perf"
+  ]
+}

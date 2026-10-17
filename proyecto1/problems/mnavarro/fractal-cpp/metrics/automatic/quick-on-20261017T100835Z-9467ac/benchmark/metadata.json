@@ -1,0 +1,113 @@
+{
+  "schema": 1,
+  "success": true,
+  "campaign_id": "c5aa03fae2804d48a83d758f0a694689",
+  "measurement_kind": "diagnostic",
+  "state_verified": true,
+  "runs": 5,
+  "warmups": 1,
+  "cooldown": 0.15,
+  "smt_state": "on",
+  "experiment": "benchmark",
+  "excluded": [],
+  "configurations": [
+    [
+      "sequential",
+      1,
+      1
+    ],
+    [
+      "fine-grained",
+      4,
+      2
+    ],
+    [
+      "coarse-grained",
+      4,
+      2
+    ],
+    [
+      "CMP",
+      4,
+      2
+    ],
+    [
+      "SMT",
+      4,
+      4
+    ]
+  ],
+  "input_sha256": "cdd3f04ec5f8a330e0a58549485e2d9a4126cce1e69921c5c58f6130b63a0035",
+  "range": 8,
+  "stride": 8,
+  "gray": false,
+  "quantum": 1,
+  "machine_sha256": "920092c0781b912b2ff4aa1270ef3438767d7cd56ede995cf1b64a49ddc13ae6",
+  "kernel": "6.17.0-41-generic",
+  "binaries_sha256": {
+    "sequential": "b5a343535022b0065bf19093090147463ace86579ad1a27411b0456f5672210a",
+    "fine-grained": "2b8278ca1b204ec86967e37e1cad7e1dc94d552338b042f02e6086cf93e62708",
+    "coarse-grained": "e5d4ff1d6cb2ad996e7d80a5c607209f567c4689f810b8d858abc4d94e85b296",
+    "CMP": "635144b5a4a22dceb6cde49cd1c7e95ee8011aa7e9e5cda62ecd01499526919b",
+    "SMT": "0cf681df62029f4bed1f0880ee397f273900ea65b8887042bdd3a9b5c18f09e9"
+  },
+  "build_flags": [
+    "CMAKE_BUILD_TYPE:STRING=Release",
+    "CMAKE_CXX_COMPILER:FILEPATH=/usr/bin/c++",
+    "CMAKE_CXX_FLAGS:STRING=",
+    "CMAKE_CXX_FLAGS_RELEASE:STRING=-O3 -DNDEBUG"
+  ],
+  "os_release": "PRETTY_NAME=\"Ubuntu 25.10\"\nNAME=\"Ubuntu\"\nVERSION_ID=\"25.10\"\nVERSION=\"25.10 (Questing Quokka)\"\nVERSION_CODENAME=questing\nID=ubuntu\nID_LIKE=debian\nHOME_URL=\"https://www.ubuntu.com/\"\nSUPPORT_URL=\"https://help.ubuntu.com/\"\nBUG_REPORT_URL=\"https://bugs.launchpad.net/ubuntu/\"\nPRIVACY_POLICY_URL=\"https://www.ubuntu.com/legal/terms-and-policies/privacy-policy\"\nUBUNTU_CODENAME=questing\nLOGO=ubuntu-logo\n",
+  "script_sha256": "9b6b324b99dd067e999273e992072e7fbcb1f83b849fa2d240798a5d3fca210f",
+  "CMP_topology": "environment=native-or-unknown profile=target distribution=ubuntu online_cpus=16 online_cores=8 allowed_cores=8\nprocessor= AMD Ryzen 7 7730U with Radeon Graphics\nlogical_cpu,socket,core\n0,0,0\n2,0,1\n4,0,2\n6,0,3\n8,0,4\n10,0,5\n12,0,6\n14,0,7\n",
+  "SMT_topology": "environment=native-or-unknown profile=target distribution=ubuntu online_cpus=16 online_cores=8 allowed_cores=8 smt_control=on smt_active=1\nprocessor= AMD Ryzen 7 7730U with Radeon Graphics\nlogical_cpu,socket,core\n0,0,0\n1,0,0\n2,0,1\n3,0,1\n4,0,2\n5,0,2\n6,0,3\n7,0,3\n8,0,4\n9,0,4\n10,0,5\n11,0,5\n12,0,6\n13,0,6\n14,0,7\n15,0,7\n",
+  "topology": {
+    "control": "on",
+    "active": "1",
+    "online": "0-15",
+    "allowed": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ]
+  },
+  "governors": {
+    "cpu0": "powersave",
+    "cpu1": "powersave",
+    "cpu10": "powersave",
+    "cpu11": "powersave",
+    "cpu12": "powersave",
+    "cpu13": "powersave",
+    "cpu14": "powersave",
+    "cpu15": "powersave",
+    "cpu2": "powersave",
+    "cpu3": "powersave",
+    "cpu4": "powersave",
+    "cpu5": "powersave",
+    "cpu6": "powersave",
+    "cpu7": "powersave",
+    "cpu8": "powersave",
+    "cpu9": "powersave"
+  },
+  "boost": "1",
+  "image_dimensions": [
+    128,
+    128,
+    3
+  ],
+  "measured_rows": 25,
+  "reference_sha256": "96fbcfa5b94c9a6cfa33c587eee7e027115d3e098c80095ce95049366e944ba0"
+}

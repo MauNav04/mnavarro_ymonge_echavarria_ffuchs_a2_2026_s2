@@ -1,0 +1,2 @@
+model,teams,threads_per_team,threads,quantum,range,stride,width,height,channels,time_ms,turns,scheduler_switches,stalls,frc_bytes
+sequential,1,1,1,1,8,8,128,128,3,274.46794899999998,0,0,0,13080

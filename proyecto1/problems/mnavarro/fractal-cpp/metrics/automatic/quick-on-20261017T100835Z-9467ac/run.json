@@ -1,0 +1,16 @@
+{
+  "success": true,
+  "directory": "/home/emalinux/Desktop/TEC_2026_II/Arqui2/Proyecto1/mnavarro_ymonge_echavarria_ffuchs_a2_2026_s2/proyecto1/problems/mnavarro/fractal-cpp/metrics/automatic/quick-on-20261017T100835Z-9467ac",
+  "action": "quick",
+  "smt_state": "on",
+  "input": "/home/emalinux/Desktop/TEC_2026_II/Arqui2/Proyecto1/mnavarro_ymonge_echavarria_ffuchs_a2_2026_s2/proyecto1/problems/mnavarro/fractal-cpp/assets/color128.png",
+  "measurement_kind": "diagnostic",
+  "completed": [
+    "preflight",
+    "benchmark",
+    "scaling",
+    "perf"
+  ],
+  "report": "/home/emalinux/Desktop/TEC_2026_II/Arqui2/Proyecto1/mnavarro_ymonge_echavarria_ffuchs_a2_2026_s2/proyecto1/problems/mnavarro/fractal-cpp/metrics/reports/diagnostic-20261017T101007Z-901c80",
+  "archive": "/home/emalinux/Desktop/TEC_2026_II/Arqui2/Proyecto1/mnavarro_ymonge_echavarria_ffuchs_a2_2026_s2/proyecto1/problems/mnavarro/fractal-cpp/results/exports/diagnostic-20261017T101007Z-901c80.zip"
+}

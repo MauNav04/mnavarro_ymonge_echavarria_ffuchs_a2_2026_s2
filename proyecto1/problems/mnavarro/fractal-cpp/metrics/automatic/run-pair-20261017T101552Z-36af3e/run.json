@@ -1,0 +1,14 @@
+{
+  "success": true,
+  "states": [
+    "on",
+    "off"
+  ],
+  "smt_restored": true,
+  "campaigns": [
+    "/home/emalinux/Desktop/TEC_2026_II/Arqui2/Proyecto1/mnavarro_ymonge_echavarria_ffuchs_a2_2026_s2/proyecto1/problems/mnavarro/fractal-cpp/metrics/automatic/run-pair-20261017T101552Z-36af3e/run-on-20261017T101552Z-dadb76",
+    "/home/emalinux/Desktop/TEC_2026_II/Arqui2/Proyecto1/mnavarro_ymonge_echavarria_ffuchs_a2_2026_s2/proyecto1/problems/mnavarro/fractal-cpp/metrics/automatic/run-pair-20261017T101552Z-36af3e/run-off-20261017T111145Z-f8b089"
+  ],
+  "report": "/home/emalinux/Desktop/TEC_2026_II/Arqui2/Proyecto1/mnavarro_ymonge_echavarria_ffuchs_a2_2026_s2/proyecto1/problems/mnavarro/fractal-cpp/metrics/reports/physical-20261017T120628Z-e7b4d7",
+  "archive": "/home/emalinux/Desktop/TEC_2026_II/Arqui2/Proyecto1/mnavarro_ymonge_echavarria_ffuchs_a2_2026_s2/proyecto1/problems/mnavarro/fractal-cpp/results/exports/physical-20261017T120628Z-e7b4d7.zip"
+}

@@ -57,10 +57,10 @@ class SmtController:
         # Sudo pide contraseña aquí una sola vez, nunca durante las mediciones.
         if os.geteuid() != 0:
             subprocess.run(["sudo", "-v"], check=True)
-        prefix = [] if os.geteuid() == 0 else ["sudo", "-n"]
+        prefix = [] if os.geteuid() == 0 else ["sudo"]
         self.process = subprocess.Popen([*prefix, "/bin/sh", "-c", HELPER],
                                         stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                        text=True, start_new_session=True)
+                                        text=True)
         try:
             require(self.receive() == "ready", "Protocolo del ayudante SMT inválido")
             self.owns_control = True
