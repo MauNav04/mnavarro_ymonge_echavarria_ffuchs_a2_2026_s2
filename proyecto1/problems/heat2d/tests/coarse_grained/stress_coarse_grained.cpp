@@ -21,17 +21,44 @@
 
 namespace {
 
+/**
+ * @brief High-precision constant for the mathematical evaluation of the thermal wave.
+ */
 constexpr double kPi =
     3.141592653589793238462643383279502884;
 
+/**
+ * @brief Maximum allowable Root-Mean-Square (RMS) error against the analytical truth.
+ * 
+ * Provides an aggregated metric of how much the simulated grid has drifted from 
+ * the exact mathematical formula over the course of the simulation.
+ */
 constexpr double kL2Tolerance = 5e-4;
+
+/**
+ * @brief Maximum allowable absolute peak error against the analytical truth.
+ *
+ * Ensures no single cell in the domain has accumulated a severe localized error 
+ * due to floating-point imprecision or threading race conditions.
+ */
 constexpr double kLInfTolerance = 1e-3;
 
+/**
+ * @brief Struct encapsulating the aggregated drift metrics.
+ */
 struct ErrorMetrics {
     double l2{0.0};
     double lInf{0.0};
 };
 
+/**
+ * @brief CLI parser for extracting dimensions and thread configurations safely.
+ * 
+ * Defends against buffer overflows and negative values prior to array allocations.
+ *
+ * @throws std::invalid_argument If unparseable or zero.
+ * @throws std::out_of_range If the parameter exceeds size_t boundaries.
+ */
 std::size_t parsePositiveSize(
     const char* text,
     const char* argumentName
@@ -74,11 +101,13 @@ std::size_t parsePositiveSize(
 }
 
 /**
- * @brief Calcula el dt máximo permitido por el esquema explícito.
+ * @brief Computes the absolute maximum temporal step (dt) permissible.
  *
- * Condición:
- *
+ * Based on the Courant-Friedrichs-Lewy (CFL) constraint for the 2D Heat Equation:
  * alpha * dt * (1/dx^2 + 1/dy^2) <= 1/2
+ * 
+ * If the user's configuration exceeds this exact value, the Forward-Euler 
+ * numerical method will mathematically blow up (infinite divergence).
  */
 double maximumStableDt(
     double alpha,
@@ -112,16 +141,12 @@ double maximumStableDt(
 }
 
 /**
- * @brief Solución analítica para la condición sinusoidal utilizada.
+ * @brief Exact mathematical resolution of the sinusoidal initial condition.
  *
- * T(x,y,t) =
- *
- * Tmax sin(pi*x/Lx) sin(pi*y/Ly)
- *
- * exp[
- *   -alpha*pi^2
- *   (1/Lx^2 + 1/Ly^2)t
- * ]
+ * T(x,y,t) = Tmax * sin(pi*x/Lx) * sin(pi*y/Ly) * exp[-alpha * pi^2 * (1/Lx^2 + 1/Ly^2) * t]
+ * 
+ * This pure mathematical solution serves as the unwavering baseline against which 
+ * the numeric approximation of the Coarse-Grained model is stress-tested.
  */
 double analyticalTemperature(
     double x,
@@ -170,7 +195,13 @@ double analyticalTemperature(
 }
 
 /**
- * @brief Calcula los errores L2 y L-infinito sobre las celdas interiores.
+ * @brief Aggregates the overall numerical drift accumulated over the simulation.
+ *
+ * Evaluates the absolute discrepancy between the parallel numerical simulation 
+ * and the exact analytical solution for every single interior grid cell.
+ * 
+ * @return ErrorMetrics Containing L2 RMS and L-infinity statistics.
+ * @throws std::runtime_error If the grid lacks interior cells to sample.
  */
 ErrorMetrics calculateAnalyticalError(
     const heat2d::Grid& numerical,
@@ -258,7 +289,10 @@ ErrorMetrics calculateAnalyticalError(
 }
 
 /**
- * @brief Comprueba que todas las temperaturas sean números finitos.
+ * @brief Fast check to identify if the numerical method has mathematically blown up.
+ * 
+ * Race conditions or CFL condition violations frequently result in NaN 
+ * (Not a Number) or Infinity cascades. This immediately halts testing if detected.
  */
 void validateFiniteGrid(
     const heat2d::Grid& grid
@@ -287,7 +321,10 @@ void validateFiniteGrid(
 }
 
 /**
- * @brief Comprueba que la condición Dirichlet permanezca intacta.
+ * @brief Validates the structural integrity of the Dirichlet Boundary Conditions.
+ *
+ * Ensures the concurrent workers haven't accidentally written outside their 
+ * assigned interior bounds and corrupted the constant-temperature perimeter.
  */
 double maximumBoundaryError(
     const heat2d::Grid& grid,
@@ -349,7 +386,13 @@ double maximumBoundaryError(
 }
 
 /**
- * @brief Calcula la diferencia máxima entre dos soluciones numéricas.
+ * @brief Evaluates the maximum scalar delta between two resulting grids.
+ * 
+ * Used during determinism checks to guarantee that successive executions 
+ * of the exact same parameters yield mathematically identical outputs, proving 
+ * the absence of thread synchronization flaws.
+ * 
+ * @throws std::invalid_argument If grid topologies differ.
  */
 double maximumGridDifference(
     const heat2d::Grid& first,
@@ -390,6 +433,9 @@ double maximumGridDifference(
     return maximumDifference;
 }
 
+/**
+ * @brief Centralizes the instantiation of the sinusoidal test domain.
+ */
 heat2d::Grid createInitialGrid(
     const heat2d::SimulationConfig& config
 ) {
@@ -414,6 +460,9 @@ heat2d::Grid createInitialGrid(
     return grid;
 }
 
+/**
+ * @brief Command Line Interface guide.
+ */
 void printUsage(
     const char* programName
 ) {
@@ -430,6 +479,13 @@ void printUsage(
 
 } // namespace
 
+/**
+ * @brief Stress test suite for the Coarse-Grained model.
+ * 
+ * Focuses strictly on numerical correctness, boundary stability, and execution 
+ * determinism. Runs identical topologies multiple times and mathematically 
+ * validates the final distributions against an exact, closed-form analytical solution.
+ */
 int main(
     int argc,
     char* argv[]
@@ -492,14 +548,16 @@ int main(
         config.cols = gridSize;
 
         /*
-         * El stress test utiliza frontera cero porque la solución
-         * analítica sinusoidal asumida satisface T = 0 en los bordes.
+         * The exact sinusoidal analytical solution requires the borders 
+         * to remain strictly at 0.0 to act as infinite heat sinks.
          */
         config.boundaryTemperature = 0.0;
 
         /*
-         * Utilizamos el 80 % del límite de estabilidad para mantener
-         * margen respecto a la frontera teórica del esquema explícito.
+         * Calculate a resilient temporal delta.
+         * By targeting 80% of the maximum theoretical limit, we ensure 
+         * the discretization remains stable while avoiding the severe inaccuracy 
+         * that occurs exactly at the CFL edge.
          */
         const double dtMaximum =
             maximumStableDt(
@@ -528,6 +586,7 @@ int main(
             );
         }
 
+        // Rigorous calculation of expected payloads to assert against the output stats.
         const std::uint64_t interiorRows =
             static_cast<std::uint64_t>(
                 gridSize - 2
@@ -580,10 +639,9 @@ int main(
             threadCount;
 
         /*
-         * Este stress test valida el solver concurrente.
-         *
-         * El bloqueo sintético se mantiene desactivado para no mezclar
-         * corrección numérica con latencias del scheduler del SO.
+         * Since this is a structural stress-test, we disable artificial latency.
+         * We want to test pure numerical and synchronization correctness without 
+         * introducing unpredictable thread sleep delays from the OS.
          */
         coarseConfig.blockingDuration =
             std::chrono::nanoseconds{0};
@@ -679,6 +737,7 @@ int main(
                 config.boundaryTemperature
             );
 
+            // Execute the model and strictly capture pure compute time.
             const auto start =
                 std::chrono::steady_clock::now();
 
@@ -707,6 +766,7 @@ int main(
                 elapsedSeconds
             );
 
+            // Metadata assertions ensure the thread pool didn't short-circuit.
             if (
                 stats.executedCellUpdates !=
                 expectedUpdates
@@ -757,6 +817,7 @@ int main(
                 );
             }
 
+            // Post-execution boundary integrity check.
             validateFiniteGrid(
                 current
             );
@@ -773,6 +834,7 @@ int main(
                 );
             }
 
+            // Compare numerical reality against exact mathematical theory.
             const ErrorMetrics errors =
                 calculateAnalyticalError(
                     current,
@@ -801,6 +863,8 @@ int main(
             double determinismDifference =
                 0.0;
 
+            // Determinism verification.
+            // Repetition 0 defines the mathematical standard. Repetition N must perfectly match.
             if (repetition == 0) {
                 deterministicReference =
                     std::make_unique<
@@ -822,6 +886,7 @@ int main(
                         current
                     );
 
+                // Any variance implies a synchronization bug.
                 if (
                     determinismDifference != 0.0
                 ) {
@@ -859,6 +924,7 @@ int main(
                 << '\n';
         }
 
+        // Aggregate statistics.
         double totalTime = 0.0;
 
         double minimumTime =
@@ -955,6 +1021,7 @@ int main(
             << (deterministic ? "PASS" : "FAIL")
             << '\n';
 
+        // Fail hard if the model wasn't deterministic.
         if (!deterministic) {
             throw std::runtime_error(
                 "Coarse-Grained execution is not deterministic."

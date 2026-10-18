@@ -107,8 +107,13 @@ std::vector<RowRange> createRowRanges(
 
 
 /**
- * @brief Checks whether multiplying three size_t values would
- *        overflow uint64_t.
+ * @brief Computes the theoretical total of cellular updates safely.
+ * 
+ * Multiplies (interior rows) * (interior columns) * (timesteps). 
+ * Includes explicit bounds-checking against `std::numeric_limits<std::uint64_t>::max()` 
+ * to prevent silent integer overflow during massive HPC simulations.
+ * 
+ * @throws std::overflow_error If the resulting updates exceed 64-bit bounds.
  */
 std::uint64_t calculateExecutedCellUpdates(
     std::size_t rows,
@@ -168,7 +173,13 @@ std::uint64_t calculateExecutedCellUpdates(
 
 
 /**
- * @brief Validates the CMP execution parameters.
+ * @brief Validates the CMP execution parameters before simulation begins.
+ * 
+ * Ensures structural integrity (matching dimensions, minimum 3x3 size for the 
+ * 5-point stencil), thread count validity, and strictly enforces the 
+ * Forward-Euler numerical stability condition.
+ * 
+ * @throws std::invalid_argument On any constraint violation.
  */
 void validateCmpInputs(
     const Grid& current,
@@ -220,7 +231,14 @@ void validateCmpInputs(
 
 }  // namespace
 
-
+/**
+ * @brief Main execution loop for the Chip Multiprocessing (CMP) model.
+ * 
+ * Orchestrates pure thread-level parallelism utilizing OS-level `std::thread`s.
+ * Unlike the Coarse-Grained model, CMP operates strictly compute-bound without 
+ * injecting artificial stalls, maximizing ALU utilization and cache coherence 
+ * across the available physical cores.
+ */
 CmpStats runCmp(
     Grid& current,
     Grid& next,
@@ -257,6 +275,7 @@ CmpStats runCmp(
             steps
         );
 
+    // Two synchronization barriers are hit per timestep.
     stats.barrierPhases =
         static_cast<std::uint64_t>(
             steps
@@ -311,6 +330,7 @@ CmpStats runCmp(
         workerIndex < config.threadCount;
         ++workerIndex
     ) {
+        // Spawn an OS thread capturing its environment and distinct work range.
         workers.emplace_back(
             [
                 &current,
@@ -333,8 +353,10 @@ CmpStats runCmp(
                     ++step
                 ) {
                     /*
+                     * Lock-free compute loop.
                      * Each worker writes only to the rows assigned to
                      * it. current is shared read-only during this phase.
+                     * Row-major traversal ensures L1-D spatial locality.
                      */
                     for (
                         std::size_t row =
@@ -361,13 +383,14 @@ CmpStats runCmp(
 
                     /*
                      * Phase 1:
-                     * wait until every worker has completed next.
+                     * wait until every worker has completed evaluating 
+                     * the stencil and writing to the `next` buffer.
                      */
                     barrier.wait();
 
                     /*
                      * A single worker performs the global operations
-                     * required between timesteps.
+                     * required between timesteps (Boundary conditions & Swap).
                      *
                      * No worker can still be writing to next here.
                      */

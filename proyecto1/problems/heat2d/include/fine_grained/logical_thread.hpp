@@ -5,7 +5,7 @@
 namespace heat2d::fine_grained {
 
 /**
- * @brief Identifica una celda dentro de la malla Heat2D.
+ * @brief Identifies a cell within the Heat2D grid.
  */
 struct CellPosition {
     std::size_t row;
@@ -13,24 +13,24 @@ struct CellPosition {
 };
 
 /**
- * @brief Representa el contexto de ejecución de un hilo lógico simulado.
+ * @brief Represents the execution context of a simulated logical thread.
  *
- * LogicalThread no representa un hilo del sistema operativo.
- * Conserva el progreso de una región mientras un scheduler externo
- * decide cuándo puede consumir su siguiente quantum.
+ * LogicalThread does not represent an operating system thread.
+ * It preserves the progress of a region while an external scheduler
+ * decides when it may consume its next quantum.
  *
- * La clase utiliza semántica de valor: copiar un LogicalThread crea
- * un snapshot independiente que conserva el progreso alcanzado.
+ * The class uses value semantics: copying a LogicalThread creates
+ * an independent snapshot that preserves the progress reached.
  */
 class LogicalThread {
 public:
     /**
-     * @brief Crea un hilo lógico asociado a una región rectangular.
+     * @brief Creates a logical thread associated with a rectangular region.
      *
-     * Los rangos utilizan la convención [inicio, fin).
+     * Ranges use the [begin, end) convention.
      *
-     * @throws std::invalid_argument si alguno de los rangos está invertido.
-     * @throws std::overflow_error si la cantidad de celdas no cabe en std::size_t.
+     * @throws std::invalid_argument if any of the ranges is inverted.
+     * @throws std::overflow_error if the number of cells does not fit in std::size_t.
      */
     LogicalThread(
         std::size_t id,
@@ -41,14 +41,14 @@ public:
     );
 
     /**
-     * @brief Permite copiar snapshots independientes del contexto.
+     * @brief Allows copying independent snapshots of the context.
      */
     LogicalThread(const LogicalThread&) = default;
 
     LogicalThread& operator=(const LogicalThread&) = default;
 
     /**
-     * @brief Permite transferir el contexto de ejecución.
+     * @brief Allows transferring the execution context.
      */
     LogicalThread(LogicalThread&&) noexcept = default;
 
@@ -63,22 +63,22 @@ public:
     bool hasWork() const noexcept;
 
     /**
-     * @throws std::logic_error si el contexto ya terminó.
+     * @throws std::logic_error if the context has already finished.
      */
     [[nodiscard]]
     CellPosition currentCell() const;
 
     /**
-     * @brief Consume exactamente un quantum.
+     * @brief Consumes exactly one quantum.
      *
-     * Un quantum corresponde actualmente a una celda.
+     * A quantum currently corresponds to one cell.
      *
-     * @throws std::logic_error si no existe trabajo pendiente.
+     * @throws std::logic_error if there is no pending work.
      */
     void advance();
 
     /**
-     * @brief Reinicia el contexto para un nuevo timestep.
+     * @brief Resets the context for a new timestep.
      */
     void reset() noexcept;
 
@@ -90,9 +90,9 @@ public:
 
 private:
     /**
-     * @brief Calcula de forma segura el tamaño de la región asignada.
+     * @brief Safely computes the size of the assigned region.
      *
-     * @throws std::overflow_error si la multiplicación excede std::size_t.
+     * @throws std::overflow_error if the multiplication exceeds std::size_t.
      */
     [[nodiscard]]
     std::size_t calculateAssignedCells() const;

@@ -24,7 +24,13 @@ namespace heat2d::smt {
 namespace {
 
 /**
- * @brief Reads one integer value from a Linux sysfs file.
+ * @brief Reads a single integer value from a Linux sysfs file.
+ * 
+ * Used for extracting core/package IDs from the `/sys/devices/system/cpu/` virtual 
+ * filesystem. Enforces strict parsing and bounds checking to ensure hardware data 
+ * is correctly ingested without buffer overflows or invalid conversions.
+ *
+ * @throws std::runtime_error If the file is missing, unreadable, or contains non-integers.
  */
 int readIntegerFile(
     const std::string& path
@@ -72,10 +78,13 @@ int readIntegerFile(
 
 
 /**
- * @brief Reads the Linux kernel SMT control state.
+ * @brief Probes the Linux kernel's global SMT control state.
  *
- * This information is diagnostic only. Topology detection itself does
- * not depend on the presence of this file.
+ * Attempts to read `/sys/devices/system/cpu/smt/control`. This information is 
+ * purely diagnostic (e.g., to log if HyperThreading is forced off at the OS level) 
+ * and does not directly alter the dynamic affinity logic.
+ * 
+ * @return std::string "on", "off", "forceoff", "notsupported", or "unavailable".
  */
 std::string readLinuxSmtControl()
 {
@@ -101,12 +110,14 @@ std::string readLinuxSmtControl()
 
 
 /**
- * @brief Obtains the logical CPUs that the current process is allowed
- *        to execute on.
+ * @brief Resolves the exact subset of logical CPUs available to the current process.
  *
- * sched_getaffinity() is deliberately preferred over sysconf() because
- * the system may contain CPUs that are unavailable to this process due
- * to cpusets, containers, taskset or scheduler restrictions.
+ * `sched_getaffinity()` is deliberately preferred over standard API calls like 
+ * `sysconf(_SC_NPROCESSORS_ONLN)` or `std::thread::hardware_concurrency()`. 
+ * This ensures the thread-pinning logic strictly respects external constraints 
+ * like cgroups, Docker cpuset allocations, or `taskset` limitations.
+ * 
+ * @throws std::runtime_error If the syscall fails or returns an empty CPU set.
  */
 std::vector<int> detectAllowedLogicalCpus()
 {
@@ -166,7 +177,7 @@ std::vector<int> detectAllowedLogicalCpus()
 
 
 /**
- * @brief Returns the sysfs topology directory for one logical CPU.
+ * @brief Constructs the absolute sysfs path for a specific logical CPU's topology.
  */
 std::string cpuTopologyPath(
     int cpuId
@@ -182,6 +193,14 @@ std::string cpuTopologyPath(
 }  // namespace
 
 
+/**
+ * @brief Discovers the physical and logical CPU mapping by scanning Linux sysfs.
+ * 
+ * Gathers the `physical_package_id` (socket) and `core_id` (physical core) for 
+ * every logical CPU allowed by the process affinity mask. This creates an exact 
+ * internal representation of the hardware, distinguishing between true physical 
+ * separation and shared-resource sibling threads (SMT/HyperThreading).
+ */
 CpuTopology detectCpuTopology()
 {
     CpuTopology topology;
@@ -193,9 +212,9 @@ CpuTopology detectCpuTopology()
         readLinuxSmtControl();
 
     /*
-     * Linux core_id values are not guaranteed to be globally unique.
+     * Linux core_id values are not guaranteed to be globally unique across sockets.
      *
-     * Therefore the physical-core identity is:
+     * Therefore, the true physical-core identity is defined by the composite key:
      *
      *   (physical_package_id, core_id)
      */
@@ -243,12 +262,13 @@ CpuTopology detectCpuTopology()
     );
 
     /*
-     * std::map provides deterministic ordering by:
+     * std::map provides deterministic ascending ordering by:
      *
-     *   packageId
-     *   coreId
+     *   1. packageId (Socket)
+     *   2. coreId (Physical Core)
      *
-     * Logical CPUs inside every core are also sorted.
+     * Sorting the mapped vectors guarantees logical CPUs inside every core 
+     * are also deterministically ordered.
      */
     for (
         auto& entry :
@@ -282,6 +302,7 @@ CpuTopology detectCpuTopology()
         );
     }
 
+    // Safety guard against malformed sysfs trees.
     validateCpuTopology(
         topology
     );
@@ -290,6 +311,13 @@ CpuTopology detectCpuTopology()
 }
 
 
+/**
+ * @brief Asserts the integrity of a discovered CPU topology structure.
+ * 
+ * Verifies that no logical CPUs were lost or duplicated during parsing, 
+ * every physical core contains at least one execution thread, and every 
+ * physical core possesses a globally unique package/core identifier tuple.
+ */
 void validateCpuTopology(
     const CpuTopology& topology
 ) {
@@ -513,7 +541,13 @@ bool smtAvailable(
         ) > 1;
 }
 
-
+/**
+ * @brief Constructs an affinity ordering strictly using distinct physical cores.
+ * 
+ * Collects the first logical thread from each physical core. Guarantees true 
+ * physical parallelism without ALU/cache resource contention, up to the 
+ * total physical core count.
+ */
 std::vector<int> buildPhysicalCpuOrder(
     const CpuTopology& topology
 ) {
@@ -542,7 +576,20 @@ std::vector<int> buildPhysicalCpuOrder(
     return order;
 }
 
-
+/**
+ * @brief Constructs an optimal breadth-first SMT affinity ordering.
+ * 
+ * Spreads execution across distinct physical cores *before* assigning secondary 
+ * sibling threads. 
+ *
+ * Pass 0: Grab the 1st logical CPU from every core.
+ * Pass 1: Grab the 2nd logical CPU from every core (invoking HyperThreading).
+ * ...
+ * 
+ * This strategy guarantees that worker counts up to `physical_cores` operate 
+ * with dedicated L1 caches and ALUs, while larger thread pools seamlessly saturate 
+ * SMT capabilities.
+ */
 std::vector<int> buildSmtCpuOrder(
     const CpuTopology& topology
 ) {
@@ -599,6 +646,7 @@ std::vector<int> buildSmtCpuOrder(
         }
     }
 
+    // Final safety check to ensure all detected CPUs were mapped.
     if (
         order.size() !=
         logicalCpuCount(

@@ -14,7 +14,11 @@ namespace heat2d::fine_grained {
 namespace {
 
 /**
- * @brief Valida las precondiciones generales de la ejecución Fine-Grained.
+ * @brief Validates the general preconditions for Fine-Grained execution.
+ * 
+ * Ensures the target grids have identical and valid dimensions, and that 
+ * at least one logical thread context is requested. Throws `std::invalid_argument` 
+ * if any configuration parameters are unacceptable before simulation starts.
  */
 void validateConfiguration(
     const Grid& current,
@@ -44,12 +48,15 @@ void validateConfiguration(
 }
 
 /**
- * @brief Crea una partición balanceada de las filas interiores.
+ * @brief Partitions the interior grid rows across logical thread contexts.
  *
- * Las filas se distribuyen en bloques contiguos. Si la división no
- * es exacta, los primeros hilos reciben una fila adicional.
+ * Divides the computational workload into contiguous blocks of rows. To handle
+ * grid dimensions that do not divide evenly by the thread count, the remainder 
+ * rows are distributed one-by-one to the first `N` threads.
  *
- * Los hilos sin filas son válidos y simplemente no tendrán trabajo.
+ * In edge cases where `logicalThreadCount` exceeds the total number of interior 
+ * rows, the trailing logical threads will simply receive an assigned row count 
+ * of zero. The logic explicitly supports these "empty" contexts without failing.
  */
 std::vector<LogicalThread> createLogicalThreads(
     const Grid& grid,
@@ -102,7 +109,7 @@ std::vector<LogicalThread> createLogicalThreads(
 }
 
 /**
- * @brief Reinicia todos los contextos para el siguiente timestep.
+ * @brief Resets all simulated thread states for the upcoming timestep.
  */
 void resetLogicalThreads(
     std::vector<LogicalThread>& logicalThreads
@@ -113,9 +120,12 @@ void resetLogicalThreads(
 }
 
 /**
- * @brief Ejecuta todos los quantums correspondientes a un timestep.
+ * @brief Executes a single timestep under fine-grained software multiplexing.
  *
- * Cada selección del scheduler permite procesar exactamente una celda.
+ * The `RoundRobinScheduler` dictates the execution order. For every scheduler 
+ * dispatch, exactly ONE grid cell (quantum) is computed. This simulates an extreme 
+ * scenario where context switching happens after the smallest possible unit of work,
+ * exposing the software overhead associated with state tracking.
  */
 std::size_t executeTimeStep(
     const Grid& current,
@@ -127,6 +137,7 @@ std::size_t executeTimeStep(
     std::size_t executedQuanta = 0;
 
     while (true) {
+        // Poll the scheduler for the next thread with pending work.
         const auto selectedThread =
             scheduler.nextThread(logicalThreads);
 
@@ -140,6 +151,7 @@ std::size_t executeTimeStep(
         const CellPosition cell =
             logicalThread.currentCell();
 
+        // Evaluate the discrete 5-point stencil for the given cell.
         computeCell(
             current,
             next,
@@ -148,6 +160,7 @@ std::size_t executeTimeStep(
             coefficients
         );
 
+        // Update the logical thread's internal state machine (move to next cell).
         logicalThread.advance();
 
         ++executedQuanta;
@@ -158,6 +171,14 @@ std::size_t executeTimeStep(
 
 }  // namespace
 
+/**
+ * @brief Entry point for the Fine-Grained Multithreading (FGMT) simulation.
+ * 
+ * Drives the numerical resolution of the 2D Heat Equation by simulating 
+ * concurrent execution through software multiplexing. It does NOT utilize 
+ * real OS-level threads (`std::thread`), making it deterministic and useful 
+ * for analyzing scheduling overhead without physical resource contention.
+ */
 FineGrainedStats runFineGrained(
     Grid& current,
     Grid& next,
@@ -218,11 +239,13 @@ FineGrainedStats runFineGrained(
             boundaryTemperature
         );
 
+        // Pointer swap to avoid massive memory allocations between steps.
         std::swap(
             current,
             next
         );
 
+        // Re-arm state machines for the upcoming temporal iteration.
         resetLogicalThreads(
             logicalThreads
         );

@@ -1,57 +1,57 @@
-#pragma once  // Evita que este archivo de cabecera sea incluido más de una vez durante la compilación.
+#pragma once  // Prevents this header file from being included more than once during compilation.
 
-#include <cstddef>  // Proporciona std::size_t para tamaños de malla y cantidad de pasos.
+#include <cstddef>  // Provides std::size_t for grid sizes and step count.
 #include <cmath>
-namespace heat2d {  // Agrupa la configuración dentro del namespace del proyecto Heat2D.
+namespace heat2d {  // Groups the configuration within the Heat2D project namespace.
 
 /**
- * @brief Contiene todos los parámetros necesarios para configurar una simulación Heat2D.
+ * @brief Contains all the parameters needed to configure a Heat2D simulation.
  *
- * Esta estructura centraliza las dimensiones físicas de la superficie,
- * resolución espacial, propiedades térmicas, condiciones iniciales y
- * parámetros temporales de la simulación.
+ * This structure centralizes the physical dimensions of the surface,
+ * spatial resolution, thermal properties, initial conditions and
+ * temporal parameters of the simulation.
  *
- * Mantener estos parámetros agrupados evita utilizar constantes dispersas
- * y permitirá modificar fácilmente los experimentos posteriormente.
+ * Keeping these parameters grouped avoids using scattered constants
+ * and will make it easy to modify the experiments later on.
  */
 struct SimulationConfig {
 
-    double lengthX = 1.0;  // Longitud física de la superficie sobre el eje X, expresada en metros.
+    double lengthX = 1.0;  // Physical length of the surface along the X axis, expressed in meters.
 
-    double lengthY = 1.0;  // Longitud física de la superficie sobre el eje Y, expresada en metros.
+    double lengthY = 1.0;  // Physical length of the surface along the Y axis, expressed in meters.
 
-    std::size_t rows = 801;  // Cantidad total de puntos discretos utilizados sobre el eje Y.
+    std::size_t rows = 801;  // Total number of discrete points used along the Y axis.
 
-    std::size_t cols = 801;  // Cantidad total de puntos discretos utilizados sobre el eje X.
+    std::size_t cols = 801;  // Total number of discrete points used along the X axis.
 
-    double alpha = 0.05;  // Difusividad térmica utilizada por el modelo de difusión.
+    double alpha = 0.05;  // Thermal diffusivity used by the diffusion model.
 
-    double dt = 0.000005;  // Tamaño de cada paso temporal, expresado en segundos (estabilidad CFL).
+    double dt = 0.000005;  // Size of each time step, expressed in seconds (CFL stability).
 
-    double totalTime = 0.005;  // Tiempo físico total para 1000 pasos (0.005 / 0.000005 = 1000).
+    double totalTime = 0.005;  // Total physical time for 1000 steps (0.005 / 0.000005 = 1000).
 
-    double maxTemperature = 100.0;  // Temperatura máxima de la distribución sinusoidal inicial.
+    double maxTemperature = 100.0;  // Maximum temperature of the initial sinusoidal distribution.
 
-    double boundaryTemperature = 0.0;  // Temperatura fija mantenida en los cuatro bordes de la superficie.
+    double boundaryTemperature = 0.0;  // Fixed temperature maintained at the four boundaries of the surface.
 
     /**
-     * @brief Calcula el espaciamiento físico entre columnas consecutivas.
+     * @brief Computes the physical spacing between consecutive columns.
      *
-     * @return Distancia dx entre puntos consecutivos del eje X.
+     * @return Distance dx between consecutive points along the X axis.
      */
     double dx() const {
 
-        return lengthX / static_cast<double>(cols - 1);  // Divide la longitud física entre la cantidad real de intervalos en X.
+        return lengthX / static_cast<double>(cols - 1);  // Divides the physical length by the actual number of intervals along X.
     }
 
     /**
-     * @brief Calcula el espaciamiento físico entre filas consecutivas.
+     * @brief Computes the physical spacing between consecutive rows.
      *
-     * @return Distancia dy entre puntos consecutivos del eje Y.
+     * @return Distance dy between consecutive points along the Y axis.
      */
     double dy() const {
 
-        return lengthY / static_cast<double>(rows - 1);  // Divide la longitud física entre la cantidad real de intervalos en Y.
+        return lengthY / static_cast<double>(rows - 1);  // Divides the physical length by the actual number of intervals along Y.
     }
 
     [[nodiscard]]

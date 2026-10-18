@@ -16,7 +16,12 @@
 namespace {
 
 /**
- * @brief Parses a strictly positive thread count.
+ * @brief Parses the requested number of worker threads from CLI arguments.
+ * 
+ * Enforces a strictly positive integer value. Fast-fails on missing or 
+ * non-numeric input to prevent undefined behavior during array allocation.
+ *
+ * @throws std::invalid_argument If the string is empty, negative, zero, or unparseable.
  */
 std::size_t parseThreadCount(
     const char* argument
@@ -59,7 +64,10 @@ std::size_t parseThreadCount(
 
 
 /**
- * @brief Prints the numerical and execution configuration.
+ * @brief Dumps the primary physical and experimental configurations to stdout.
+ *
+ * Prints spatial/temporal discretization parameters, physical dimensions,
+ * and the specific number of OS-level threads configured for this CMP run.
  */
 void printConfiguration(
     const heat2d::SimulationConfig& config,
@@ -142,6 +150,15 @@ void printConfiguration(
 }  // namespace
 
 
+/**
+ * @brief Standalone executable entry point for the CMP model.
+ * 
+ * 1. Parses configuration and asserts numerical stability.
+ * 2. Initializes the double-buffered grid with a sinusoidal heat signature.
+ * 3. Invokes the CMP thread pool to calculate the diffusion equation.
+ * 4. Captures strictly the wall-clock execution time (excluding initialization).
+ * 5. Dumps raw throughput and execution metrics to stdout.
+ */
 int main(
     int argc,
     char* argv[]
@@ -167,6 +184,7 @@ int main(
             threadCount
         );
 
+        // Pre-flight check: Forward Euler stability criterion.
         if (
             !heat2d::isStable(
                 config.alpha,
@@ -237,7 +255,10 @@ int main(
 
         /*
          * Measure the complete CMP kernel execution.
+         * Note: Memory allocation and initialization are excluded from the chronometer
+         * to measure strictly the compute throughput.
          */
+        // === TIMING REGION START ===
         const auto start =
             std::chrono::steady_clock::now();
 
@@ -256,6 +277,7 @@ int main(
 
         const auto end =
             std::chrono::steady_clock::now();
+        // === TIMING REGION END ===
 
         const double elapsedSeconds =
             std::chrono::duration<double>(

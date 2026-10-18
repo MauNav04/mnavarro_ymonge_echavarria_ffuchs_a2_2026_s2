@@ -7,10 +7,10 @@
 namespace heat2d::fine_grained {
 
 /**
- * @brief Métricas básicas de una ejecución Fine-Grained.
+ * @brief Basic metrics of a Fine-Grained execution.
  *
- * Permiten validar que el modelo haya consumido exactamente
- * los quantums esperados durante la simulación.
+ * They allow validating that the model has consumed exactly
+ * the expected quantums during the simulation.
  */
 struct FineGrainedStats {
     std::size_t logicalThreadCount;
@@ -19,25 +19,25 @@ struct FineGrainedStats {
 };
 
 /**
- * @brief Ejecuta la simulación Heat2D utilizando Fine-Grained Multithreading.
+ * @brief Runs the Heat2D simulation using Fine-Grained Multithreading.
  *
- * El dominio interior se divide entre hilos lógicos. Cada contexto
- * ejecuta exactamente una celda por quantum y el scheduler cambia
- * de hilo en cada decisión utilizando Round-Robin.
+ * The interior domain is divided among logical threads. Each context
+ * executes exactly one cell per quantum and the scheduler switches
+ * threads at each decision using Round-Robin.
  *
- * @param current Malla correspondiente al estado actual.
- * @param next Malla utilizada como buffer del siguiente estado.
- * @param steps Cantidad de pasos temporales.
- * @param logicalThreadCount Cantidad de hilos lógicos simulados.
- * @param alpha Difusividad térmica.
- * @param dt Paso temporal.
- * @param dx Separación espacial horizontal.
- * @param dy Separación espacial vertical.
- * @param boundaryTemperature Temperatura fija de los bordes.
+ * @param current Grid corresponding to the current state.
+ * @param next Grid used as a buffer for the next state.
+ * @param steps Number of time steps.
+ * @param logicalThreadCount Number of simulated logical threads.
+ * @param alpha Thermal diffusivity.
+ * @param dt Time step.
+ * @param dx Horizontal spatial separation.
+ * @param dy Vertical spatial separation.
+ * @param boundaryTemperature Fixed temperature of the boundaries.
  *
- * @return Estadísticas de la ejecución Fine-Grained.
+ * @return Statistics of the Fine-Grained execution.
  *
- * @throws std::invalid_argument si la configuración es inválida.
+ * @throws std::invalid_argument if the configuration is invalid.
  */
 [[nodiscard]]
 FineGrainedStats runFineGrained(

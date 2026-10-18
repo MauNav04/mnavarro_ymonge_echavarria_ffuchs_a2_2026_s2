@@ -1,3 +1,13 @@
+/**
+ * @file round_robin_scheduler_test.cpp
+ * @brief Unit test suite for the Fine-Grained Round-Robin Scheduler.
+ *
+ * This suite rigorously validates the deterministic dispatching logic of the 
+ * Round-Robin scheduler. Correctness here guarantees that the Fine-Grained 
+ * model distributes simulated execution time fairly among logical contexts, 
+ * simulating a true preemptive OS scheduler.
+ */
+
 #include "fine_grained/logical_thread.hpp"
 #include "fine_grained/round_robin_scheduler.hpp"
 
@@ -13,6 +23,14 @@ namespace {
 using heat2d::fine_grained::LogicalThread;
 using heat2d::fine_grained::RoundRobinScheduler;
 
+/*
+ * Compile-time assertions for value semantics.
+ * 
+ * WHY: Schedulers are often passed by value into execution harnesses or 
+ * stored in dynamically resized containers. Asserting copy/move semantics 
+ * ensures that the scheduler's internal state (e.g., the `nextCandidate_` pointer) 
+ * transfers correctly without causing race conditions or state corruption.
+ */
 static_assert(
     std::is_copy_constructible<RoundRobinScheduler>::value,
     "RoundRobinScheduler must be copy constructible."
@@ -39,7 +57,11 @@ static_assert(
 );
 
 /**
- * @brief Interrumpe la prueba cuando una condición no se cumple.
+ * @brief Halts the test gracefully if a logical assertion fails.
+ * 
+ * WHY: Throwing `std::runtime_error` instead of using `assert()` allows the 
+ * test harness to catch the error, print a readable diagnostic message, and 
+ * exit with a standardized error code rather than invoking `std::abort()`.
  */
 void require(
     bool condition,
@@ -51,7 +73,11 @@ void require(
 }
 
 /**
- * @brief Verifica la secuencia Round-Robin básica.
+ * @brief Validates the strict, cyclic polling order of the scheduler.
+ * 
+ * WHY: Fair scheduling is the core requirement of the Fine-Grained model. 
+ * This test guarantees that the scheduler iterates through threads [0, 1, 2] 
+ * and properly wraps around back to 0, ensuring no thread is starved.
  */
 void testRoundRobinSequence() {
     std::vector<LogicalThread> logicalThreads;
@@ -90,7 +116,12 @@ void testRoundRobinSequence() {
 }
 
 /**
- * @brief Verifica que los contextos finalizados sean omitidos.
+ * @brief Ensures the scheduler bypasses exhausted contexts.
+ * 
+ * WHY: In uneven domain decompositions, some threads will finish their 
+ * assigned row chunks before others. The scheduler must seamlessly skip 
+ * finished threads (e.g., T0) without wasting cycles or attempting to 
+ * execute them, which would trigger out-of-bounds errors.
  */
 void testCompletedThreadsAreSkipped() {
     std::vector<LogicalThread> logicalThreads;
@@ -113,7 +144,7 @@ void testCompletedThreadsAreSkipped() {
     require(selectedThread == 2, "Scheduler should select thread 2.");
     logicalThreads[2].advance();
 
-    // T0 ya terminó. El scheduler debe omitirlo.
+    // T0 is now depleted. The scheduler must skip it.
     selectedThread = scheduler.nextThread(logicalThreads);
     require(selectedThread == 1, "Scheduler did not skip completed thread 0.");
     logicalThreads[1].advance();
@@ -123,7 +154,11 @@ void testCompletedThreadsAreSkipped() {
 }
 
 /**
- * @brief Verifica que reset() reinicie la posición del scheduler.
+ * @brief Verifies that `reset()` correctly rewinds the scheduling logic.
+ * 
+ * WHY: The framework simulates thousands of sequential timesteps. The scheduler 
+ * must be cleanly rewound to its initial state at the start of each global 
+ * timestep to ensure the simulation remains perfectly deterministic.
  */
 void testReset() {
     std::vector<LogicalThread> logicalThreads;
@@ -148,7 +183,11 @@ void testReset() {
 }
 
 /**
- * @brief Verifica el comportamiento con un único hilo lógico.
+ * @brief Validates edge-case behavior with only a single thread.
+ * 
+ * WHY: A 1-thread Fine-Grained execution should logically map to a purely 
+ * sequential execution. The scheduler must handle this degenerate cyclic case 
+ * without math errors (e.g., modulo 1).
  */
 void testSingleLogicalThread() {
     std::vector<LogicalThread> logicalThreads;
@@ -175,13 +214,15 @@ void testSingleLogicalThread() {
 }
 
 /**
- * @brief Verifica que no se pueda crear un scheduler sin contextos.
+ * @brief Asserts strict rejection of meaningless configurations.
+ * 
+ * WHY: A scheduler with 0 threads cannot perform any work and would likely 
+ * cause a divide-by-zero error in the polling logic (`% threadCount`).
  */
 void testZeroThreadCountIsRejected() {
     bool exceptionDetected = false;
 
     try {
-        // Inicialización anónima para evitar advertencias de variables no usadas
         RoundRobinScheduler(0);
     } catch (const std::invalid_argument&) {
         exceptionDetected = true;
@@ -194,7 +235,11 @@ void testZeroThreadCountIsRejected() {
 }
 
 /**
- * @brief Verifica que scheduler y colección utilicen el mismo tamaño.
+ * @brief Prevents out-of-bounds memory accesses during polling.
+ * 
+ * WHY: The scheduler assumes the provided `vector` matches its internal fixed 
+ * `logicalThreadCount_`. If passed a smaller vector, it would cause a segfault. 
+ * If passed a larger vector, it would ignore threads. This enforces strict parity.
  */
 void testMismatchedThreadCountIsRejected() {
     RoundRobinScheduler scheduler(2);
@@ -218,14 +263,18 @@ void testMismatchedThreadCountIsRejected() {
 }
 
 /**
- * @brief Verifica que los contextos inicialmente vacíos sean omitidos.
+ * @brief Validates proper handling of empty topological regions.
+ * 
+ * WHY: When physical rows < logical threads, some threads are instantiated with 
+ * zero assigned rows. The scheduler must transparently skip these empty threads 
+ * without stalling.
  */
 void testInitiallyEmptyThreadsAreSkipped() {
     std::vector<LogicalThread> logicalThreads;
 
-    logicalThreads.emplace_back(10, 1, 1, 1, 4); // Vacía
-    logicalThreads.emplace_back(20, 2, 3, 1, 3); // Activa
-    logicalThreads.emplace_back(30, 4, 4, 1, 4); // Vacía
+    logicalThreads.emplace_back(10, 1, 1, 1, 4); // Empty
+    logicalThreads.emplace_back(20, 2, 3, 1, 3); // Active
+    logicalThreads.emplace_back(30, 4, 4, 1, 4); // Empty
 
     RoundRobinScheduler scheduler(logicalThreads.size());
     const auto selectedThread = scheduler.nextThread(logicalThreads);
@@ -242,7 +291,11 @@ void testInitiallyEmptyThreadsAreSkipped() {
 }
 
 /**
- * @brief Verifica que una colección completamente vacía finalice.
+ * @brief Ensures the scheduler cleanly halts if no work exists.
+ * 
+ * WHY: A zero-timestep simulation, or a grid with no interior area, results 
+ * in all threads being empty. The scheduler must not infinitely loop searching 
+ * for active threads.
  */
 void testAllThreadsInitiallyEmpty() {
     std::vector<LogicalThread> logicalThreads;
@@ -261,7 +314,10 @@ void testAllThreadsInitiallyEmpty() {
 }
 
 /**
- * @brief Verifica que el scheduler utilice índices posicionales.
+ * @brief Verifies that the scheduler returns vector indices, not thread IDs.
+ * 
+ * WHY: The framework relies on vector indices (0 to N) to directly index 
+ * arrays, rather than the arbitrary mathematical IDs assigned to the threads.
  */
 void testThreadIdIsIndependentFromVectorIndex() {
     std::vector<LogicalThread> logicalThreads;
@@ -297,7 +353,11 @@ void testThreadIdIsIndependentFromVectorIndex() {
 }
 
 /**
- * @brief Verifica que el scheduler permanezca agotado al completar.
+ * @brief Asserts the scheduler remains safely in a depleted state.
+ * 
+ * WHY: Calling `nextThread` after the simulation timestep is technically 
+ * complete should not crash or restart the sequence; it should consistently 
+ * return `std::nullopt` until explicitly reset.
  */
 void testRepeatedCallsAfterCompletion() {
     std::vector<LogicalThread> logicalThreads;
@@ -324,7 +384,7 @@ void testRepeatedCallsAfterCompletion() {
 }
 
 /**
- * @brief Verifica los observadores const del scheduler.
+ * @brief Validates `const` correctness of state observers.
  */
 void testConstObservers() {
     const RoundRobinScheduler scheduler(4);
@@ -336,7 +396,7 @@ void testConstObservers() {
 }
 
 /**
- * @brief Verifica semántica de copia.
+ * @brief Ensures copy construction perfectly replicates the scheduling phase.
  */
 void testCopySemantics() {
     std::vector<LogicalThread> logicalThreads;
@@ -360,7 +420,7 @@ void testCopySemantics() {
 }
 
 /**
- * @brief Verifica semántica de movimiento.
+ * @brief Ensures `std::move` preserves the internal polling pointer.
  */
 void testMoveSemantics() {
     std::vector<LogicalThread> logicalThreads;

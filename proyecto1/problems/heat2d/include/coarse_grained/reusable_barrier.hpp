@@ -7,10 +7,10 @@
 namespace heat2d {
 
 /**
- * @brief Barrera reutilizable compatible con C++17.
+ * @brief Reusable barrier compatible with C++17.
  *
- * Todos los threads participantes deben alcanzar wait() antes
- * de que cualquiera pueda continuar hacia la siguiente fase.
+ * All participating threads must reach wait() before
+ * any of them can continue to the next phase.
  */
 class ReusableBarrier {
 public:

@@ -19,6 +19,12 @@ namespace {
 
 /**
  * @brief Parses a positive worker count from the command line.
+ * 
+ * Extracts the requested number of Simultaneous Multithreading (SMT) workers. 
+ * Fast-fails on missing, non-numeric, or zero input to prevent undefined 
+ * behavior during thread pool allocation.
+ *
+ * @throws std::invalid_argument If the string cannot be parsed into a positive integer.
  */
 std::size_t parseThreadCount(
     const char* text
@@ -73,6 +79,10 @@ std::size_t parseThreadCount(
 
 /**
  * @brief Prints the Linux CPU topology detected for the current process.
+ * 
+ * Outputs the exact hardware configuration detected through `sysfs`, differentiating 
+ * between true physical cores and available logical CPUs (threads). This clarifies 
+ * the baseline for measuring hardware SMT acceleration vs software time-slicing.
  */
 void printTopology(
     const heat2d::smt::CpuTopology& topology
@@ -130,6 +140,10 @@ void printTopology(
 
 /**
  * @brief Prints the exact logical CPU placement used by the workers.
+ * 
+ * Maps every worker ID to its pinned logical CPU. This is crucial for verifying 
+ * that the `pthread_setaffinity_np` logic successfully saturated distinct physical 
+ * cores before placing secondary threads on the same physical core (HyperThreading).
  */
 void printCpuAssignments(
     const heat2d::smt::SmtStats& stats
@@ -166,7 +180,15 @@ void printCpuAssignments(
 
 }  // namespace
 
-
+/**
+ * @brief Standalone executable entry point for the Simultaneous Multithreading (SMT) model.
+ * 
+ * 1. Probes Linux `sysfs` to determine the physical topology and available logical CPUs.
+ * 2. Defaults to occupying every available logical CPU unless overridden by the user.
+ * 3. Identifies if the execution will leverage true hardware SMT or software oversubscription.
+ * 4. Pings threads to specific logical CPUs using the optimal breadth-first assignment.
+ * 5. Executes the compute kernel and measures execution time and throughput.
+ */
 int main(
     int argc,
     char* argv[]
@@ -215,6 +237,7 @@ int main(
                 physicalCores * 4
             );
 
+        // Sanity check to prevent out-of-memory or extreme OS thrashing.
         if (
             requestedThreads >
             maxSupported
@@ -236,6 +259,7 @@ int main(
             topology
         );
 
+        // Distinguish between true Hardware SMT and OS-level Software oversubscription.
         const bool isHardwareSmt =
             heat2d::smt::smtAvailable(topology) && requestedThreads <= availableLogicalCpus;
 
@@ -302,6 +326,7 @@ int main(
             << requestedThreads
             << '\n';
 
+        // Pre-flight check: Forward Euler stability criterion.
         const bool stable =
             heat2d::isStable(
                 config.alpha,
@@ -368,9 +393,11 @@ int main(
         smtConfig.threadCount =
             requestedThreads;
 
+        // Allow creating more threads than logical CPUs, forcing OS time-slicing.
         smtConfig.allowOversubscription =
             true;
 
+        // === TIMING REGION START ===
         const auto start =
             std::chrono::steady_clock::now();
 
@@ -389,6 +416,7 @@ int main(
 
         const auto end =
             std::chrono::steady_clock::now();
+        // === TIMING REGION END ===
 
         const double elapsedSeconds =
             std::chrono::duration<double>(

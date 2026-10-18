@@ -1,29 +1,29 @@
-#pragma once  // Evita que este archivo de cabecera sea incluido más de una vez durante la compilación.
+#pragma once  // Prevents this header file from being included more than once during compilation.
 
-#include <cstddef>  // Proporciona std::size_t, utilizado para tamaños e índices.
-#include <vector>   // Proporciona std::vector, que almacenará las temperaturas de forma contigua.
+#include <cstddef>  // Provides std::size_t, used for sizes and indices.
+#include <vector>   // Provides std::vector, which will store temperatures contiguously.
 
-namespace heat2d {  // Agrupa todas las estructuras del problema Heat Diffusion 2D dentro de un namespace propio.
+namespace heat2d {  // Groups all Heat Diffusion 2D problem structures within their own namespace.
 
 /**
- * @brief Representa una superficie rectangular de temperaturas en dos dimensiones.
+ * @brief Represents a rectangular two-dimensional surface of temperatures.
  *
- * La clase Grid permite trabajar conceptualmente con una matriz T[fila][columna],
- * pero almacena internamente todos los valores dentro de un único std::vector<double>.
+ * The Grid class allows working conceptually with a matrix T[row][column],
+ * but internally stores all values within a single std::vector<double>.
  *
- * El almacenamiento contiguo facilita el acceso secuencial a memoria y será útil
- * posteriormente para estudiar localidad de caché y paralelización.
+ * Contiguous storage facilitates sequential memory access and will be useful
+ * later for studying cache locality and parallelization.
  */
 class Grid {
 
 public:
 
     /**
-     * @brief Construye una nueva malla bidimensional.
+     * @brief Constructs a new two-dimensional grid.
      *
-     * @param rows Cantidad de filas de la superficie.
-     * @param cols Cantidad de columnas de la superficie.
-     * @param initialTemperature Temperatura inicial asignada a todas las celdas.
+     * @param rows Number of rows of the surface.
+     * @param cols Number of columns of the surface.
+     * @param initialTemperature Initial temperature assigned to all cells.
      */
     Grid(
         std::size_t rows,
@@ -32,11 +32,11 @@ public:
     );
 
     /**
-     * @brief Permite acceder y modificar una celda de la malla.
+     * @brief Allows accessing and modifying a cell of the grid.
      *
-     * @param row Fila de la celda.
-     * @param col Columna de la celda.
-     * @return Referencia al valor de temperatura almacenado en la celda.
+     * @param row Row of the cell.
+     * @param col Column of the cell.
+     * @return Reference to the temperature value stored in the cell.
      */
     double& operator()(
         std::size_t row,
@@ -44,14 +44,14 @@ public:
     );
 
     /**
-     * @brief Permite consultar una celda de una malla constante.
+     * @brief Allows querying a cell of a constant grid.
      *
-     * Esta versión evita modificar accidentalmente la temperatura cuando
-     * el objeto Grid fue recibido como constante.
+     * This version avoids accidentally modifying the temperature when
+     * the Grid object was received as constant.
      *
-     * @param row Fila de la celda.
-     * @param col Columna de la celda.
-     * @return Referencia constante al valor de temperatura almacenado.
+     * @param row Row of the cell.
+     * @param col Column of the cell.
+     * @return Constant reference to the stored temperature value.
      */
     const double& operator()(
         std::size_t row,
@@ -59,56 +59,56 @@ public:
     ) const;
 
     /**
-     * @brief Obtiene la cantidad de filas de la malla.
+     * @brief Gets the number of rows of the grid.
      *
-     * @return Número de filas.
+     * @return Number of rows.
      */
     std::size_t rows() const;
 
     /**
-     * @brief Obtiene la cantidad de columnas de la malla.
+     * @brief Gets the number of columns of the grid.
      *
-     * @return Número de columnas.
+     * @return Number of columns.
      */
     std::size_t cols() const;
 
     /**
-     * @brief Obtiene la cantidad total de celdas de la malla.
+     * @brief Gets the total number of cells of the grid.
      *
-     * @return Número total de elementos almacenados.
+     * @return Total number of stored elements.
      */
     std::size_t size() const;
 
     /**
-     * @brief Asigna la misma temperatura a todas las celdas.
+     * @brief Assigns the same temperature to all cells.
      *
-     * @param temperature Temperatura que se asignará a toda la superficie.
+     * @param temperature Temperature that will be assigned to the entire surface.
      */
     void fill(double temperature);
 
 private:
 
     /**
-     * @brief Convierte una posición bidimensional en un índice lineal.
+     * @brief Converts a two-dimensional position into a linear index.
      *
-     * La conversión utiliza almacenamiento row-major:
+     * The conversion uses row-major storage:
      *
      * index = row * cols + col
      *
-     * @param row Fila de la celda.
-     * @param col Columna de la celda.
-     * @return Índice correspondiente dentro del vector interno.
+     * @param row Row of the cell.
+     * @param col Column of the cell.
+     * @return Index corresponding to the internal vector.
      */
     std::size_t index(
         std::size_t row,
         std::size_t col
     ) const;
 
-    std::size_t rows_;       // Cantidad de filas existentes en la malla.
+    std::size_t rows_;       // Number of rows existing in the grid.
 
-    std::size_t cols_;       // Cantidad de columnas existentes en la malla.
+    std::size_t cols_;       // Number of columns existing in the grid.
 
-    std::vector<double> data_;  // Vector contiguo que almacena todas las temperaturas.
+    std::vector<double> data_;  // Contiguous vector that stores all temperatures.
 };
 
 }  // namespace heat2d

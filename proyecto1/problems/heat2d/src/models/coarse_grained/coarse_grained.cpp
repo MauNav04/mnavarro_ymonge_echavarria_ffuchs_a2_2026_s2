@@ -17,7 +17,9 @@ namespace heat2d {
 namespace {
 
 /**
- * @brief Intervalo semiabierto de filas interiores [first, last).
+ * @brief Represents a half-open interval of interior rows [first, last).
+ * 
+ * Used for static partitioning of the spatial domain among thread workers.
  */
 struct RowRange {
     std::size_t first;
@@ -25,7 +27,12 @@ struct RowRange {
 };
 
 /**
- * @brief Multiplica dos contadores verificando overflow.
+ * @brief Multiplies two counters with strict overflow protection.
+ *
+ * Designed to prevent silent arithmetic wraparounds when calculating 
+ * vast quantities of simulated cellular updates over thousands of timesteps.
+ *
+ * @throws std::overflow_error If the product exceeds uint64_t capacity.
  */
 std::uint64_t checkedMultiply(
     std::uint64_t left,
@@ -45,10 +52,13 @@ std::uint64_t checkedMultiply(
 }
 
 /**
- * @brief Divide las filas interiores entre los workers.
+ * @brief Distributes the interior rows of the grid across OS threads.
  *
- * La partición es contigua y balanceada. Los primeros workers reciben
- * una fila adicional cuando la división no es exacta.
+ * Implements a static, contiguous partitioning strategy. If the total number 
+ * of interior rows does not divide evenly by the thread count, the remainder 
+ * `R` rows are distributed identically (one extra row) to the first `R` workers.
+ *
+ * @return std::vector<RowRange> containing the exact row boundaries per worker.
  */
 std::vector<RowRange> createRowRanges(
     std::size_t rows,
@@ -100,13 +110,13 @@ std::vector<RowRange> createRowRanges(
 }
 
 /**
- * @brief Simula un evento bloqueante de alta latencia.
+ * @brief Emulates a high-latency blocking event (e.g., I/O or LLC miss).
  *
- * sleep_for() suspende temporalmente al worker y permite que el
- * planificador del sistema operativo programe otro thread runnable.
- *
- * Esto representa un stall sintético y no debe interpretarse como
- * la latencia física exacta de un cache miss.
+ * Invokes an OS-level sleep, forcing the thread into a blocked state and 
+ * yielding the CPU back to the kernel scheduler. This allows the OS to 
+ * dispatch other ready threads (oversubscription latency hiding).
+ * 
+ * @param duration The exact wall-clock time the thread should remain suspended.
  */
 void simulateCostlyBlockingEvent(
     std::chrono::nanoseconds duration
@@ -121,13 +131,17 @@ void simulateCostlyBlockingEvent(
 }
 
 /**
- * @brief Determina si una fila finaliza un bloque Coarse-Grained.
+ * @brief Determines if the current row terminates a coarse processing chunk.
  *
- * Los eventos se definen utilizando el índice global de la fila,
- * independientemente del worker al que haya sido asignada.
- *
- * Esto mantiene constante el número total de eventos cuando cambia
- * threadCount.
+ * @param row The absolute global index of the row being processed.
+ * @param lastInteriorRow The global index of the grid's final computable row.
+ * @param rowsPerBlockingEvent The frequency threshold for synthetic stalls.
+ * 
+ * @return True if the thread should yield the CPU after this row.
+ * 
+ * Note: By evaluating against the global `row` index rather than a thread-local 
+ * counter, the total number of blocking events generated across the entire grid 
+ * remains mathematically constant, regardless of `threadCount`.
  */
 bool shouldBlockAfterRow(
     std::size_t row,
@@ -138,8 +152,8 @@ bool shouldBlockAfterRow(
         (row % rowsPerBlockingEvent) == 0;
 
     /*
-     * La última región puede contener menos filas que el tamaño
-     * completo del bloque. También debe producir un evento.
+     * The final sub-region might contain fewer rows than a full chunk,
+     * but must still emit a blocking event to ensure statistical equivalence.
      */
     const bool completedFinalPartialBlock =
         row == lastInteriorRow;
@@ -151,6 +165,14 @@ bool shouldBlockAfterRow(
 
 } // namespace
 
+/**
+ * @brief Main execution orchestrator for the Coarse-Grained Multithreading (CGMT) model.
+ * 
+ * Spawns real OS threads (`std::thread`), chunks the grid statically, and coordinates 
+ * the simulation using a multi-phase synchronization barrier. Injects periodic 
+ * high-latency stalls to evaluate the OS scheduler's capability to hide latency 
+ * through thread oversubscription.
+ */
 CoarseGrainedStats runCoarseGrained(
     Grid& current,
     Grid& next,
@@ -163,7 +185,7 @@ CoarseGrainedStats runCoarseGrained(
     const CoarseGrainedConfig& coarseConfig
 ) {
     /*
-     * Validación estructural.
+     * Architectural assertions & Grid boundary validation.
      */
     if (
         current.rows() != next.rows() ||
@@ -206,8 +228,8 @@ CoarseGrainedStats runCoarseGrained(
     }
 
     /*
-     * Se calculan una única vez los coeficientes utilizados por
-     * todas las actualizaciones.
+     * Pre-calculate thermodynamic constants to avoid redundant float math 
+     * inside the deep innermost loops.
      */
     const DiffusionCoefficients coefficients =
         makeDiffusionCoefficients(
@@ -236,7 +258,7 @@ CoarseGrainedStats runCoarseGrained(
         );
 
     /*
-     * Número de actualizaciones realizadas en cada timestep.
+     * Calculate theoretical payload sizes for logging and verification.
      */
     const std::uint64_t cellsPerStep =
         checkedMultiply(
@@ -253,12 +275,11 @@ CoarseGrainedStats runCoarseGrained(
         );
 
     /*
-     * Número global de eventos bloqueantes por timestep:
-     *
+     * Compute the global number of blocking events per timestep:
      * ceil(interiorRows / rowsPerBlockingEvent)
      *
-     * La expresión mediante división y módulo evita overflow en
-     * interiorRows + rowsPerBlockingEvent - 1.
+     * Division + Modulo avoids potential integer overflow from the standard 
+     * ceiling macro `(A + B - 1) / B`.
      */
     const std::uint64_t rowsPerEvent =
         static_cast<std::uint64_t>(
@@ -279,7 +300,7 @@ CoarseGrainedStats runCoarseGrained(
         );
 
     /*
-     * Cuando blockingDuration es cero, no se ejecuta ningún stall.
+     * If blocking duration is zero, bypass the event counter entirely.
      */
     if (
         coarseConfig.blockingDuration.count() > 0
@@ -294,10 +315,9 @@ CoarseGrainedStats runCoarseGrained(
     }
 
     /*
-     * Existen dos fases globales de barrera por timestep:
-     *
-     * 1. Todos terminaron de escribir next.
-     * 2. Todos observan boundary + swap antes del próximo timestep.
+     * The simulation requires a strict two-phase synchronization barrier per timestep:
+     * 1. All workers finish computing their chunks and writing to the `next` grid.
+     * 2. All workers observe the pointer swap and boundary updates before proceeding.
      */
     stats.barrierPhases =
         checkedMultiply(
@@ -308,14 +328,14 @@ CoarseGrainedStats runCoarseGrained(
         );
 
     /*
-     * Una simulación sin pasos no necesita crear workers.
+     * Zero-step fast exit.
      */
     if (steps == 0) {
         return stats;
     }
 
     /*
-     * Partición estática y contigua del dominio.
+     * Static and contiguous domain partitioning.
      */
     const std::vector<RowRange> ranges =
         createRowRanges(
@@ -324,9 +344,8 @@ CoarseGrainedStats runCoarseGrained(
         );
 
     /*
-     * Todos los workers participan en las dos fases de barrera,
-     * incluso cuando alguno recibió un rango vacío debido a
-     * over-partitioning.
+     * All spun-up threads must participate in the dual-phase barrier, 
+     * even if a thread received an empty spatial range due to over-partitioning.
      */
     ReusableBarrier barrier(
         coarseConfig.threadCount
@@ -349,6 +368,7 @@ CoarseGrainedStats runCoarseGrained(
         const RowRange range =
             ranges[threadId];
 
+        // Spawn OS-level thread capturing threadId and workload range by value.
         workers.emplace_back(
             [&, threadId, range]() {
 
@@ -358,10 +378,8 @@ CoarseGrainedStats runCoarseGrained(
                     ++step
                 ) {
                     /*
-                     * Cada worker procesa únicamente sus filas.
-                     *
-                     * Todos leen current y escriben regiones
-                     * disjuntas de next.
+                     * Lock-free compute phase: Each thread reads from the shared `current` 
+                     * buffer and writes to its strictly disjoint, private region in `next`.
                      */
                     for (
                         std::size_t row = range.first;
@@ -383,12 +401,9 @@ CoarseGrainedStats runCoarseGrained(
                         }
 
                         /*
-                         * Un stall sintético ocurre únicamente después
-                         * de completar un bloque grueso de filas.
-                         *
-                         * La condición utiliza el índice GLOBAL de la
-                         * fila, por lo que el número total de eventos
-                         * no depende de threadCount.
+                         * Check if the thread must yield after finishing this row.
+                         * The logic relies on the GLOBAL row index to ensure the total 
+                         * stall volume injected into the system remains invariant.
                          */
                         if (
                             coarseConfig.blockingDuration.count() > 0 &&
@@ -405,16 +420,15 @@ CoarseGrainedStats runCoarseGrained(
                     }
 
                     /*
-                     * FASE 1:
-                     *
-                     * Todos deben haber terminado next antes de
-                     * modificar las fronteras o intercambiar mallas.
+                     * PHASE 1: Execution Sync
+                     * Ensure all threads have finished evaluating the stencil 
+                     * before the main thread touches boundary conditions or swaps grids.
                      */
                     barrier.wait();
 
                     /*
-                     * Un único worker realiza el trabajo serial
-                     * necesario para cerrar el timestep.
+                     * Serial execution phase: Thread 0 handles global state updates 
+                     * while all other threads sleep inside the barrier.
                      */
                     if (threadId == 0) {
                         applyFixedBoundary(
@@ -429,10 +443,9 @@ CoarseGrainedStats runCoarseGrained(
                     }
 
                     /*
-                     * FASE 2:
-                     *
-                     * Ningún worker puede comenzar el siguiente
-                     * timestep hasta que boundary + swap terminen.
+                     * PHASE 2: Swap Sync
+                     * Ensure no thread begins step K+1 until Thread 0 has successfully 
+                     * swapped the `current` and `next` pointers.
                      */
                     barrier.wait();
                 }
@@ -441,7 +454,7 @@ CoarseGrainedStats runCoarseGrained(
     }
 
     /*
-     * Espera por la terminación de todos los workers.
+     * Join all OS threads before yielding control back to the caller.
      */
     for (
         std::thread& worker :

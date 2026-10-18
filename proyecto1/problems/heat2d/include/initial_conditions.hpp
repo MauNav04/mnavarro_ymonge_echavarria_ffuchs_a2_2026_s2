@@ -1,23 +1,23 @@
-#pragma once  // Evita que este archivo de cabecera sea incluido más de una vez durante la compilación.
+#pragma once  // Prevents this header file from being included more than once during compilation.
 
-#include "grid.hpp"  // Incluye la definición de Grid para poder modificar la superficie de temperaturas.
+#include "grid.hpp"  // Includes the Grid definition to be able to modify the temperature surface.
 
-namespace heat2d {  // Agrupa estas funciones dentro del espacio de nombres del proyecto Heat2D.
+namespace heat2d {  // Groups these functions within the Heat2D project namespace.
 
 /**
- * @brief Inicializa la superficie utilizando una distribución sinusoidal bidimensional.
+ * @brief Initializes the surface using a two-dimensional sinusoidal distribution.
  *
- * La temperatura inicial se calcula mediante:
+ * The initial temperature is computed as:
  *
  * T(x,y) = Tmax * sin(pi*x/Lx) * sin(pi*y/Ly)
  *
- * Esta distribución produce temperatura cero en los bordes y una
- * temperatura máxima aproximadamente en el centro de la superficie.
+ * This distribution produces zero temperature at the boundaries and a
+ * maximum temperature approximately at the center of the surface.
  *
- * @param grid Malla bidimensional donde se almacenarán las temperaturas.
- * @param maxTemperature Temperatura máxima de la distribución inicial.
- * @param lengthX Longitud física de la superficie en el eje X.
- * @param lengthY Longitud física de la superficie en el eje Y.
+ * @param grid Two-dimensional grid where the temperatures will be stored.
+ * @param maxTemperature Maximum temperature of the initial distribution.
+ * @param lengthX Physical length of the surface along the X axis.
+ * @param lengthY Physical length of the surface along the Y axis.
  */
 void initializeSinusoidal(
     Grid& grid,
@@ -27,13 +27,13 @@ void initializeSinusoidal(
 );
 
 /**
- * @brief Establece una temperatura fija en los cuatro bordes de la superficie.
+ * @brief Sets a fixed temperature at the four boundaries of the surface.
  *
- * Esta función implementa una condición de frontera de Dirichlet,
- * donde la temperatura de los bordes permanece fijada a un valor conocido.
+ * This function implements a Dirichlet boundary condition,
+ * where the boundary temperature remains fixed at a known value.
  *
- * @param grid Malla bidimensional que será modificada.
- * @param boundaryTemperature Temperatura asignada a los cuatro bordes.
+ * @param grid Two-dimensional grid that will be modified.
+ * @param boundaryTemperature Temperature assigned to the four boundaries.
  */
 void applyFixedBoundary(
     Grid& grid,

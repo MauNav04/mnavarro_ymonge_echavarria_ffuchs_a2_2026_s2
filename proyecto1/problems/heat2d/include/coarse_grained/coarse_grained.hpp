@@ -9,82 +9,82 @@
 namespace heat2d {
 
 /**
- * @brief Configuración específica del modelo Coarse-Grained.
+ * @brief Configuration specific to the Coarse-Grained model.
  *
- * El modelo utiliza threads reales. Cada worker procesa regiones
- * contiguas de filas y, después de una cantidad configurable de filas,
- * puede experimentar un evento bloqueante sintético de alta latencia.
+ * The model uses real threads. Each worker processes contiguous
+ * row regions and, after a configurable number of rows,
+ * may experience a synthetic high-latency blocking event.
  */
 struct CoarseGrainedConfig {
     /**
-     * Cantidad de workers reales utilizados por la simulación.
+     * Number of real workers used by the simulation.
      */
     std::size_t threadCount{1};
 
     /**
-     * Duración solicitada para cada evento bloqueante sintético.
+     * Requested duration for each synthetic blocking event.
      *
-     * Una duración de cero desactiva los bloqueos.
+     * A duration of zero disables blocking.
      */
     std::chrono::nanoseconds blockingDuration{0};
 
     /**
-     * Cantidad de filas interiores procesadas entre eventos
-     * bloqueantes sintéticos.
+     * Number of interior rows processed between synthetic
+     * blocking events.
      *
-     * El valor formal propuesto para los experimentos es 8.
+     * The formal value proposed for the experiments is 8.
      */
     std::size_t rowsPerBlockingEvent{8};
 };
 
 /**
- * @brief Estadísticas internas de una ejecución Coarse-Grained.
+ * @brief Internal statistics of a Coarse-Grained execution.
  */
 struct CoarseGrainedStats {
     std::size_t threadCount{0};
     std::size_t timeSteps{0};
 
     /**
-     * Cantidad total de actualizaciones de celdas interiores.
+     * Total number of interior cell updates.
      */
     std::uint64_t executedCellUpdates{0};
 
     /**
-     * Cantidad total de eventos bloqueantes sintéticos ejecutados.
+     * Total number of synthetic blocking events executed.
      *
-     * Si blockingDuration == 0, el valor es cero.
+     * If blockingDuration == 0, the value is zero.
      */
     std::uint64_t blockingEvents{0};
 
     /**
-     * Cantidad de fases globales de barrera.
+     * Number of global barrier phases.
      *
-     * Se utilizan dos por timestep:
-     *  1. Finalización del cálculo de next.
-     *  2. Finalización de boundary + swap.
+     * Two are used per timestep:
+     *  1. Completion of the next computation.
+     *  2. Completion of boundary + swap.
      */
     std::uint64_t barrierPhases{0};
 };
 
 /**
- * @brief Ejecuta Heat2D utilizando el modelo Coarse-Grained.
+ * @brief Runs Heat2D using the Coarse-Grained model.
  *
- * Los workers son std::thread reales. Cada uno procesa un rango
- * contiguo de filas interiores. Los eventos bloqueantes sintéticos
- * ocurren después de bloques grandes de filas, mientras que una
- * barrera reutilizable mantiene la consistencia entre timesteps.
+ * The workers are real std::threads. Each one processes a contiguous
+ * range of interior rows. Synthetic blocking events occur after large
+ * blocks of rows, while a reusable barrier maintains consistency
+ * between timesteps.
  *
- * @param current Malla correspondiente al estado actual.
- * @param next Malla auxiliar para el siguiente timestep.
- * @param steps Cantidad de timesteps.
- * @param alpha Difusividad térmica.
- * @param dt Paso temporal.
- * @param dx Separación espacial horizontal.
- * @param dy Separación espacial vertical.
- * @param boundaryTemperature Temperatura fija de frontera.
- * @param coarseConfig Configuración específica de Coarse-Grained.
+ * @param current Grid corresponding to the current state.
+ * @param next Auxiliary grid for the next timestep.
+ * @param steps Number of timesteps.
+ * @param alpha Thermal diffusivity.
+ * @param dt Time step.
+ * @param dx Horizontal spatial separation.
+ * @param dy Vertical spatial separation.
+ * @param boundaryTemperature Fixed boundary temperature.
+ * @param coarseConfig Configuration specific to Coarse-Grained.
  *
- * @return Estadísticas de la ejecución.
+ * @return Statistics of the execution.
  */
 [[nodiscard]]
 CoarseGrainedStats runCoarseGrained(

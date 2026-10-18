@@ -20,7 +20,14 @@ constexpr std::size_t kDefaultRowsPerBlockingEvent =
     8;
 
 /**
- * @brief Convierte un argumento a entero positivo.
+ * @brief Parses a command-line argument as a strictly positive integer.
+ * 
+ * Used primarily to extract the number of thread workers or the rows per chunk.
+ * Enforces rigorous boundary checks to prevent runtime zero-division or 
+ * overflow vulnerabilities.
+ *
+ * @throws std::invalid_argument If the string is empty, negative, zero, or unparseable.
+ * @throws std::out_of_range If the numeric value exceeds `std::size_t` limits.
  */
 std::size_t parsePositiveSize(
     const char* text,
@@ -74,10 +81,11 @@ std::size_t parsePositiveSize(
 }
 
 /**
- * @brief Convierte un argumento a entero no negativo.
+ * @brief Parses a command-line argument as a non-negative integer.
  *
- * Se utiliza para la duración del bloqueo porque cero desactiva
- * explícitamente los stalls sintéticos.
+ * Specifically designed for the blocking duration parameter, where `0` is a 
+ * valid and expected input that explicitly deactivates the synthetic stall 
+ * injection mechanism without breaking execution logic.
  */
 std::size_t parseNonNegativeSize(
     const char* text,
@@ -130,7 +138,7 @@ std::size_t parseNonNegativeSize(
 }
 
 /**
- * @brief Muestra la interfaz de línea de comandos.
+ * @brief Displays the Command Line Interface syntax and defaults.
  */
 void printUsage(
     const char* programName
@@ -163,6 +171,14 @@ void printUsage(
 
 } // namespace
 
+/**
+ * @brief Entry point for the Coarse-Grained Multithreading (CGMT) standalone test.
+ * 
+ * Instantiates the computational grid, processes execution parameters from the CLI 
+ * (including threads and latency injection values), and triggers the thread pool.
+ * It is solely responsible for chronometer bounds (strictly around the computation 
+ * phase) to avoid initialization/IO noise in the reported metrics.
+ */
 int main(
     int argc,
     char* argv[]
@@ -191,6 +207,7 @@ int main(
         std::size_t rowsPerBlockingEvent =
             kDefaultRowsPerBlockingEvent;
 
+        // Parse optional latency parameters.
         if (argc >= 3) {
             blockingMicroseconds =
                 parseNonNegativeSize(
@@ -209,6 +226,7 @@ int main(
 
         const heat2d::SimulationConfig config;
 
+        // Assert numerical safety for the given Forward Euler discretization.
         const bool stable =
             heat2d::isStable(
                 config.alpha,
@@ -235,6 +253,7 @@ int main(
             config.boundaryTemperature
         );
 
+        // Pre-heat the matrix according to the problem constraints.
         heat2d::initializeSinusoidal(
             current,
             config.maxTemperature,
@@ -260,7 +279,7 @@ int main(
             );
 
         /*
-         * Configuración específica Coarse-Grained.
+         * Setup the explicit struct defining Coarse-Grained properties.
          */
         heat2d::CoarseGrainedConfig coarseConfig;
 
@@ -275,6 +294,7 @@ int main(
         coarseConfig.rowsPerBlockingEvent =
             rowsPerBlockingEvent;
 
+        // Configuration Dump
         std::cout
             << "\n=== Heat Diffusion 2D - Coarse-Grained ===\n";
 
@@ -351,9 +371,11 @@ int main(
         std::cout
             << "Numerical stability: STABLE\n";
 
+        // === TIMING REGION START ===
         const auto start =
             std::chrono::steady_clock::now();
 
+        // Dispatch OS-level threads, evaluate chunks, and handle dual-phase sync.
         const heat2d::CoarseGrainedStats stats =
             heat2d::runCoarseGrained(
                 current,
@@ -369,12 +391,14 @@ int main(
 
         const auto end =
             std::chrono::steady_clock::now();
+        // === TIMING REGION END ===
 
         const double elapsedSeconds =
             std::chrono::duration<double>(
                 end - start
             ).count();
 
+        // Post-execution evaluation.
         const double finalCenterTemperature =
             current(
                 centerRow,

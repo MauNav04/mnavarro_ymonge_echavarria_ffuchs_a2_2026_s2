@@ -13,10 +13,21 @@
 
 namespace {
 
+/**
+ * @brief Allowable floating-point drift for numerical validation.
+ * 
+ * Used when asserting that the Fine-Grained execution matches the strictly 
+ * sequential baseline. 1e-12 accommodates IEEE-754 summation variations 
+ * caused by out-of-order execution, while catching structural logic bugs.
+ */
 constexpr double comparisonTolerance = 1e-12;
 
 /**
- * @brief Falla la prueba cuando una condición esperada no se cumple.
+ * @brief Asserts an expected condition, halting execution on failure.
+ *
+ * Provides a localized testing mechanism that throws a standard exception 
+ * instead of invoking `std::abort` like the `assert` macro, allowing the 
+ * test suite to exit gracefully.
  */
 void require(
     bool condition,
@@ -28,8 +39,11 @@ void require(
 }
 
 /**
- * @brief Configuración pequeña pero suficientemente representativa
- *        para validar el modelo Fine-Grained.
+ * @brief Generates a stable, computationally light 2D test scenario.
+ *
+ * 51x51 resolution guarantees sufficient interior cells to validate 
+ * thread partitioning and Round-Robin distribution without causing 
+ * excessive integration test execution time.
  */
 heat2d::SimulationConfig createTestConfiguration() {
     heat2d::SimulationConfig config;
@@ -51,8 +65,10 @@ heat2d::SimulationConfig createTestConfiguration() {
 }
 
 /**
- * @brief Inicializa una malla usando exactamente las mismas condiciones
- *        empleadas por el modelo base.
+ * @brief Consistently initializes a test grid.
+ *
+ * Applies the sinusoidal thermal wave and fixed Dirichlet boundary conditions 
+ * required for deterministic evaluation.
  */
 void initializeGrid(
     heat2d::Grid& grid,
@@ -72,7 +88,11 @@ void initializeGrid(
 }
 
 /**
- * @brief Ejecuta la implementación secuencial usada como referencia.
+ * @brief Generates the single-threaded baseline "ground truth" grid.
+ *
+ * The Sequential model relies purely on a nested loop structure without 
+ * synchronization overhead, making it the mathematical reference standard 
+ * for validating the concurrency models.
  */
 void runSequentialReference(
     heat2d::Grid& current,
@@ -102,7 +122,12 @@ void runSequentialReference(
 }
 
 /**
- * @brief Calcula la máxima diferencia absoluta entre dos mallas.
+ * @brief Computes the maximum absolute delta between two grids.
+ * 
+ * Evaluates every corresponding cell across both matrices. Used to detect 
+ * non-deterministic execution flaws or boundary-condition overwrites.
+ *
+ * @throws std::runtime_error If the two grids have different dimensions.
  */
 double calculateMaximumDifference(
     const heat2d::Grid& first,
@@ -142,7 +167,10 @@ double calculateMaximumDifference(
 }
 
 /**
- * @brief Verifica que todos los bordes mantengan la temperatura fija.
+ * @brief Asserts that Dirichlet boundary conditions were not violated.
+ *
+ * Ensures the concurrent models didn't incorrectly process perimeter 
+ * cells (rows 0/N, columns 0/N) during their stencil execution phases.
  */
 void validateBoundaries(
     const heat2d::Grid& grid,
@@ -194,8 +222,11 @@ void validateBoundaries(
 }
 
 /**
- * @brief Ejecuta Fine-Grained con una cantidad determinada
- *        de hilos lógicos y lo compara con la referencia secuencial.
+ * @brief Validates a single Fine-Grained run against the sequential ground truth.
+ *
+ * Executes the Fine-Grained model, compares its output grid against the provided 
+ * sequential reference, and asserts the generated metadata (executed quanta, 
+ * logical thread count).
  */
 void testFineGrainedAgainstSequential(
     const heat2d::SimulationConfig& config,
@@ -232,6 +263,7 @@ void testFineGrainedAgainstSequential(
             config.boundaryTemperature
         );
 
+    // Verify mathematical correctness of the Round-Robin dispatcher.
     const std::size_t interiorCells =
         (config.rows - 2) *
         (config.cols - 2);
@@ -255,11 +287,13 @@ void testFineGrainedAgainstSequential(
         "Fine-Grained executed an incorrect number of quanta."
     );
 
+    // Verify boundary constraints remain unbroken.
     validateBoundaries(
         current,
         config.boundaryTemperature
     );
 
+    // Assert computational parity with the Serial model.
     const double maximumDifference =
         calculateMaximumDifference(
             sequentialResult,
@@ -282,8 +316,10 @@ void testFineGrainedAgainstSequential(
 }
 
 /**
- * @brief Comprueba configuraciones con diferentes cantidades
- *        de hilos lógicos.
+ * @brief Executes parity checks across exponential thread configurations.
+ * 
+ * Verifies that the internal grid-partitioning and task-scheduling logic 
+ * scales correctly from 1 to 64 contexts without dropping cell updates.
  */
 void testMultipleLogicalThreadCounts() {
     const heat2d::SimulationConfig config =
@@ -343,7 +379,7 @@ void testMultipleLogicalThreadCounts() {
 }
 
 /**
- * @brief Verifica que cero hilos lógicos sea rechazado.
+ * @brief Asserts that the API structurally rejects zero-thread configurations.
  */
 void testZeroLogicalThreadsAreRejected() {
     const heat2d::SimulationConfig config =
@@ -374,7 +410,7 @@ void testZeroLogicalThreadsAreRejected() {
                 current,
                 next,
                 config.steps(),
-                0,
+                0, // Illegal logical thread count
                 config.alpha,
                 config.dt,
                 config.dx(),
@@ -393,7 +429,10 @@ void testZeroLogicalThreadsAreRejected() {
 }
 
 /**
- * @brief Verifica una ejecución válida sin timesteps.
+ * @brief Asserts stability when requested to execute zero timesteps.
+ * 
+ * Verifies that the model cleanly exits without initiating execution loops 
+ * or modifying the source grid.
  */
 void testZeroTimeSteps() {
     const heat2d::SimulationConfig config =
@@ -431,7 +470,7 @@ void testZeroTimeSteps() {
         heat2d::fine_grained::runFineGrained(
             current,
             next,
-            0,
+            0, // Zero time steps
             4,
             config.alpha,
             config.dt,
@@ -461,12 +500,13 @@ void testZeroTimeSteps() {
         "Zero-step simulation modified the initial grid."
     );
 }
+
 /**
- * @brief Verifica una sobrepartición extrema del dominio.
+ * @brief Validates the spatial partitioner against extreme oversubscription.
  *
- * La malla posee únicamente cinco filas interiores, pero se crean
- * 5000 contextos lógicos. Solo los primeros cinco reciben filas;
- * los demás deben permanecer inactivos sin afectar el resultado.
+ * Configures 5000 logical contexts for a domain containing only 5 interior rows.
+ * Asserts that the Round-Robin dispatcher correctly handles the massive volume 
+ * of empty (depleted) threads without crashing or miscalculating results.
  */
 void testMoreLogicalThreadsThanInteriorRows() {
     heat2d::SimulationConfig config;
@@ -525,12 +565,13 @@ void testMoreLogicalThreadsThanInteriorRows() {
         logicalThreadCount
     );
 }
+
 /**
- * @brief Verifica la malla mínima válida del modelo Heat2D.
+ * @brief Validates execution behavior on the smallest permissible grid size.
  *
- * Una malla 3x3 contiene exactamente una celda interior.
- * El test comprueba que esa única celda pueda distribuirse
- * correctamente incluso cuando existen múltiples hilos lógicos.
+ * A 3x3 grid contains exactly one interior computational cell.
+ * Tests if the scheduler properly executes the simulation when N threads 
+ * compete for exactly 1 unit of work.
  */
 void testMinimumGrid() {
     heat2d::SimulationConfig config;
@@ -601,6 +642,12 @@ void testMinimumGrid() {
 }
 }  // namespace
 
+/**
+ * @brief Central execution suite for the Fine-Grained model integration tests.
+ * 
+ * Verifies parity against the ground truth sequential solver across varying 
+ * topological extremes (thread scaling, minimum grids, massive oversubscription).
+ */
 int main() {
     try {
         std::cout

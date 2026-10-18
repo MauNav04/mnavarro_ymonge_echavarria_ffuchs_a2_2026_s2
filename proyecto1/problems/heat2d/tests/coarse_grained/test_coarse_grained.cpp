@@ -18,7 +18,10 @@
 namespace {
 
 /**
- * @brief Calcula la diferencia absoluta máxima entre dos mallas.
+ * @brief Computes the absolute maximum difference between two temperature grids.
+ *
+ * Used to verify mathematical equivalence between the parallel Coarse-Grained 
+ * solver and the strictly single-threaded sequential reference model.
  */
 double maximumGridDifference(
     const heat2d::Grid& first,
@@ -60,7 +63,7 @@ double maximumGridDifference(
 }
 
 /**
- * @brief Construye la condición inicial común para las pruebas.
+ * @brief Constructs and initializes the baseline thermal state for testing.
  */
 heat2d::Grid createInitialGrid(
     const heat2d::SimulationConfig& config
@@ -87,10 +90,10 @@ heat2d::Grid createInitialGrid(
 }
 
 /**
- * @brief Compara Coarse-Grained contra la referencia secuencial.
+ * @brief Compares Coarse-Grained simulation output against the sequential ground truth.
  *
- * El bloqueo sintético se desactiva para aislar la corrección
- * numérica del solver paralelo.
+ * Synthetic blocking is temporarily disabled during this parity check to isolate 
+ * pure numerical correction from OS scheduling noise.
  */
 void testAgainstSequential(
     std::size_t threadCount
@@ -110,7 +113,7 @@ void testAgainstSequential(
         createInitialGrid(config);
 
     /*
-     * Referencia secuencial.
+     * Sequential reference baseline.
      */
     heat2d::Grid sequentialCurrent =
         initial;
@@ -133,7 +136,7 @@ void testAgainstSequential(
     );
 
     /*
-     * Ejecución Coarse-Grained.
+     * Coarse-Grained execution.
      */
     heat2d::Grid coarseCurrent =
         initial;
@@ -153,8 +156,8 @@ void testAgainstSequential(
         std::chrono::nanoseconds{0};
 
     /*
-     * Aunque el bloqueo está desactivado, usamos explícitamente
-     * la política propuesta para el modelo formal.
+     * Although blocking is disabled here, we explicitly initialize 
+     * the grouping policy field to satisfy structural parameters.
      */
     coarseConfig.rowsPerBlockingEvent =
         8;
@@ -259,7 +262,7 @@ void testAgainstSequential(
 }
 
 /**
- * @brief Verifica que no se acepten cero workers.
+ * @brief Asserts that initializing the model with zero workers throws an exception.
  */
 void testRejectsZeroThreads() {
     heat2d::SimulationConfig config;
@@ -307,11 +310,10 @@ void testRejectsZeroThreads() {
 }
 
 /**
- * @brief Verifica que el mecanismo de bloqueo sintético realmente
- *        introduzca una espera observable.
+ * @brief Verifies that the synthetic blocking mechanism produces measurable delays.
  *
- * Este test utiliza una granularidad de una fila por evento para
- * ejercer agresivamente la ruta de bloqueo.
+ * Aggressively exercises the stall logic by setting a frequency threshold 
+ * of 1 row per blocking event.
  */
 void testBlockingEvents() {
     heat2d::SimulationConfig config;
@@ -329,7 +331,7 @@ void testBlockingEvents() {
         createInitialGrid(config);
 
     /*
-     * Ejecución sin bloqueo.
+     * Unblocked baseline run.
      */
     heat2d::Grid unblockedCurrent =
         initial;
@@ -348,9 +350,6 @@ void testBlockingEvents() {
     unblockedConfig.blockingDuration =
         std::chrono::nanoseconds{0};
 
-    /*
-     * Para esta prueba específica usamos una fila por evento.
-     */
     unblockedConfig.rowsPerBlockingEvent =
         1;
 
@@ -380,7 +379,7 @@ void testBlockingEvents() {
         ).count();
 
     /*
-     * Ejecución con bloqueo.
+     * Blocked execution run.
      */
     heat2d::Grid blockedCurrent =
         initial;
@@ -397,8 +396,7 @@ void testBlockingEvents() {
         4;
 
     /*
-     * 1 ms hace que el efecto sea suficientemente grande para
-     * distinguirlo del overhead normal del scheduler.
+     * 1 ms guarantees an observable delay well above OS scheduling jitter.
      */
     blockedConfig.blockingDuration =
         std::chrono::milliseconds{1};
@@ -432,7 +430,7 @@ void testBlockingEvents() {
         ).count();
 
     /*
-     * El bloqueo no puede modificar el resultado numérico.
+     * Artificial stalls must never corrupt the mathematical output of the diffusion equation.
      */
     const double maxDifference =
         maximumGridDifference(
@@ -452,15 +450,6 @@ void testBlockingEvents() {
         );
     }
 
-    /*
-     * Malla 11x11:
-     *
-     * 9 filas interiores
-     * 5 timesteps
-     * 1 fila/evento
-     *
-     * 9 * 5 = 45 eventos.
-     */
     const std::uint64_t expectedBlockingEvents =
         static_cast<std::uint64_t>(
             config.rows - 2
@@ -486,10 +475,6 @@ void testBlockingEvents() {
         );
     }
 
-    /*
-     * No exigimos proporcionalidad exacta debido al scheduler,
-     * pero sí un incremento claramente observable.
-     */
     constexpr double minimumObservableIncrease =
         0.005;
 
@@ -519,16 +504,11 @@ void testBlockingEvents() {
 }
 
 /**
- * @brief Verifica específicamente la nueva política de agrupación
- *        de filas usada por el modelo formal.
+ * @brief Validates the custom row-chunk grouping frequency policy.
  *
- * Para 17 filas interiores y bloques de 8:
- *
- * ceil(17 / 8) = 3 eventos/timestep.
- *
- * Con 3 timesteps:
- *
- * 3 * 3 = 9 eventos.
+ * For 17 interior rows and blocks of 8:
+ * ceil(17 / 8) = 3 events per timestep.
+ * Across 3 timesteps, this results in exactly 9 total blocking events.
  */
 void testBlockingEventGrouping() {
     heat2d::SimulationConfig config;
@@ -545,9 +525,6 @@ void testBlockingEventGrouping() {
     const heat2d::Grid initial =
         createInitialGrid(config);
 
-    /*
-     * Referencia secuencial.
-     */
     heat2d::Grid sequentialCurrent =
         initial;
 
@@ -568,11 +545,6 @@ void testBlockingEventGrouping() {
         config.boundaryTemperature
     );
 
-    /*
-     * Coarse-Grained con la política formal:
-     *
-     * 100 us cada 8 filas.
-     */
     heat2d::Grid coarseCurrent =
         initial;
 
@@ -606,11 +578,6 @@ void testBlockingEventGrouping() {
             coarseConfig
         );
 
-    /*
-     * 19 filas totales -> 17 interiores.
-     *
-     * ceil(17 / 8) = 3.
-     */
     const std::uint64_t interiorRows =
         static_cast<std::uint64_t>(
             config.rows - 2
@@ -674,7 +641,7 @@ void testBlockingEventGrouping() {
 }
 
 /**
- * @brief Verifica que una duración bloqueante negativa sea rechazada.
+ * @brief Asserts that negative stall durations are rejected by validation logic.
  */
 void testRejectsNegativeBlockingDuration() {
     heat2d::SimulationConfig config;
@@ -726,7 +693,7 @@ void testRejectsNegativeBlockingDuration() {
 }
 
 /**
- * @brief Verifica que rowsPerBlockingEvent no pueda ser cero.
+ * @brief Asserts that a zero frequency threshold for rows per blocking event is rejected.
  */
 void testRejectsZeroRowsPerBlockingEvent() {
     heat2d::SimulationConfig config;
@@ -781,7 +748,7 @@ void testRejectsZeroRowsPerBlockingEvent() {
 }
 
 /**
- * @brief Verifica que una ejecución sin timesteps no modifique el estado.
+ * @brief Verifies that executing zero timesteps leaves the matrix untouched.
  */
 void testZeroSteps() {
     heat2d::SimulationConfig config;
@@ -868,6 +835,12 @@ void testZeroSteps() {
 
 } // namespace
 
+/**
+ * @brief Central test runner for the Coarse-Grained Multithreading (CGMT) model.
+ * 
+ * Executes comprehensive integration checks covering thread scaling parity, 
+ * synthetic latency injection, grouping frequency assertions, and boundary error handling.
+ */
 int main() {
     try {
         std::cout

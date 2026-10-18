@@ -114,6 +114,11 @@ private:
 
 /**
  * @brief Safely multiplies two uint64_t values.
+ * 
+ * Includes explicit bounds-checking against `std::numeric_limits<std::uint64_t>::max()` 
+ * to prevent silent integer overflow during execution statistics generation.
+ *
+ * @throws std::overflow_error If the multiplication overflows.
  */
 std::uint64_t checkedMultiply64(
     std::uint64_t left,
@@ -134,7 +139,7 @@ std::uint64_t checkedMultiply64(
 }
 
 /**
- * @brief Calculates the expected number of interior cell updates.
+ * @brief Calculates the expected number of interior cell updates safely.
  */
 std::uint64_t calculateExecutedCellUpdates(
     std::size_t rows,
@@ -286,7 +291,12 @@ void joinWorkers(
 
 }  // namespace
 
-
+/**
+ * @brief Main execution orchestrator for the Simultaneous Multithreading (SMT) model.
+ *
+ * Analyzes the CPU topology, handles thread pinning to strictly separate logical
+ * processors, and executes the simulation with a dual-phase barrier.
+ */
 SmtStats runSmt(
     Grid& current,
     Grid& next,

@@ -9,29 +9,29 @@
 namespace heat2d::fine_grained {
 
 /**
- * @brief Planifica hilos lógicos utilizando una política Round-Robin.
+ * @brief Schedules logical threads using a Round-Robin policy.
  *
- * Cada llamada a nextThread() representa una nueva decisión de scheduling.
- * Después de cada quantum, el siguiente hilo lógico recibe el turno,
- * independientemente de si ocurrió o no un stall.
+ * Each call to nextThread() represents a new scheduling decision.
+ * After each quantum, the next logical thread gets its turn,
+ * regardless of whether a stall occurred or not.
  */
 class RoundRobinScheduler {
 public:
     /**
-     * @brief Crea un scheduler para una cantidad fija de hilos lógicos.
+     * @brief Creates a scheduler for a fixed number of logical threads.
      *
-     * @param logicalThreadCount Cantidad de hilos lógicos administrados.
+     * @param logicalThreadCount Number of managed logical threads.
      *
-     * @throws std::invalid_argument si logicalThreadCount es cero.
+     * @throws std::invalid_argument if logicalThreadCount is zero.
      */
     explicit RoundRobinScheduler(
         std::size_t logicalThreadCount
     );
     /**
- * @brief Permite copiar el estado actual del scheduler.
+ * @brief Allows copying the current state of the scheduler.
  *
- * La copia conserva la posición Round-Robin actual, pero continúa
- * evolucionando de manera independiente.
+ * The copy preserves the current Round-Robin position but continues
+ * to evolve independently.
  */
 RoundRobinScheduler(const RoundRobinScheduler&) = default;
 
@@ -40,7 +40,7 @@ RoundRobinScheduler& operator=(
 ) = default;
 
 /**
- * @brief Permite transferir el estado actual del scheduler.
+ * @brief Allows transferring the current state of the scheduler.
  */
 RoundRobinScheduler(
     RoundRobinScheduler&&
@@ -53,17 +53,17 @@ RoundRobinScheduler& operator=(
 ~RoundRobinScheduler() = default;
 
     /**
-     * @brief Obtiene el índice del próximo hilo con trabajo pendiente.
+     * @brief Gets the index of the next thread with pending work.
      *
-     * Los hilos que ya finalizaron son omitidos manteniendo el orden
-     * circular entre los demás contextos activos.
+     * Threads that have already finished are skipped while maintaining
+     * circular order among the other active contexts.
      *
-     * @param logicalThreads Hilos lógicos administrados por el scheduler.
+     * @param logicalThreads Logical threads managed by the scheduler.
      *
-     * @return Índice del siguiente hilo o std::nullopt si todos terminaron.
+     * @return Index of the next thread or std::nullopt if all have finished.
      *
-     * @throws std::invalid_argument si la cantidad de hilos recibida
-     *         no coincide con la configuración del scheduler.
+     * @throws std::invalid_argument if the number of threads received
+     *         does not match the scheduler configuration.
      */
     [[nodiscard]]
     std::optional<std::size_t> nextThread(
@@ -71,12 +71,12 @@ RoundRobinScheduler& operator=(
     );
 
     /**
-     * @brief Reinicia el Round-Robin desde el primer hilo lógico.
+     * @brief Resets the Round-Robin starting from the first logical thread.
      */
     void reset() noexcept;
 
     /**
-     * @brief Retorna la cantidad de hilos configurados.
+     * @brief Returns the number of configured threads.
      */
     [[nodiscard]]
     std::size_t logicalThreadCount() const noexcept;

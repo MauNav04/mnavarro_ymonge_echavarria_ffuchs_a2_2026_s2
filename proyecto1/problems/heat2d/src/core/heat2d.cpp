@@ -6,6 +6,18 @@
 
 namespace heat2d {
 
+/**
+ * @brief Evaluates the numerical stability of the Forward-Euler discretization.
+ *
+ * Implements the Courant–Friedrichs–Lewy (CFL) condition for the 2D Heat Equation.
+ * The explicit finite-difference method will mathematically diverge (producing 
+ * infinite or NaN values) if the time step `dt` is too large relative to the 
+ * spatial grid resolution (`dx`, `dy`). 
+ *
+ * The stability criterion is:  alpha * dt * (1/dx^2 + 1/dy^2) <= 0.5
+ *
+ * @return true if the parameters guarantee a stable simulation.
+ */
 bool isStable(
     double alpha,
     double dt,
@@ -36,6 +48,16 @@ bool isStable(
     return stabilityFactor <= 0.5;
 }
 
+/**
+ * @brief Precomputes the thermodynamic constants for the finite-difference stencil.
+ *
+ * Extracts the `(alpha * dt) / dx^2` and `(alpha * dt) / dy^2` terms. By calculating 
+ * these once per simulation rather than inside the innermost `computeCell` loop, 
+ * we eliminate millions of redundant floating-point multiplications and divisions, 
+ * strictly optimizing for compute throughput.
+ *
+ * @throws std::invalid_argument If physical dimensions are invalid or numerically unstable.
+ */
 DiffusionCoefficients makeDiffusionCoefficients(
     double alpha,
     double dt,
@@ -60,6 +82,7 @@ DiffusionCoefficients makeDiffusionCoefficients(
         );
     }
 
+    // Fail-fast on unstable parameters to prevent wasted compute cycles.
     if (!isStable(alpha, dt, dx, dy)) {
         throw std::invalid_argument(
             "The selected alpha, dt, dx and dy values violate "
@@ -73,6 +96,16 @@ DiffusionCoefficients makeDiffusionCoefficients(
     };
 }
 
+/**
+ * @brief Executes the 5-point finite-difference stencil for a single spatial cell.
+ *
+ * Approximates the second spatial derivatives (Laplacian) using the central, top, 
+ * bottom, left, and right neighboring cells from the `current` state. 
+ * The result is written directly to the `next` state buffer.
+ *
+ * This function must be lock-free and entirely stateless to guarantee thread safety 
+ * when invoked concurrently by thousands of Fine/Coarse/CMP/SMT workers.
+ */
 void computeCell(
     const Grid& current,
     Grid& next,
@@ -80,6 +113,7 @@ void computeCell(
     std::size_t column,
     const DiffusionCoefficients& coefficients
 ) {
+    // Read the current state of the 5-point cross stencil.
     const double center =
         current(row, column);
 
@@ -95,6 +129,7 @@ void computeCell(
     const double bottom =
         current(row + 1, column);
 
+    // Calculate thermal gradient deltas over X and Y axes.
     const double diffusionX =
         coefficients.x *
         (right - 2.0 * center + left);
@@ -103,10 +138,20 @@ void computeCell(
         coefficients.y *
         (bottom - 2.0 * center + top);
 
+    // Apply the Forward-Euler temporal update.
     next(row, column) =
         center + diffusionX + diffusionY;
 }
 
+/**
+ * @brief Helper function executing a complete sequential diffusion timestep.
+ *
+ * Integrates the spatial traversal and boundary condition enforcement into 
+ * a single call. Internally iterates the grid in strict row-major order 
+ * to guarantee optimal L1-D cache line utilization.
+ *
+ * @throws std::invalid_argument If the source and destination grids are structurally mismatched.
+ */
 void diffusionStep(
     const Grid& current,
     Grid& next,
@@ -139,6 +184,7 @@ void diffusionStep(
             dy
         );
 
+    // Iterate exclusively over the interior domain to avoid out-of-bounds neighbor access.
     for (
         std::size_t row = 1;
         row < current.rows() - 1;
@@ -159,6 +205,7 @@ void diffusionStep(
         }
     }
 
+    // Reinforce Dirichlet boundary conditions (constant temperature borders).
     applyFixedBoundary(
         next,
         boundaryTemperature

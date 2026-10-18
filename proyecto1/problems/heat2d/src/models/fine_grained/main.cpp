@@ -16,9 +16,10 @@ namespace {
 constexpr std::size_t defaultLogicalThreadCount = 4;
 
 /**
- * @brief Obtiene la cantidad de hilos lógicos desde la línea de comandos.
+ * @brief Retrieves the simulated logical thread count from CLI arguments.
  *
- * Si no se especifica un valor, utiliza cuatro contextos lógicos.
+ * If no argument is provided, defaults to `defaultLogicalThreadCount`.
+ * Fast-fails on non-positive or unparseable inputs.
  */
 std::size_t parseLogicalThreadCount(
     int argc,
@@ -62,7 +63,11 @@ std::size_t parseLogicalThreadCount(
 }
 
 /**
- * @brief Imprime la configuración principal del experimento.
+ * @brief Dumps the primary physical and experimental configurations to stdout.
+ *
+ * Prints spatial/temporal discretization parameters, physical dimensions,
+ * and specific scheduling policies (Round-Robin with 1-cell quantum) defining 
+ * the Fine-Grained software simulation.
  */
 void printConfiguration(
     const heat2d::SimulationConfig& config,
@@ -127,7 +132,11 @@ void printConfiguration(
 }
 
 /**
- * @brief Calcula la cantidad teórica de quantums de la simulación.
+ * @brief Calculates the deterministic, theoretical total of executed quanta.
+ *
+ * Expected workload = (Total interior cells) * (Total timesteps).
+ * Used post-execution to mathematically assert the simulation didn't drop 
+ * or duplicate cellular updates.
  */
 std::size_t expectedQuanta(
     const heat2d::SimulationConfig& config
@@ -142,6 +151,15 @@ std::size_t expectedQuanta(
 
 }  // namespace
 
+/**
+ * @brief Standalone executable entry point for the Fine-Grained model.
+ * 
+ * 1. Parses configuration and asserts numerical stability.
+ * 2. Initializes the grid with a sinusoidal heat signature.
+ * 3. Invokes the software-simulated Fine-Grained execution.
+ * 4. Captures strictly the wall-clock execution time (excluding initialization).
+ * 5. Asserts the executed quanta matches the mathematical expectation.
+ */
 int main(
     int argc,
     char* argv[]
@@ -160,6 +178,7 @@ int main(
             logicalThreadCount
         );
 
+        // Pre-flight check: Forward Euler stability criterion.
         if (
             !heat2d::isStable(
                 config.alpha,
@@ -176,6 +195,7 @@ int main(
         std::cout
             << "Numerical stability: STABLE\n";
 
+        // Double-buffering scheme allocation.
         heat2d::Grid current(
             config.rows,
             config.cols,
@@ -212,6 +232,7 @@ int main(
                 centerColumn
             );
 
+        // === TIMING REGION START ===
         const auto startTime =
             std::chrono::steady_clock::now();
 
@@ -230,6 +251,7 @@ int main(
 
         const auto endTime =
             std::chrono::steady_clock::now();
+        // === TIMING REGION END ===
 
         const double elapsedSeconds =
             std::chrono::duration<double>(
@@ -270,6 +292,7 @@ int main(
             << elapsedSeconds
             << " s\n";
 
+        // Hard validation: Ensure the Round-Robin scheduler didn't leak.
         if (
             stats.executedQuanta !=
             expectedQuanta(config)

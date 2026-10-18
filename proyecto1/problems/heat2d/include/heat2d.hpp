@@ -7,7 +7,7 @@
 namespace heat2d {
 
 /**
- * @brief Coeficientes constantes del esquema explícito de difusión.
+ * @brief Constant coefficients of the explicit diffusion scheme.
  */
 struct DiffusionCoefficients {
     double x;
@@ -15,9 +15,9 @@ struct DiffusionCoefficients {
 };
 
 /**
- * @brief Comprueba la estabilidad numérica del esquema explícito 2D.
+ * @brief Checks the numerical stability of the explicit 2D scheme.
  *
- * Se requiere:
+ * The following is required:
  *
  * alpha * dt * (1 / dx^2 + 1 / dy^2) <= 1 / 2
  */
@@ -30,11 +30,11 @@ bool isStable(
 );
 
 /**
- * @brief Valida los parámetros físicos y genera los coeficientes
- *        utilizados durante un paso de difusión.
+ * @brief Validates the physical parameters and generates the coefficients
+ *        used during a diffusion step.
  *
- * @throws std::invalid_argument si algún parámetro es inválido
- *         o si la configuración es numéricamente inestable.
+ * @throws std::invalid_argument if any parameter is invalid
+ *         or if the configuration is numerically unstable.
  */
 [[nodiscard]]
 DiffusionCoefficients makeDiffusionCoefficients(
@@ -45,17 +45,17 @@ DiffusionCoefficients makeDiffusionCoefficients(
 );
 
 /**
- * @brief Calcula la temperatura de una única celda interior.
+ * @brief Computes the temperature of a single interior cell.
  *
- * Lee exclusivamente de current y escribe únicamente en next.
- * Esta función representa la unidad mínima de trabajo que utilizará
- * el modelo Fine-Grained.
+ * Reads exclusively from current and writes only to next.
+ * This function represents the minimum unit of work that will be used
+ * by the Fine-Grained model.
  *
- * @param current Estado térmico actual.
- * @param next Estado térmico siguiente.
- * @param row Fila interior a actualizar.
- * @param column Columna interior a actualizar.
- * @param coefficients Coeficientes precalculados de difusión.
+ * @param current Current thermal state.
+ * @param next Next thermal state.
+ * @param row Interior row to update.
+ * @param column Interior column to update.
+ * @param coefficients Precomputed diffusion coefficients.
  */
 void computeCell(
     const Grid& current,
@@ -66,10 +66,10 @@ void computeCell(
 );
 
 /**
- * @brief Calcula un timestep completo de difusión.
+ * @brief Computes a complete diffusion timestep.
  *
- * Todas las celdas interiores se calculan utilizando current.
- * Los resultados se almacenan en next.
+ * All interior cells are computed using current.
+ * The results are stored in next.
  */
 void diffusionStep(
     const Grid& current,

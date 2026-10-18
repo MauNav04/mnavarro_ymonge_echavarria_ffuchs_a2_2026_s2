@@ -1,3 +1,15 @@
+/**
+ * @file logical_thread_test.cpp
+ * @brief Unit test suite for the Fine-Grained LogicalThread context.
+ *
+ * This suite rigorously validates the deterministic state machine of the 
+ * `LogicalThread` class. Ensuring strict correctness here is paramount, 
+ * as the Round-Robin scheduler relies entirely on these contexts to traverse 
+ * the computational grid safely. Any boundary violation or traversal error 
+ * here would cascade into memory corruption (segfaults) or mathematically 
+ * invalid stencils during the massive HPC simulation.
+ */
+
 #include "fine_grained/logical_thread.hpp"
 
 #include <cstddef>
@@ -13,6 +25,14 @@ namespace {
 using heat2d::fine_grained::CellPosition;
 using heat2d::fine_grained::LogicalThread;
 
+/*
+ * Compile-time assertions for value semantics.
+ * 
+ * WHY: The Round-Robin scheduler stores `LogicalThread` instances in a 
+ * `std::vector`. Reallocations of this vector (e.g., during initialization) 
+ * demand robust copy and move semantics to ensure the internal state 
+ * (program counters) isn't corrupted or unintentionally shared.
+ */
 // Corrección: Se cambia _v<Type> por <Type>::value para compatibilidad con C++11/14
 static_assert(
     std::is_copy_constructible<LogicalThread>::value,
@@ -40,7 +60,11 @@ static_assert(
 );
 
 /**
- * @brief Falla la prueba si una condición esperada no se cumple.
+ * @brief Fails the test gracefully if an expected condition is not met.
+ *
+ * WHY: We use a custom exception-throwing verifier instead of `cassert` 
+ * to ensure the test suite can catch failures, report them cleanly, 
+ * and exit with a standard error code without aborting abruptly.
  */
 void require(bool condition, const char* message) {
     if (!condition) {
@@ -49,7 +73,7 @@ void require(bool condition, const char* message) {
 }
 
 /**
- * @brief Comprueba que dos posiciones de celda sean iguales.
+ * @brief Asserts that two spatial cell coordinates are perfectly equivalent.
  */
 void requireSameCell(
     const CellPosition& actual,
@@ -67,7 +91,12 @@ void requireSameCell(
 }
 
 /**
- * @brief Verifica el recorrido completo de una región rectangular.
+ * @brief Validates the exact path of the simulated thread's instruction pointer.
+ *
+ * WHY: The hardware's L1-D cache prefetcher relies heavily on contiguous memory 
+ * access. This test mathematically proves that the `LogicalThread` traverses 
+ * its assigned 2D bounding box in strict row-major order, maximizing spatial 
+ * locality during the Fine-Grained execution.
  */
 void testSequentialRegionTraversal() {
     LogicalThread logicalThread(
@@ -131,7 +160,12 @@ void testSequentialRegionTraversal() {
 }
 
 /**
- * @brief Comprueba que reset() restaure completamente el contexto.
+ * @brief Ensures the thread context can be cleanly rewound.
+ *
+ * WHY: Heat2D requires simulating thousands of discrete timesteps. 
+ * Re-instantiating `LogicalThread` objects every step would cause massive 
+ * memory allocation overhead. `reset()` ensures zero-allocation recycling 
+ * between iterations.
  */
 void testReset() {
     LogicalThread logicalThread(
@@ -169,7 +203,12 @@ void testReset() {
 }
 
 /**
- * @brief Comprueba que un rango vacío sea válido y no contenga trabajo.
+ * @brief Validates safe handling of threads instantiated with zero area.
+ *
+ * WHY: During domain decomposition, if the user requests more threads 
+ * than there are interior rows, some threads will inevitably receive an 
+ * empty workload. The system must gracefully park these threads rather 
+ * than crashing.
  */
 void testEmptyRegion() {
     LogicalThread logicalThread(
@@ -197,7 +236,11 @@ void testEmptyRegion() {
 }
 
 /**
- * @brief Comprueba que los rangos invertidos sean rechazados.
+ * @brief Ensures the constructor rejects inverted row boundaries.
+ * 
+ * WHY: Fail-fast philosophy. Catching inverted boundaries at construction 
+ * avoids silent infinite loops or out-of-bounds pointer math deep inside 
+ * the simulation core.
  */
 void testInvalidRegion() {
     bool exceptionDetected = false;
@@ -221,7 +264,11 @@ void testInvalidRegion() {
 }
 
 /**
- * @brief Comprueba que no se pueda consultar una celda después de finalizar.
+ * @brief Asserts strict protection against accessing depleted contexts.
+ *
+ * WHY: If the scheduler erroneously attempts to read the position of a 
+ * thread that has already finished its temporal quantum, throwing a 
+ * `std::logic_error` immediately isolates the scheduler bug.
  */
 void testCurrentCellAfterCompletion() {
     LogicalThread logicalThread(
@@ -256,7 +303,11 @@ void testCurrentCellAfterCompletion() {
 }
 
 /**
- * @brief Comprueba que advance() no pueda ejecutarse después de finalizar.
+ * @brief Asserts strict protection against advancing a depleted context.
+ *
+ * WHY: Similar to `testCurrentCellAfterCompletion`, this prevents the 
+ * internal instruction pointers (row/column) from incrementing out of 
+ * their safely allocated bounding box, preventing memory corruption.
  */
 void testAdvanceAfterCompletion() {
     LogicalThread logicalThread(
@@ -284,7 +335,7 @@ void testAdvanceAfterCompletion() {
 }
 
 /**
- * @brief Comprueba que un rango de columnas invertido sea rechazado.
+ * @brief Ensures the constructor rejects inverted column boundaries.
  */
 void testInvalidColumnRegion() {
     bool exceptionDetected = false;
@@ -308,7 +359,11 @@ void testInvalidColumnRegion() {
 }
 
 /**
- * @brief Comprueba que los observadores funcionen sobre objetos const.
+ * @brief Validates `const` correctness of state observers.
+ *
+ * WHY: The framework passes configurations by `const` reference wherever 
+ * possible to enforce immutability guarantees. The thread must be queryable 
+ * without modifying its internal program counters.
  */
 void testConstObservers() {
     const LogicalThread logicalThread(
@@ -346,8 +401,11 @@ void testConstObservers() {
 }
 
 /**
- * @brief Verifica que copiar un LogicalThread preserve el progreso
- *        sin compartir estado mutable entre ambos objetos.
+ * @brief Verifies that copying a context perfectly duplicates its state.
+ *
+ * WHY: When passing `LogicalThread` by value (e.g., into lambdas or 
+ * different vectors), the new instance must be completely disjoint from 
+ * the original to avoid shared mutable state race conditions.
  */
 void testCopySemantics() {
     LogicalThread original(
@@ -387,7 +445,10 @@ void testCopySemantics() {
 }
 
 /**
- * @brief Verifica que mover un LogicalThread conserve el estado transferido.
+ * @brief Verifies efficient memory transferring using r-value references.
+ *
+ * WHY: When vector arrays resize, `std::move` must faithfully transfer the 
+ * internal instruction pointers without losing the thread's execution progress.
  */
 void testMoveSemantics() {
     LogicalThread source(
@@ -421,8 +482,11 @@ void testMoveSemantics() {
 }
 
 /**
- * @brief Comprueba que una región demasiado grande no provoque
- *        overflow silencioso en el número de celdas.
+ * @brief Ensures protection against integer wraparounds on massive grids.
+ *
+ * WHY: Modern HPC setups can simulate billions of nodes. If $Rows \times Cols$ 
+ * exceeds the bit-width of `size_t`, silent integer overflow would occur, 
+ * destroying execution statistics and scheduler bounds.
  */
 void testAssignedCellsOverflow() {
     bool exceptionDetected = false;

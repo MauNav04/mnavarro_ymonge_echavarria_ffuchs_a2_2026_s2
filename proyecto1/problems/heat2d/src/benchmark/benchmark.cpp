@@ -23,12 +23,25 @@ namespace heat2d::benchmark {
 
 namespace {
 
+/** 
+ * @brief Acceptable floating-point drift allowed between models.
+ * 
+ * Due to non-deterministic execution order in concurrent models, floating-point 
+ * addition associativity (`(a+b)+c != a+(b+c)`) causes micro-deviations. 
+ * 1e-12 safely accommodates these IEEE-754 variations while catching logical 
+ * implementation errors.
+ */
 constexpr double validationTolerance =
     1e-12;
 
 
 /**
- * @brief Multiplies two uint64 values while checking overflow.
+ * @brief Multiplies two uint64 values while rigorously checking for overflow.
+ *
+ * Essential for accumulating statistics (like total cell updates) during 
+ * massive benchmark campaigns running thousands of timesteps.
+ *
+ * @throws std::overflow_error If the product exceeds 64-bit bounds.
  */
 std::uint64_t checkedMultiply64(
     std::uint64_t left,
@@ -50,7 +63,12 @@ std::uint64_t checkedMultiply64(
 
 
 /**
- * @brief Validates the numerical and experimental benchmark configuration.
+ * @brief Validates the global physical and temporal configuration of the campaign.
+ *
+ * Asserts structural minimums (3x3 grid), valid positive physical dimensions, 
+ * and rigorously enforces the Forward-Euler stability condition.
+ * 
+ * @throws std::invalid_argument If any configuration parameter is invalid or unstable.
  */
 void validateBenchmarkConfig(
     const BenchmarkConfig& config
@@ -146,7 +164,10 @@ void validateBenchmarkConfig(
 
 
 /**
- * @brief Validates one execution case.
+ * @brief Validates the logical constraints of an individual execution case.
+ * 
+ * Ensures that the requested thread count aligns with the capabilities and 
+ * definitions of the selected concurrency model (e.g., Sequential must equal 1).
  */
 void validateBenchmarkCase(
     const BenchmarkCase& benchmarkCase
@@ -219,7 +240,7 @@ void validateBenchmarkCase(
 
 
 /**
- * @brief Validates that the benchmark has usable execution cases.
+ * @brief Iterates over and validates an entire suite of execution cases.
  */
 void validateCases(
     const std::vector<BenchmarkCase>& cases
@@ -242,7 +263,7 @@ void validateCases(
 
 
 /**
- * @brief Returns the spatial step in the X direction.
+ * @brief Calculates the horizontal spatial step (dx).
  */
 double calculateDx(
     const BenchmarkConfig& config
@@ -256,7 +277,7 @@ double calculateDx(
 
 
 /**
- * @brief Returns the spatial step in the Y direction.
+ * @brief Calculates the vertical spatial step (dy).
  */
 double calculateDy(
     const BenchmarkConfig& config
@@ -270,7 +291,11 @@ double calculateDy(
 
 
 /**
- * @brief Creates the common initial state used by every benchmark run.
+ * @brief Constructs the baseline grid state for the benchmark suite.
+ * 
+ * Generates the sinusoidal thermal distribution once. This exact grid is 
+ * copied repeatedly into every model run to guarantee absolute uniformity 
+ * across the experimental campaign.
  */
 Grid createInitialGrid(
     const BenchmarkConfig& config
@@ -298,7 +323,7 @@ Grid createInitialGrid(
 
 
 /**
- * @brief Builds the configuration used by one Coarse-Grained case.
+ * @brief Instantiates the specific execution parameters for the Coarse-Grained solver.
  */
 heat2d::CoarseGrainedConfig createCoarseGrainedConfig(
     const BenchmarkConfig& config,
@@ -320,7 +345,7 @@ heat2d::CoarseGrainedConfig createCoarseGrainedConfig(
 
 
 /**
- * @brief Builds the configuration used by one CMP case.
+ * @brief Instantiates the specific execution parameters for the CMP solver.
  */
 heat2d::CmpConfig createCmpConfig(
     const BenchmarkCase& benchmarkCase
@@ -335,7 +360,7 @@ heat2d::CmpConfig createCmpConfig(
 
 
 /**
- * @brief Builds the configuration used by one SMT case.
+ * @brief Instantiates the specific execution parameters for the SMT solver.
  */
 heat2d::smt::SmtConfig createSmtConfig(
     const BenchmarkCase& benchmarkCase
@@ -350,7 +375,7 @@ heat2d::smt::SmtConfig createSmtConfig(
 
 
 /**
- * @brief Calculates the expected number of synthetic blocking events.
+ * @brief Mathematically determines the exact expected number of injected stalls.
  */
 std::uint64_t calculateExpectedBlockingEvents(
     const BenchmarkConfig& config
@@ -394,9 +419,11 @@ std::uint64_t calculateExpectedBlockingEvents(
 
 
 /**
- * @brief Validates the metadata returned by the Fine-Grained solver.
+ * @brief Asserts the returned statistics from the Fine-Grained execution.
  *
- * This check is intentionally performed outside timed regions.
+ * Ensures no quanta (cell updates) were dropped or duplicated by the 
+ * Round-Robin scheduler. This validation occurs *outside* the timed region 
+ * to prevent instrumentation overhead from spoiling the benchmark data.
  */
 void validateFineGrainedStats(
     const fine_grained::FineGrainedStats& stats,
@@ -436,9 +463,10 @@ void validateFineGrainedStats(
 
 
 /**
- * @brief Validates the metadata returned by the Coarse-Grained solver.
+ * @brief Asserts the returned statistics from the Coarse-Grained execution.
  *
- * This check is intentionally performed outside timed regions.
+ * Validates thread count, executed cell updates, blocking events, and 
+ * synchronization barriers. Handled outside the timed region.
  */
 void validateCoarseGrainedStats(
     const heat2d::CoarseGrainedStats& stats,
@@ -518,9 +546,10 @@ void validateCoarseGrainedStats(
 
 
 /**
- * @brief Validates the metadata returned by the CMP solver.
+ * @brief Asserts the returned statistics from the CMP execution.
  *
- * This check is intentionally performed outside timed regions.
+ * Validates thread count, cell updates, and dual-phase barriers. 
+ * Handled outside the timed region.
  */
 void validateCmpStats(
     const heat2d::CmpStats& stats,
@@ -585,9 +614,10 @@ void validateCmpStats(
 
 
 /**
- * @brief Validates metadata returned by the SMT solver.
+ * @brief Asserts the returned statistics from the SMT execution.
  *
- * This validation is intentionally performed outside timed regions.
+ * Validates threads, topological CPU constraints, thread-pinning behavior, 
+ * and computational invariants. Handled outside the timed region.
  */
 void validateSmtStats(
     const heat2d::smt::SmtStats& stats,
@@ -689,9 +719,11 @@ void validateSmtStats(
 
 
 /**
- * @brief Executes one model without measuring it.
+ * @brief Executes a single benchmark model without invoking the chronometer.
  *
- * Used exclusively for correctness validation.
+ * This function is used exclusively during the pre-campaign numerical 
+ * validation phase to ensure all execution models produce identical heat 
+ * maps before the actual timed runs begin.
  */
 Grid executeUnmeasured(
     const BenchmarkConfig& config,
@@ -846,7 +878,12 @@ Grid executeUnmeasured(
 
 
 /**
- * @brief Calculates the maximum absolute difference between two grids.
+ * @brief Computes the largest absolute scalar difference between two grids.
+ * 
+ * Used during pre-campaign validation to identify non-deterministic race 
+ * conditions or synchronization failures across the execution models.
+ * 
+ * @throws std::invalid_argument If the two grid topologies differ.
  */
 double calculateMaximumDifference(
     const Grid& first,
@@ -893,10 +930,11 @@ double calculateMaximumDifference(
 
 
 /**
- * @brief Executes one timed benchmark observation.
+ * @brief Measures the execution time of a single benchmark observation.
  *
- * Grid creation, initialization and post-execution validation
- * are deliberately excluded from the timed region.
+ * Designed to guarantee scientific accuracy: grid creation, spatial parameter 
+ * calculation, model configuration objects, and validation metadata assertions 
+ * are strictly hoisted outside the `start` and `end` chronometer boundary.
  */
 BenchmarkSample executeMeasured(
     const BenchmarkConfig& config,
@@ -995,6 +1033,7 @@ BenchmarkSample executeMeasured(
             );
     }
 
+    // === START CRITICAL TIMING SECTION ===
     const auto start =
         std::chrono::steady_clock::now();
 
@@ -1092,6 +1131,7 @@ BenchmarkSample executeMeasured(
 
     const auto end =
         std::chrono::steady_clock::now();
+    // === END CRITICAL TIMING SECTION ===
 
     /*
      * Metadata validation happens after the timer stops.
@@ -1133,6 +1173,7 @@ BenchmarkSample executeMeasured(
             end - start
         ).count();
 
+    // Catch system clock aberrations (e.g., NTP adjustments)
     if (
         elapsedSeconds <= 0.0 ||
         !std::isfinite(
@@ -1156,7 +1197,8 @@ BenchmarkSample executeMeasured(
         elapsedSeconds;
 
     /*
-     * Cheap post-execution sanity check.
+     * Cheap post-execution sanity check to ensure floating-point values 
+     * haven't cascaded into infinity/NaNs during the execution.
      */
     const double centerTemperature =
         current(
@@ -1191,7 +1233,9 @@ BenchmarkSample executeMeasured(
 
 
 /**
- * @brief Executes one discarded warm-up.
+ * @brief Executes a single warmup round intended to prime CPU caches and frequency scaling.
+ * 
+ * Invokes the model execution but discards the time output.
  */
 void executeWarmup(
     const BenchmarkConfig& config,
@@ -1345,6 +1389,9 @@ void executeWarmup(
 }  // namespace
 
 
+/**
+ * @brief Computes the absolute maximum cell updates executed by a single run.
+ */
 std::size_t calculateCellUpdates(
     const BenchmarkConfig& config
 ) {
@@ -1398,6 +1445,9 @@ std::size_t calculateCellUpdates(
 }
 
 
+/**
+ * @brief Translates an ExecutionModel enumerator into its standardized string literal.
+ */
 const char* modelName(
     ExecutionModel model
 ) noexcept {
@@ -1422,6 +1472,16 @@ const char* modelName(
 }
 
 
+/**
+ * @brief Validates the logical correctness of every target model prior to benchmarking.
+ *
+ * Runs each provided `BenchmarkCase` using the given `BenchmarkConfig` without 
+ * measuring the execution time. Then computes the delta against the Serial implementation. 
+ * If any concurrency bug (e.g., race conditions, phase bleeding) causes the grid state 
+ * to drift beyond `validationTolerance`, it fails the suite upfront.
+ * 
+ * @throws std::runtime_error If the max difference exceeds the permitted delta.
+ */
 void validateBenchmarkCases(
     const BenchmarkConfig& config,
     const std::vector<BenchmarkCase>& cases
@@ -1484,6 +1544,12 @@ void validateBenchmarkCases(
 }
 
 
+/**
+ * @brief Primes the system by running discardable warmup phases.
+ * 
+ * Ensures CPU scaling governors trigger 'performance' mode and the necessary
+ * memory pages are mapped by the OS.
+ */
 void runWarmups(
     const BenchmarkConfig& config,
     const std::vector<BenchmarkCase>& cases
@@ -1532,6 +1598,16 @@ void runWarmups(
 }
 
 
+/**
+ * @brief Main execution orchestrator for an automated benchmarking campaign.
+ *
+ * Runs `measuredRuns` cycles of all provided `cases`. Crucially, it applies 
+ * a rotational offset per round to prevent any given model from continuously 
+ * executing first or last, mitigating systemic thermal throttling bias.
+ * 
+ * @return std::vector<BenchmarkSample> A flattened array containing precisely 
+ *         timed execution statistics for every test permutation.
+ */
 std::vector<BenchmarkSample> runBenchmark(
     const BenchmarkConfig& config,
     const std::vector<BenchmarkCase>& cases
@@ -1577,6 +1653,7 @@ std::vector<BenchmarkSample> runBenchmark(
     ) {
         /*
          * Rotate the first configuration every round.
+         * Mitigates thermal-bias (where the first test always gets a cool CPU).
          *
          * R1: A B C D
          * R2: B C D A
