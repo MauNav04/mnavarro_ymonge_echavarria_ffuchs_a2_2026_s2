@@ -49,7 +49,6 @@ proyecto1/problems/gray-scott/scripts/gray_scott_coarse
 proyecto1/problems/gray-scott/scripts/gray_scott_fine
 
 # Gray-Scott generated videos and temporary frames
-proyecto1/problems/gray-scott/videos/
 test_logical_thread
 test_round_robin_scheduler
 heat2d_stress_test
