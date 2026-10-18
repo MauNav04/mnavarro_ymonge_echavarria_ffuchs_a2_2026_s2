@@ -1,4 +1,4 @@
-# Heat Diffusion 2D — Guía de Evaluación (Avance 2 / Demostración 2)
+# Heat Diffusion 2D — Multithreading Execution Models
 
 **CE 4302 — Arquitectura de Computadores II**  
 **Instituto Tecnológico de Costa Rica (TEC)**  
@@ -6,26 +6,42 @@
 
 ---
 
-## Resumen de Navegación para Demostración 2
+## 1. Descripción General
 
-Esta guía permite localizar rápidamente los elementos solicitados para la **Demostración 2 (Semana 8)** correspondientes al problema **Difusión de Calor 2D sobre una superficie**.
+Este proyecto implementa y evalúa diferentes **modelos de ejecución multithreading** sobre una simulación de difusión de calor en dos dimensiones.
 
-| # | Requerimiento de la evaluación | Ubicación en el repositorio | Descripción breve |
-|---|---|---|---|
-| **1** | **Ejecución del sistema base sin hilos** | [`src/main.cpp`](src/main.cpp), [`src/models/sequential.cpp`](src/models/sequential.cpp) y [`src/core/heat2d.cpp`](src/core/heat2d.cpp) | Implementación secuencial completa del método explícito de diferencias finitas para difusión de calor 2D. |
-| **2** | **Identificación de variables importantes para aumentar la paralelización** | [`include/config.hpp`](include/config.hpp), [`src/core/heat2d.cpp`](src/core/heat2d.cpp) y [`src/models/sequential.cpp`](src/models/sequential.cpp) | Se identifican tamaño de malla, cantidad de pasos temporales, número de celdas interiores, granularidad del trabajo y número de hilos como variables críticas. |
-| **3** | **Identificación de los puntos de paralelización** | [`src/core/heat2d.cpp`](src/core/heat2d.cpp) | Los bucles sobre las filas y columnas interiores pueden distribuirse entre múltiples trabajadores porque cada celda lee de `current` y escribe en una posición independiente de `next`. |
-| **4** | **Diagramas preliminares de las soluciones** | Sección 4 | Se muestra la transición del sistema secuencial hacia una solución paralela mediante división por filas y mediante bloques 2D. |
-| **5** | **Dos propuestas de diseño comparadas** | Sección 5 | Se comparan descomposición estática por filas y descomposición 2D mediante tiles según balance, caché, sincronización, granularidad y complejidad. |
-| **6** | **Validación del sistema secuencial** | [`tests/stress_sequential.cpp`](tests/stress_sequential.cpp) | Prueba de estrés que verifica estabilidad, fronteras, simetría, disipación térmica y error contra la solución analítica. |
+El objetivo principal es mantener constante el problema computacional y modificar únicamente la estrategia utilizada para distribuir y ejecutar el trabajo.
+
+Los modelos implementados son:
+
+- **Sequential**
+- **Fine-Grained Multithreading**
+- **Coarse-Grained Multithreading**
+- **Chip Multiprocessing (CMP)**
+- **Simultaneous Multithreading (SMT)**
+
+Todos los modelos utilizan:
+
+- la misma ecuación física;
+- la misma representación de la superficie;
+- la misma condición inicial;
+- las mismas condiciones de frontera;
+- el mismo kernel numérico;
+- la misma cantidad de pasos temporales.
+
+De esta forma, las diferencias observadas durante los experimentos corresponden principalmente al **modelo de ejecución y al overhead asociado a cada estrategia**.
 
 ---
 
-# 1. Descripción del Problema
+# 2. Problema Computacional
 
-El problema seleccionado consiste en simular la **difusión de calor sobre una superficie bidimensional**.
+El problema consiste en simular la **difusión de calor sobre una superficie bidimensional**.
 
-La superficie se representa mediante una malla rectangular donde cada posición almacena una temperatura $T[i][j]$.
+La superficie se representa mediante una malla rectangular donde cada posición almacena una temperatura:
+
+```math
+T[i][j]
+```
 
 La evolución de la temperatura está descrita por la ecuación del calor bidimensional:
 
@@ -42,14 +58,14 @@ La evolución de la temperatura está descrita por la ecuación del calor bidime
 
 donde:
 
-- $T$ representa la temperatura.
-- $\alpha$ representa la difusividad térmica.
-- $x$ y $y$ representan las coordenadas espaciales.
+- $T$ representa la temperatura;
+- $\alpha$ representa la difusividad térmica;
+- $x$ y $y$ representan las coordenadas espaciales;
 - $t$ representa el tiempo.
 
 Para resolver numéricamente la ecuación se utiliza un esquema explícito de **diferencias finitas**.
 
-Para cada celda interior de la superficie:
+Para cada celda interior:
 
 ```math
 T_{i,j}^{n+1}
@@ -80,7 +96,7 @@ T_{i-1,j}^{n}
 \right]
 ```
 
-Cada celda interior depende exclusivamente de su temperatura actual y de sus cuatro vecinos:
+Cada actualización utiliza únicamente la celda central y sus cuatro vecinos:
 
 ```text
                     T(i-1,j)
@@ -92,61 +108,25 @@ T(i,j-1)  ←         T(i,j)         →  T(i,j+1)
                     T(i+1,j)
 ```
 
-Por lo tanto, el cálculo de una celda en el instante $n+1$ utiliza únicamente información correspondiente al instante $n$.
+Por lo tanto, durante un mismo timestep las celdas interiores pueden calcularse independientemente siempre que:
 
-El resultado se almacena en una segunda malla.
-
-Esta característica permite que **todas las celdas interiores de un mismo paso temporal puedan ser calculadas de manera independiente**.
+- todas lean desde el estado `current`;
+- cada trabajador escriba únicamente su celda correspondiente en `next`;
+- el siguiente timestep no comience hasta completar el actual.
 
 ---
 
-# 2. Sistema Base Secuencial
+# 3. Representación de Datos
 
-## 2.1 Organización del Sistema
+La superficie se almacena mediante un único:
 
-La implementación secuencial se encuentra dividida en diferentes módulos para separar:
-
-- representación de datos;
-- configuración;
-- física del problema;
-- condiciones iniciales;
-- modelo de ejecución.
-
-La estructura actual es:
-
-```text
-heat2d/
-├── include/
-│   ├── config.hpp
-│   ├── grid.hpp
-│   ├── heat2d.hpp
-│   ├── initial_conditions.hpp
-│   └── sequential.hpp
-│
-├── src/
-│   ├── main.cpp
-│   │
-│   ├── core/
-│   │   ├── grid.cpp
-│   │   ├── heat2d.cpp
-│   │   └── initial_conditions.cpp
-│   │
-│   └── models/
-│       └── sequential.cpp
-│
-└── tests/
-    └── stress_sequential.cpp
+```cpp
+std::vector<double>
 ```
 
-### Responsabilidades de los Archivos
+utilizando almacenamiento contiguo en **row-major order**.
 
-#### `grid.hpp` / `grid.cpp`
-
-Representan la superficie bidimensional.
-
-La matriz lógica $T[i][j]$ se almacena físicamente mediante un único `std::vector<double>` contiguo.
-
-La transformación de una coordenada bidimensional hacia memoria lineal es:
+La transformación de coordenadas bidimensionales a memoria lineal es:
 
 ```math
 index(i,j)
@@ -156,18 +136,26 @@ i \cdot N_{columnas}
 j
 ```
 
-Esta representación favorece:
+Este diseño favorece la localidad espacial cuando las columnas se recorren consecutivamente.
 
-- localidad espacial;
-- accesos consecutivos a memoria;
-- aprovechamiento de líneas de caché;
-- división posterior de regiones entre hilos.
+La simulación utiliza además **double buffering**:
+
+```text
+             lectura                     escritura
+current ───────────────► kernel ─────────────────────► next
+                                                     │
+                                                     ▼
+                                                  swap()
+                                                     │
+                                                     ▼
+                                      siguiente timestep
+```
+
+De esta forma, los valores requeridos por el stencil no son modificados mientras todavía están siendo utilizados.
 
 ---
 
-#### `initial_conditions.hpp` / `initial_conditions.cpp`
-
-Inicializan la distribución térmica del sistema.
+# 4. Condición Inicial y Fronteras
 
 La condición inicial utilizada es:
 
@@ -185,317 +173,33 @@ T_{\max}
 \right)
 ```
 
-Para una superficie de $1\,m \times 1\,m$ y una temperatura máxima de $100^\circ C$:
+Para una superficie de:
 
 ```math
-T(0.5,0.5,0)
-=
-100^\circ C
+L_x = L_y = 1
 ```
 
-También se implementan condiciones de frontera de **Dirichlet**, manteniendo los cuatro bordes a una temperatura fija.
-
-Actualmente:
+y:
 
 ```math
-T_{borde}
-=
-0^\circ C
+T_{\max}=100^\circ C
 ```
+
+la temperatura máxima se encuentra en el centro del dominio.
+
+Se utilizan condiciones de frontera de **Dirichlet**:
+
+```math
+T_{borde}=0^\circ C
+```
+
+por lo que los cuatro bordes permanecen a temperatura constante durante toda la simulación.
 
 ---
 
-#### `heat2d.hpp` / `heat2d.cpp`
+# 5. Estabilidad Numérica
 
-Contienen el núcleo matemático de la simulación.
-
-La función principal es:
-
-```cpp
-diffusionStep(...)
-```
-
-Su responsabilidad es transformar:
-
-```text
-current
-   ↓
-ecuación de difusión
-   ↓
-next
-```
-
-Es decir:
-
-```math
-T^n
-\longrightarrow
-T^{n+1}
-```
-
-También contiene la verificación de estabilidad numérica.
-
----
-
-#### `sequential.hpp` / `sequential.cpp`
-
-Implementan el modelo de ejecución secuencial.
-
-El flujo general es:
-
-```text
-diffusionStep()
-      ↓
-std::swap(current, next)
-      ↓
-siguiente paso temporal
-```
-
-Este procedimiento se repite durante todos los pasos temporales solicitados.
-
----
-
-#### `config.hpp`
-
-Contiene los principales parámetros físicos y numéricos:
-
-- `rows`
-- `cols`
-- `lengthX`
-- `lengthY`
-- `alpha`
-- `dt`
-- `totalTime`
-- `maxTemperature`
-- `boundaryTemperature`
-
-También calcula:
-
-```math
-\Delta x
-=
-\frac{L_x}{N_x-1}
-```
-
-```math
-\Delta y
-=
-\frac{L_y}{N_y-1}
-```
-
-y la cantidad de pasos temporales:
-
-```math
-N_{steps}
-\approx
-\frac{t_{total}}{\Delta t}
-```
-
----
-
-#### `main.cpp`
-
-Es el punto de entrada del sistema secuencial.
-
-Se encarga de:
-
-1. crear la configuración;
-2. crear las dos mallas;
-3. aplicar la condición inicial;
-4. verificar estabilidad;
-5. ejecutar la simulación secuencial;
-6. mostrar los resultados finales.
-
----
-
-#### `stress_sequential.cpp`
-
-Contiene las pruebas robustas utilizadas para verificar que la implementación secuencial produce resultados numéricamente correctos.
-
----
-
-## 2.2 Flujo de Ejecución Secuencial
-
-```mermaid
-flowchart TD
-    A[SimulationConfig] --> B[Crear Grid current]
-    A --> C[Crear Grid next]
-    B --> D[Inicialización sinusoidal]
-    D --> E[Aplicar fronteras de Dirichlet]
-    E --> F{¿Quedan pasos temporales?}
-    F -->|Sí| G[diffusionStep current a next]
-    G --> H[std::swap current y next]
-    H --> F
-    F -->|No| I[Resultado final]
-```
-
-El sistema utiliza **double buffering**:
-
-```text
-Paso n:
-
-current ── lectura ──► diffusionStep() ── escritura ──► next
-
-                                                     │
-                                                     ▼
-                                                std::swap()
-
-Paso n+1:
-
-current ◄──────────────────────────────────────────── next
-```
-
-Este mecanismo evita modificar valores de temperatura que todavía son necesarios dentro del mismo paso temporal.
-
-También evita realizar una copia completa de la matriz después de cada iteración.
-
----
-
-# 3. Identificación de Variables y Puntos de Paralelización
-
-## 3.1 Variables Críticas del Problema
-
-### `rows` y `cols`
-
-Determinan la resolución de la superficie.
-
-La cantidad de celdas interiores calculadas en cada paso temporal es:
-
-```math
-N_{interior}
-=
-(rows-2)(cols-2)
-```
-
-Por ejemplo:
-
-```text
-101 × 101
-→ 9 801 celdas interiores
-
-801 × 801
-→ 638 401 celdas interiores
-
-2001 × 2001
-→ 3 996 001 celdas interiores
-```
-
-Por lo tanto:
-
-> **`rows` y `cols` son las variables principales que aumentan la cantidad de paralelismo espacial disponible.**
-
-Mientras mayor sea la malla, mayor será la cantidad de operaciones independientes que pueden repartirse entre hilos.
-
----
-
-### `steps`
-
-Representa la cantidad de iteraciones temporales de la simulación:
-
-```math
-steps
-\approx
-\frac{totalTime}{dt}
-```
-
-La cantidad total aproximada de actualizaciones de celda es:
-
-```math
-W
-=
-(rows-2)(cols-2)(steps)
-```
-
-donde $W$ representa aproximadamente el trabajo computacional total.
-
-Por ejemplo, para una malla de $801 \times 801$ y $1000$ pasos:
-
-```math
-W
-=
-799
-\cdot
-799
-\cdot
-1000
-```
-
-```math
-W
-=
-638\,401\,000
-```
-
-Por lo tanto, se realizan aproximadamente:
-
-```math
-\boxed{
-638.4\text{ millones de actualizaciones}
-}
-```
-
-Los pasos temporales **no pueden paralelizarse directamente entre sí**, porque:
-
-```math
-T^{n+1}
-\text{ depende de }
-T^n
-```
-
-Sin embargo, las celdas pertenecientes al mismo paso temporal sí pueden calcularse de manera concurrente.
-
----
-
-### `threadCount`
-
-En las versiones paralelas representará la cantidad de trabajadores disponibles para dividir el dominio.
-
-Se evaluarán configuraciones como:
-
-```text
-1 hilo
-2 hilos
-4 hilos
-8 hilos
-...
-```
-
-dependiendo de la cantidad de núcleos físicos e hilos lógicos disponibles en el hardware utilizado para los experimentos.
-
-Esta variable permitirá estudiar:
-
-- escalabilidad;
-- speedup;
-- eficiencia;
-- saturación del procesador.
-
----
-
-### `chunkSize` / `tileSize`
-
-Determinará la cantidad de trabajo asignada a cada unidad de ejecución.
-
-Los bloques grandes implican:
-
-- menor overhead;
-- menos decisiones del scheduler;
-- granularidad gruesa.
-
-Los bloques pequeños implican:
-
-- mayor cantidad de unidades de trabajo;
-- mayor frecuencia de planificación;
-- granularidad fina.
-
-> El tamaño del bloque permitirá controlar experimentalmente la granularidad de la ejecución.
-
----
-
-### `alpha`, `dt`, `dx` y `dy`
-
-Estas variables no aumentan directamente el paralelismo, pero modifican la cantidad de trabajo necesaria para representar correctamente el fenómeno físico.
-
-La estabilidad numérica requiere:
+El esquema explícito debe satisfacer:
 
 ```math
 \alpha \Delta t
@@ -508,553 +212,271 @@ La estabilidad numérica requiere:
 \frac{1}{2}
 ```
 
-Si:
+Cuando:
 
 ```math
-\Delta x
-=
-\Delta y
-=
-h
+\Delta x = \Delta y = h
 ```
 
-entonces:
+la condición se reduce a:
 
 ```math
-\frac{\alpha\Delta t}{h^2}
+\frac{\alpha \Delta t}{h^2}
 \leq
 \frac{1}{4}
 ```
 
-Al aumentar la resolución espacial:
-
-```math
-\Delta x \downarrow
-```
-
-y:
-
-```math
-\Delta y \downarrow
-```
-
-por lo que normalmente debe disminuir también:
-
-```math
-\Delta t \downarrow
-```
-
-Esto puede provocar un aumento en la cantidad de pasos temporales y, por consecuencia, aumentar considerablemente el trabajo computacional.
+La implementación valida esta condición antes de iniciar la simulación.
 
 ---
 
-## 3.2 Punto Principal de Paralelización
+# 6. Arquitectura del Proyecto
 
-El principal punto de paralelización se encuentra dentro de:
-
-[`src/core/heat2d.cpp`](src/core/heat2d.cpp)
-
-en la función:
-
-```cpp
-diffusionStep(...)
-```
-
-Actualmente la ejecución es:
-
-```cpp
-for (std::size_t row = 1; row < current.rows() - 1; ++row) {
-
-    for (std::size_t col = 1; col < current.cols() - 1; ++col) {
-
-        // Leer vecinos desde current.
-        // Calcular nueva temperatura.
-        // Escribir únicamente en next(row, col).
-    }
-}
-```
-
-Durante un mismo paso temporal:
+La implementación separa el problema físico del modelo de ejecución.
 
 ```text
-Celda (1,1) ─┐
-Celda (1,2) ─┤
-Celda (1,3) ─┤
-Celda (2,1) ─┼──► pueden calcularse independientemente
-Celda (2,2) ─┤
-Celda (2,3) ─┤
-...          ─┘
+                         Heat2D Core
+                             │
+                ┌────────────┼────────────┐
+                │            │            │
+                ▼            ▼            ▼
+              Grid       Initial       Diffusion
+                         Conditions       Kernel
+                             │
+                             ▼
+                    Execution Models
+                             │
+         ┌──────────┬────────┼────────┬──────────┐
+         │          │        │        │          │
+         ▼          ▼        ▼        ▼          ▼
+    Sequential     FG       CG       CMP        SMT
 ```
 
-Esto es posible porque cada trabajador:
-
-1. lee únicamente de `current`;
-2. escribe únicamente en posiciones independientes de `next`;
-3. no necesita utilizar resultados parciales de otro trabajador durante el mismo timestep.
-
-Por lo tanto, dentro de cada paso temporal se puede aplicar paralelismo espacial.
-
----
-
-## 3.3 Punto de Sincronización
-
-Aunque las celdas de una iteración son independientes, el siguiente paso temporal no puede comenzar hasta que todas hayan sido calculadas.
-
-Por lo tanto, será necesaria una sincronización global:
+La estructura principal es:
 
 ```text
-Thread 0 ──────────┐
-Thread 1 ──────────┤
-Thread 2 ──────────┼──► BARRIER ──► SWAP ──► timestep siguiente
-Thread 3 ──────────┘
+proyecto1/problems/heat2d/
+│
+├── include/
+│   ├── config.hpp
+│   ├── grid.hpp
+│   ├── heat2d.hpp
+│   ├── initial_conditions.hpp
+│   ├── sequential.hpp
+│   ├── fine_grained/
+│   ├── coarse_grained/
+│   ├── cmp/
+│   └── smt/
+│
+├── src/
+│   ├── core/
+│   │   ├── grid.cpp
+│   │   ├── heat2d.cpp
+│   │   └── initial_conditions.cpp
+│   │
+│   ├── benchmark/
+│   │   └── benchmark.cpp
+│   │
+│   └── models/
+│       ├── sequential.cpp
+│       ├── fine_grained/
+│       ├── coarse_grained/
+│       ├── cmp/
+│       └── smt/
+│
+├── benchmarks/
+│   └── benchmark_heat2d.cpp
+│
+├── tests/
+│   ├── fine_grained/
+│   ├── coarse_grained/
+│   ├── cmp/
+│   └── smt/
+│
+└── metricas/
+    ├── heat2d_benchmark.csv
+    ├── resumen_estadistico.csv
+    └── graficas/
 ```
-
-Matemáticamente, $T^{n+1}$ debe estar completamente calculado antes de utilizarlo para obtener $T^{n+2}$.
 
 ---
 
-# 4. Diagramas Preliminares de Solución
+# 7. Modelos de Ejecución
 
-## 4.1 Arquitectura Secuencial Actual
+## 7.1 Sequential
 
-```mermaid
-flowchart LR
-    A[current]
-    A --> B[Procesar fila 1]
-    B --> C[Procesar fila 2]
-    C --> D[Procesar fila 3]
-    D --> E[...]
-    E --> F[Procesar última fila interior]
-    F --> G[next]
-    G --> H[swap]
-    H --> A
-```
+La implementación secuencial constituye la referencia computacional para las comparaciones de rendimiento.
 
-Actualmente un único flujo de ejecución procesa secuencialmente todas las filas y columnas de la superficie.
-
----
-
-## 4.2 Arquitectura Paralela Preliminar — División por Filas
-
-```mermaid
-flowchart TD
-    A[current]
-
-    A --> B1[Thread 0: filas 1 hasta k]
-    A --> B2[Thread 1: filas k+1 hasta 2k]
-    A --> B3[Thread 2: filas 2k+1 hasta 3k]
-    A --> B4[Thread N: filas restantes]
-
-    B1 --> C[Barrier]
-    B2 --> C
-    B3 --> C
-    B4 --> C
-
-    C --> D[Swap current / next]
-    D --> E[Siguiente timestep]
-```
-
-El cambio principal sería:
+Para cada timestep:
 
 ```text
-SECUENCIAL
+for each interior row
+    for each interior column
+        computeCell()
 
-Un trabajador
+applyFixedBoundary()
+
+swap(current, next)
+```
+
+No existe paralelismo ni sincronización entre trabajadores.
+
+---
+
+## 7.2 Fine-Grained Multithreading
+
+El modelo Fine-Grained utiliza **contextos lógicos cooperativos** administrados por un scheduler Round-Robin.
+
+Los componentes principales son:
+
+```text
+LogicalThread
       │
       ▼
-Todas las filas
+RoundRobinScheduler
+      │
+      ▼
+small execution quantum
+      │
+      ▼
+next logical context
 ```
 
-frente a:
+Cada contexto lógico mantiene su posición dentro de la región asignada.
 
-```text
-PARALELO
+El cambio entre contextos ocurre con una granularidad muy pequeña, lo cual permite estudiar el costo de una planificación extremadamente frecuente.
 
-                 ┌── Thread 0 → filas A
-                 │
-Grid ────────────┼── Thread 1 → filas B
-                 │
-                 ├── Thread 2 → filas C
-                 │
-                 └── Thread 3 → filas D
-```
-
-Esta estrategia aprovecha que las filas consecutivas también ocupan regiones consecutivas de memoria.
+Este modelo representa una simulación de **Fine-Grained Multithreading**, no ejecución paralela real sobre múltiples núcleos.
 
 ---
 
-## 4.3 Arquitectura Paralela Preliminar — División mediante Tiles
+## 7.3 Coarse-Grained Multithreading
 
-La superficie también puede dividirse en pequeños bloques bidimensionales:
+El modelo Coarse-Grained divide el dominio entre trabajadores reales utilizando `std::thread`.
 
-```text
-┌────────────┬────────────┬────────────┐
-│   Tile 0   │   Tile 1   │   Tile 2   │
-├────────────┼────────────┼────────────┤
-│   Tile 3   │   Tile 4   │   Tile 5   │
-├────────────┼────────────┼────────────┤
-│   Tile 6   │   Tile 7   │   Tile 8   │
-└────────────┴────────────┴────────────┘
-```
+Cada trabajador procesa una región amplia de filas.
 
-Posteriormente:
+El modelo incorpora eventos de bloqueo configurables para representar el comportamiento de un sistema donde un hilo puede ceder el procesador ante una operación costosa.
+
+La estructura general es:
 
 ```text
-                 Tiles disponibles
-                        │
-                        ▼
-                 Scheduler / Cola
-                        │
-          ┌─────────────┼─────────────┐
-          ▼             ▼             ▼
-      Thread 0       Thread 1      Thread 2
+Worker 0 ──► rows A
+Worker 1 ──► rows B
+Worker 2 ──► rows C
+Worker N ──► rows N
+
+              │
+              ▼
+            barrier
+              │
+              ▼
+             swap
 ```
 
-El tamaño del tile podría ser configurable:
-
-```text
-8 × 8
-16 × 16
-32 × 32
-64 × 64
-```
-
-Esto permitiría estudiar experimentalmente cómo cambia el rendimiento según la granularidad.
+Se utiliza una barrera reutilizable para coordinar los timesteps.
 
 ---
 
-# 5. Dos Propuestas Preliminares de Diseño
+## 7.4 Chip Multiprocessing — CMP
 
-## 5.1 Propuesta 1 — Descomposición Estática por Filas
+CMP utiliza múltiples threads del sistema operativo para ejecutar diferentes regiones del dominio concurrentemente.
 
-La superficie se divide en franjas horizontales.
+Las filas interiores se distribuyen de forma estática entre los trabajadores.
 
-Por ejemplo, utilizando cuatro hilos:
-
-```text
-┌─────────────────────────────────┐
-│             Thread 0            │
-├─────────────────────────────────┤
-│             Thread 1            │
-├─────────────────────────────────┤
-│             Thread 2            │
-├─────────────────────────────────┤
-│             Thread 3            │
-└─────────────────────────────────┘
-```
-
-Cada hilo recibe aproximadamente:
-
-```math
-N_{filas/thread}
-\approx
-\frac{rows-2}{threadCount}
-```
-
-filas interiores.
-
-### Ventajas
-
-- Implementación sencilla.
-- Bajo overhead de planificación.
-- Buena localidad espacial.
-- Accesos mayormente contiguos a memoria.
-- Balance de carga muy predecible.
-- Adecuada para **CMP**.
-- Adecuada para aproximar **Coarse-Grained Multithreading**.
-
-### Desventajas
-
-- Granularidad relativamente grande.
-- Menor flexibilidad para controlar el tamaño de las tareas.
-- Cuando la cantidad de hilos crece demasiado puede haber pocas filas por trabajador.
-- Es menos adecuada para simular planificación extremadamente frecuente.
-
----
-
-## 5.2 Propuesta 2 — Descomposición Bidimensional mediante Tiles
-
-La superficie se divide en pequeños bloques bidimensionales.
-
-Por ejemplo:
-
-```math
-16 \times 16
-```
-
-celdas por bloque.
-
-Cada bloque constituye una unidad independiente de trabajo.
-
-### Ventajas
-
-- Granularidad configurable.
-- Permite crear una gran cantidad de unidades de trabajo.
-- Facilita planificación round-robin.
-- Permite implementar scheduling dinámico.
-- Adecuada para aproximar **Fine-Grained Multithreading**.
-- Permite estudiar el efecto del tamaño de tarea sobre caché y overhead.
-- Puede utilizarse junto con sobresuscripción para pruebas relacionadas con SMT.
-
-### Desventajas
-
-- Mayor complejidad del scheduler.
-- Mayor overhead de planificación.
-- Tiles excesivamente pequeños pueden reducir el rendimiento.
-- Requiere más decisiones de coordinación entre trabajadores.
-
----
-
-## 5.3 Comparación de las Propuestas
-
-| Criterio | División por Filas | División por Tiles |
-|---|---:|---:|
-| Complejidad de implementación | Baja | Media |
-| Localidad espacial | Muy buena | Buena / Muy buena |
-| Overhead de scheduling | Bajo | Mayor |
-| Cantidad de tareas disponibles | Limitada por filas | Muy alta |
-| Balance de carga en Heat2D | Muy bueno | Muy bueno |
-| Granularidad configurable | Limitada | Alta |
-| Adecuada para Coarse-Grained | **Sí** | Posible |
-| Adecuada para CMP | **Sí** | Sí |
-| Adecuada para Fine-Grained | Limitada | **Sí** |
-| Scheduling round-robin | Poco flexible | **Muy flexible** |
-| Riesgo de overhead excesivo | Bajo | Alto para tiles pequeños |
-
----
-
-## 5.4 Uso Preliminar de Cada Propuesta
-
-La distribución preliminar sería:
+Cada timestep requiere dos fases de sincronización:
 
 ```text
-                  Heat Diffusion 2D
-                          │
-             ┌────────────┴────────────┐
-             │                         │
-             ▼                         ▼
-       División por filas         División por Tiles
-             │                         │
-       ┌─────┴──────┐                  │
-       ▼            ▼                  ▼
-Coarse-Grained     CMP           Fine-Grained
-                                      │
-                                      ▼
-                              Scheduler Round-Robin
+Workers compute
+      │
+      ▼
+Barrier 1
+      │
+      ▼
+Boundary update / swap
+      │
+      ▼
+Barrier 2
+      │
+      ▼
+Next timestep
 ```
 
-Para SMT se estudiará el comportamiento del kernel paralelo utilizando:
+Cada trabajador:
 
-- múltiples hilos;
-- sobresuscripción;
-- hilos lógicos;
-- comparación SMT habilitado y deshabilitado.
+- lee desde `current`;
+- escribe en una región independiente de `next`;
+- permanece activo durante la simulación;
+- participa en las barreras globales.
 
 ---
 
-# 6. Cambios Más Significativos Previstos
+## 7.5 Simultaneous Multithreading — SMT
 
-## 6.1 Sistema Secuencial Actual
+El modelo SMT extiende el modelo paralelo incorporando información explícita de la topología del procesador.
 
-Actualmente:
+La implementación detecta:
+
+- logical CPUs visibles para el proceso;
+- núcleos físicos;
+- relación entre núcleos físicos y hardware threads;
+- disponibilidad de SMT.
+
+Los workers utilizan afinidad explícita mediante Linux:
 
 ```text
-for cada timestep:
-
-    for cada fila interior:
-
-        for cada columna interior:
-
-            leer current
-
-            calcular nueva temperatura
-
-            escribir next
-
-    swap(current, next)
+pthread_setaffinity_np()
 ```
 
-Existe un único flujo de ejecución.
+La política de placement utiliza primero un logical CPU de cada núcleo físico:
+
+```text
+Core 0 → HW thread 0
+Core 1 → HW thread 0
+Core 2 → HW thread 0
+...
+```
+
+y posteriormente incorpora los hardware threads adicionales:
+
+```text
+Core 0 → HW thread 1
+Core 1 → HW thread 1
+Core 2 → HW thread 1
+...
+```
+
+Esto permite controlar de forma reproducible la distribución de los workers sobre la topología disponible.
 
 ---
 
-## 6.2 Sistema Paralelo Preliminar
+# 8. Configuración Experimental
 
-La estructura futura será aproximadamente:
-
-```text
-crear trabajadores
-
-for cada timestep:
-
-    dividir el dominio
-
-    entregar trabajo a los trabajadores
-
-    ejecutar regiones simultáneamente
-
-    esperar a todos los trabajadores
-
-    barrier
-
-    swap(current, next)
-
-siguiente timestep
-```
-
-Por lo tanto, el cambio principal consiste en transformar:
+La configuración principal utilizada durante la campaña final fue:
 
 ```text
-1 flujo
-   ↓
-N filas
+Surface:                  1.0 m x 1.0 m
+Grid:                     801 x 801
+Interior cells/timestep:  638 401
+alpha:                    0.05
+dt:                       0.000005 s
+Timesteps:                1000
+Total simulated time:     0.005 s
+Maximum temperature:      100 °C
+Boundary temperature:     0 °C
 ```
 
-en:
-
-```text
-N trabajadores
-      ↓
-regiones independientes de la superficie
-```
-
----
-
-## 6.3 Separación entre Física y Modelo de Ejecución
-
-Una decisión importante del diseño consiste en mantener separada la ecuación física del mecanismo de ejecución.
-
-```text
-                    CORE HEAT2D
-                         │
-                         │
-                ecuación de difusión
-                         │
-          ┌──────────────┼───────────────┐
-          │              │               │
-          ▼              ▼               ▼
-     Secuencial      Fine-Grained    Coarse-Grained
-                                         │
-                               ┌─────────┴─────────┐
-                               ▼                   ▼
-                              CMP                 SMT
-```
-
-La ecuación matemática debe permanecer idéntica.
-
-> **Lo único que cambia entre experimentos es cómo se distribuye y ejecuta el trabajo computacional.**
-
-Esto permitirá realizar comparaciones experimentales más justas.
-
----
-
-# 7. Ejecución del Sistema Base sin Hilos
-
-## 7.1 Compilación en macOS usando Clang
-
-Desde la raíz del repositorio:
-
-```bash
-clang++ \
-  -std=c++17 \
-  -Wall \
-  -Wextra \
-  -Wpedantic \
-  -Iproyecto1/problems/heat2d/include \
-  proyecto1/problems/heat2d/src/main.cpp \
-  proyecto1/problems/heat2d/src/core/grid.cpp \
-  proyecto1/problems/heat2d/src/core/initial_conditions.cpp \
-  proyecto1/problems/heat2d/src/core/heat2d.cpp \
-  proyecto1/problems/heat2d/src/models/sequential.cpp \
-  -o heat2d_sequential
-```
-
----
-
-## 7.2 Ejecución
-
-```bash
-./heat2d_sequential
-```
-
----
-
-## 7.3 Salida Obtenida
-
-```text
-=== Heat Diffusion 2D - Sequential Simulation ===
-Surface size: 1.000000 m x 1.000000 m
-Grid size: 101 x 101
-dx: 0.010000 m
-dy: 0.010000 m
-Alpha: 0.050000
-dt: 0.000100 s
-Requested simulation time: 0.100000 s
-Time steps: 1000
-Actually simulated time: 0.100000 s
-Numerical stability: STABLE
-Initial center temperature: 100.000000 C
-Final center temperature: 90.602100 C
-Simulation completed successfully.
-```
-
-Esta versión constituye el **sistema base sin hilos**.
-
-Su tiempo de ejecución será utilizado posteriormente como referencia para calcular las métricas de rendimiento de los modelos paralelos.
-
----
-
-# 8. Validación Robusta de la Implementación Secuencial
-
-Además del sistema base, se desarrolló:
-
-[`tests/stress_sequential.cpp`](tests/stress_sequential.cpp)
-
-Esta prueba ejecuta una configuración considerablemente más pesada.
-
-## 8.1 Configuración de Stress Test
-
-```text
-Malla:               801 × 801
-Longitud X:          1 m
-Longitud Y:          1 m
-dx:                  0.00125 m
-dy:                  0.00125 m
-dt:                  0.000005 s
-Pasos temporales:    1000
-```
-
-La cantidad de celdas interiores es:
-
-```math
-N_{interior}
-=
-(801-2)^2
-```
-
-```math
-N_{interior}
-=
-799^2
-```
-
-```math
-\boxed{
-N_{interior}
-=
-638\,401
-}
-```
-
-Por lo tanto, la cantidad aproximada total de actualizaciones es:
+La cantidad de actualizaciones realizadas en una ejecución es:
 
 ```math
 N_{updates}
 =
-638\,401
-\cdot
-1000
+(801-2)
+(801-2)
+(1000)
 ```
+
+por lo que:
 
 ```math
 \boxed{
@@ -1064,31 +486,15 @@ N_{updates}
 }
 ```
 
----
-
-## 8.2 Validaciones Implementadas
-
-El stress test comprueba:
-
-- estabilidad numérica;
-- ausencia de `NaN`;
-- ausencia de infinito;
-- condiciones de frontera de Dirichlet;
-- rango físico de temperaturas;
-- simetría espacial;
-- disminución del contenido térmico;
-- error contra solución analítica;
-- error global mediante norma $L_2$;
-- error máximo mediante norma $L_\infty$;
-- correspondencia correcta entre tiempo solicitado y tiempo simulado.
+Cada ejecución procesa aproximadamente **638.4 millones de actualizaciones de celda**.
 
 ---
 
-# 9. Validación contra la Solución Analítica
+# 9. Validación Numérica
 
-La condición inicial utilizada posee una solución analítica conocida.
+La condición sinusoidal utilizada posee una solución analítica conocida.
 
-La solución exacta para una superficie rectangular es:
+Para un dominio rectangular:
 
 ```math
 T(x,y,t)
@@ -1118,7 +524,7 @@ Para:
 L_x=L_y=1
 ```
 
-se reduce a:
+se obtiene:
 
 ```math
 \boxed{
@@ -1131,13 +537,11 @@ e^{-2\pi^2\alpha t}
 }
 ```
 
-Esto permite comparar directamente la solución numérica con una solución matemática exacta.
+Esto permite comparar la solución numérica directamente contra una referencia matemática.
 
 ---
 
-## 9.1 Norma $L_2$
-
-Se utiliza el error cuadrático medio:
+## 9.1 Error L2 RMS
 
 ```math
 L_{2,RMS}
@@ -1153,13 +557,9 @@ T_k^{exact}
 }
 ```
 
-Este valor permite estimar el error global de toda la superficie.
-
 ---
 
-## 9.2 Norma $L_\infty$
-
-También se calcula:
+## 9.2 Error L-infinity
 
 ```math
 L_\infty
@@ -1172,35 +572,31 @@ T_k^{exact}
 \right|
 ```
 
-Este valor indica el peor error encontrado entre todas las celdas.
-
 ---
 
-## 9.3 Resultados Obtenidos
+## 9.3 Stress Test Secuencial
 
-La ejecución de estrés produjo:
+La configuración robusta utiliza:
 
 ```text
-=== Heat2D Sequential Robust Stress Test ===
-Grid: 801 x 801
-dx: 0.001250000 m
-dy: 0.001250000 m
-dt: 0.000005000 s
-Steps: 1000
-Stability: STABLE
+Grid:                801 x 801
+dx:                  0.00125 m
+dy:                  0.00125 m
+dt:                  0.000005 s
+Timesteps:           1000
+```
 
---- Numerical Results ---
+Resultados:
+
+```text
 Initial center temperature: 100.000000000 C
-Final center temperature: 99.507734813 C
-Initial thermal sum: 25938156.345798809
-Final thermal sum: 25810471.831851281
-Thermal sum reduction: 0.492265187 %
+Final center temperature:    99.507734813 C
 
-L2 RMS analytical error: 0.000000290 C
+L2 RMS analytical error:     0.000000290 C
 L-infinity analytical error: 0.000000581 C
 ```
 
-Las validaciones realizadas fueron:
+Las validaciones comprueban:
 
 ```text
 [PASS] Numerical stability
@@ -1212,245 +608,569 @@ Las validaciones realizadas fueron:
 [PASS] Analytical L2 error
 [PASS] Analytical L-infinity error
 [PASS] Requested simulation time
-
-Stress test: PASSED
 ```
-
-Estos resultados permiten utilizar la versión secuencial como **referencia funcional** para comprobar las implementaciones paralelas.
 
 ---
 
-# 10. Validación de Simetría Espacial
+# 10. Compilación
 
-La condición inicial es simétrica.
+Desde la raíz del repositorio:
 
-Por lo tanto, debe mantenerse aproximadamente:
-
-```math
-T(i,j)
-=
-T
-\left(
-N-1-i,
-M-1-j
-\right)
+```bash
+make clean
+make release
 ```
 
-durante la simulación.
+Esto genera los ejecutables principales dentro de:
 
-Esta comprobación ayuda a detectar:
+```text
+build/bin/
+```
 
-- errores `off-by-one`;
-- índices incorrectos;
-- procesamiento incompleto de filas;
-- procesamiento incompleto de columnas;
-- corrupción de regiones específicas de la matriz.
+incluyendo:
+
+```text
+heat2d_sequential
+heat2d_fine_grained
+heat2d_coarse_grained
+heat2d_cmp
+heat2d_smt
+heat2d_benchmark
+```
+
+La compilación de release utiliza C++17 y optimización:
+
+```text
+-O3
+-DNDEBUG
+-Wall
+-Wextra
+-Wpedantic
+```
 
 ---
 
-# 11. Validación de Disminución Térmica
+# 11. Ejecución de Pruebas
 
-Se utiliza como indicador discreto la suma:
+La suite completa de pruebas puede ejecutarse mediante:
 
-```math
-E_n
-=
-\sum_{i,j}
-T_{i,j}^{n}
+```bash
+make test
 ```
 
-Como los bordes permanecen a:
+La suite valida:
 
-```math
-T=0
+- Fine-Grained logical threads;
+- Round-Robin scheduler;
+- integración Fine-Grained;
+- reusable barrier;
+- integración Coarse-Grained;
+- integración CMP;
+- detección de topología;
+- thread affinity;
+- integración SMT;
+- rechazo de configuraciones inválidas;
+- comportamiento con cero timesteps;
+- equivalencia numérica contra la versión secuencial.
+
+Una ejecución correcta finaliza con:
+
+```text
+All Heat2D tests PASSED.
 ```
-
-y existe temperatura positiva en el interior, el calor abandona gradualmente el dominio.
-
-Por lo tanto, se espera:
-
-```math
-E_{n+1}
-<
-E_n
-```
-
-durante cada iteración.
-
-El stress test comprueba:
-
-```math
-E_0
->
-E_1
->
-E_2
->
-\cdots
->
-E_N
-```
-
-Esto permite detectar generación artificial de temperatura dentro de la simulación.
 
 ---
 
-# 12. Variables para los Experimentos de Paralelización
+# 12. Stress Tests
 
-Las principales variables experimentales previstas son:
+También se incluyen pruebas de estrés específicas para los diferentes modelos.
 
-| Variable | Función experimental |
-|---|---|
-| `rows` | Incrementa la dimensión vertical y cantidad de trabajo disponible. |
-| `cols` | Incrementa la dimensión horizontal y cantidad de trabajo disponible. |
-| `steps` | Incrementa la cantidad total de iteraciones computacionales. |
-| `threadCount` | Permite estudiar escalabilidad, speedup y eficiencia. |
-| `chunkSize` | Permite modificar la granularidad de división por filas. |
-| `tileSize` | Permite modificar la granularidad de tareas 2D. |
-| Modelo de ejecución | Permite comparar Secuencial, Fine-Grained, Coarse-Grained, CMP y SMT. |
-| SMT ON/OFF | Permite estudiar el efecto real del multihilo simultáneo. |
+## Fine-Grained
+
+```bash
+make stress-fg
+```
+
+## Coarse-Grained
+
+```bash
+make stress-cg CG_THREADS=8
+```
+
+## CMP
+
+```bash
+make stress-cmp
+```
+
+## SMT
+
+```bash
+make stress-smt
+```
+
+Estas pruebas utilizan cargas mayores que los integration tests y verifican tanto propiedades numéricas como invariantes propias de cada modelo de ejecución.
 
 ---
 
-# 13. Métricas Previstas
+# 13. Campaña Experimental
 
-La versión secuencial servirá como referencia.
+La campaña final de rendimiento se ejecuta directamente desde el `Makefile`.
 
-Sea $T_1$ el tiempo de ejecución secuencial.
+Antes de comenzar:
 
-Para $p$ trabajadores, el speedup será:
+```bash
+make clean
+make release
+make test
+```
+
+Posteriormente:
+
+```bash
+make campaign-200-heat2d
+```
+
+Este target ejecuta **200 repeticiones por configuración**.
+
+Los resultados generados se almacenan en:
+
+```text
+proyecto1/problems/heat2d/metricas/
+```
+
+Los principales archivos son:
+
+```text
+metricas/
+├── heat2d_benchmark.csv
+├── resumen_estadistico.csv
+└── graficas/
+```
+
+---
+
+# 14. Metodología Experimental
+
+La campaña mantiene constante:
+
+```text
+Problema físico
+Configuración numérica
+Malla
+Número de timesteps
+Condiciones iniciales
+Condiciones de frontera
+Kernel computacional
+```
+
+y modifica únicamente el modelo de ejecución.
+
+Las configuraciones principales evaluadas fueron:
+
+| Modelo | Configuración |
+|---|---:|
+| Sequential | 1 worker |
+| CMP | 8 threads |
+| SMT Hardware | 16 threads |
+| SMT Software | 16 workers |
+| Coarse-Grained | 8 threads |
+| Fine-Grained | 8 logical contexts |
+
+Cada configuración fue ejecutada:
+
+```text
+200 veces
+```
+
+para analizar:
+
+- tiempo de ejecución;
+- media;
+- mediana;
+- desviación estándar;
+- intervalo de confianza del 95 %;
+- speedup;
+- eficiencia;
+- throughput;
+- variabilidad.
+
+---
+
+# 15. Plataforma Experimental
+
+Los resultados finales de rendimiento fueron obtenidos sobre una ejecución **Linux nativa** utilizando:
+
+```text
+CPU: AMD Ryzen 7 7730U
+Physical cores: 8
+Hardware threads: 16
+```
+
+La ejecución nativa es importante para los experimentos relacionados con:
+
+- afinidad;
+- SMT;
+- hardware threads;
+- contadores de rendimiento;
+- comportamiento real del scheduler.
+
+Las ejecuciones realizadas dentro de máquinas virtuales fueron utilizadas para desarrollo y validación funcional, pero **no constituyen los resultados oficiales de rendimiento**.
+
+---
+
+# 16. Resultados de la Campaña de 200 Ejecuciones
+
+Cada ejecución procesa:
+
+```text
+638 401 000 cell updates
+```
+
+Los resultados principales fueron:
+
+| Modelo | Workers | Tiempo medio (s) | IC 95 % (s) | Speedup | Throughput (MUpdates/s) |
+|---|---:|---:|---:|---:|---:|
+| Sequential | 1 | 6.2467 | [6.2342, 6.2593] | 1.00x | 102.22 |
+| CMP | 8 | 1.0531 | [1.0446, 1.0616] | 5.93x | 607.77 |
+| SMT Hardware | 16 | 0.8738 | [0.8720, 0.8756] | 7.15x | 730.77 |
+| SMT Software | 16 | 1.1368 | [1.1256, 1.1479] | 5.50x | 563.50 |
+| Coarse-Grained | 8 | 3.1581 | [3.1554, 3.1608] | 1.98x | 202.16 |
+| Fine-Grained | 8 | 9.3796 | [9.3676, 9.3916] | 0.67x | 68.07 |
+
+El speedup mostrado en esta tabla se calcula utilizando la relación entre los tiempos medios:
 
 ```math
-\boxed{
 S(p)
 =
-\frac{T_1}{T_p}
-}
+\frac{\overline{T}_{Sequential}}
+{\overline{T}_{p}}
 ```
 
-donde:
+---
 
-- $T_1$ = tiempo secuencial;
-- $T_p$ = tiempo utilizando $p$ trabajadores.
+# 17. Speedup
 
-La eficiencia paralela será:
+Tomando la versión secuencial como referencia:
+
+```text
+Sequential       1.00x
+CMP              5.93x
+SMT Hardware     7.15x
+SMT Software     5.50x
+Coarse-Grained   1.98x
+Fine-Grained     0.67x
+```
+
+La configuración con menor tiempo de ejecución fue:
+
+```text
+SMT Hardware — 16 threads
+```
+
+con aproximadamente:
+
+```text
+0.874 s
+```
+
+y un speedup cercano a:
+
+```text
+7.15x
+```
+
+respecto a la versión secuencial.
+
+---
+
+# 18. Eficiencia
+
+La eficiencia se define como:
 
 ```math
-\boxed{
 E(p)
 =
 \frac{S(p)}{p}
-}
 ```
 
-También se analizarán:
+Para las configuraciones paralelas principales:
 
-- tiempo total de ejecución;
-- throughput de celdas;
-- escalabilidad;
-- ciclos de CPU;
-- instrucciones ejecutadas;
-- IPC;
-- fallos de caché;
-- referencias de caché;
-- cambios de contexto;
-- migraciones entre CPUs;
-- utilización de hilos lógicos bajo SMT.
+| Modelo | Workers | Speedup | Eficiencia aproximada |
+|---|---:|---:|---:|
+| CMP | 8 | 5.93x | 74.1 % |
+| SMT Hardware | 16 | 7.15x | 44.7 % |
+| SMT Software | 16 | 5.50x | 34.3 % |
+| Coarse-Grained | 8 | 1.98x | 24.7 % |
+| Fine-Grained | 8 | 0.67x | 8.3 % |
+
+En Fine-Grained esta relación se presenta únicamente como una normalización respecto a los **ocho contextos lógicos simulados** y no debe interpretarse como eficiencia de ocho núcleos físicos.
 
 ---
 
-# 14. Resumen Arquitectónico para la Demostración
+# 19. Interpretación de Resultados
+
+## 19.1 Sequential
+
+La versión secuencial requirió aproximadamente:
 
 ```text
-                      HEAT DIFFUSION 2D
-                              │
-                              ▼
-                  Sistema Base Secuencial
-                              │
-                  ┌───────────┼───────────┐
-                  │           │           │
-                  ▼           ▼           ▼
-          Grid contiguo   Double Buffer   FDM 2D
-                  │           │           │
-                  └───────────┼───────────┘
-                              │
-                              ▼
-                    diffusionStep()
-                              │
-                              ▼
-                 Celdas independientes
-                    por cada timestep
-                              │
-              ┌───────────────┴───────────────┐
-              │                               │
-              ▼                               ▼
-      División por Filas                División por Tiles
-              │                               │
-       ┌──────┴──────┐                        │
-       ▼             ▼                        ▼
-Coarse-Grained      CMP                 Fine-Grained
-                                              │
-                                              ▼
-                                     Scheduler Round-Robin
-              │                               │
-              └───────────────┬───────────────┘
-                              │
-                              ▼
-                             SMT
-                              │
-                              ▼
-                   Análisis de rendimiento
+6.25 s
+```
+
+por ejecución y constituye la referencia para las demás configuraciones.
+
+---
+
+## 19.2 CMP
+
+CMP con ocho workers redujo el tiempo medio hasta aproximadamente:
+
+```text
+1.05 s
+```
+
+alcanzando:
+
+```text
+5.93x speedup
+```
+
+y un throughput superior a:
+
+```text
+607 millones de actualizaciones/s
+```
+
+El resultado muestra que el kernel Heat2D dispone de suficiente paralelismo espacial para aprovechar varios trabajadores concurrentes.
+
+---
+
+## 19.3 SMT Hardware
+
+SMT Hardware con 16 threads obtuvo el mejor tiempo observado:
+
+```text
+0.874 s
+```
+
+con:
+
+```text
+7.15x speedup
+```
+
+y aproximadamente:
+
+```text
+731 millones de actualizaciones/s
+```
+
+Esta configuración utilizó los hardware threads disponibles mediante placement explícito sobre la topología detectada.
+
+---
+
+## 19.4 SMT Software
+
+La configuración SMT Software obtuvo:
+
+```text
+1.137 s
+```
+
+y aproximadamente:
+
+```text
+5.50x speedup
+```
+
+El resultado fue inferior al de SMT Hardware y al de la configuración CMP utilizada en la campaña.
+
+---
+
+## 19.5 Coarse-Grained
+
+Coarse-Grained obtuvo aproximadamente:
+
+```text
+3.16 s
+```
+
+y:
+
+```text
+1.98x speedup
+```
+
+Los eventos de bloqueo y la coordinación entre workers introducen overhead adicional respecto a CMP.
+
+---
+
+## 19.6 Fine-Grained
+
+Fine-Grained obtuvo aproximadamente:
+
+```text
+9.38 s
+```
+
+por ejecución.
+
+Esto corresponde a:
+
+```text
+0.67x
+```
+
+respecto a la versión secuencial.
+
+El resultado es coherente con la naturaleza del modelo implementado: múltiples contextos lógicos son planificados cooperativamente con una granularidad muy pequeña sobre un único flujo de ejecución.
+
+El costo del scheduling y del manejo de estados supera en este caso el beneficio potencial del modelo.
+
+---
+
+# 20. Métricas Microarquitectónicas
+
+Además del tiempo total, la infraestructura experimental permite estudiar métricas de hardware como:
+
+- ciclos;
+- instrucciones;
+- IPC;
+- cargas de caché L1;
+- misses de caché L1;
+- cargas LLC;
+- misses LLC;
+- context switches.
+
+Estas métricas complementan el análisis de tiempo al permitir observar diferencias en:
+
+- overhead de instrucciones;
+- comportamiento de caché;
+- sincronización;
+- presión sobre el scheduler;
+- utilización de recursos del procesador.
+
+Los datos de profiling se utilizan como evidencia descriptiva adicional y no sustituyen la campaña estadística de 200 ejecuciones utilizada para analizar tiempos.
+
+---
+
+# 21. Principales Hallazgos
+
+La experimentación permite destacar los siguientes resultados:
+
+1. **Heat2D posee un alto grado de paralelismo espacial.**  
+   Las celdas interiores de un mismo timestep pueden calcularse independientemente.
+
+2. **CMP obtiene una aceleración considerable.**  
+   Ocho workers redujeron el tiempo de aproximadamente `6.25 s` a `1.05 s`.
+
+3. **SMT Hardware obtuvo el mejor resultado de la campaña.**  
+   Con 16 threads se alcanzó aproximadamente `7.15x` de speedup.
+
+4. **La sobresuscripción o ejecución software no sustituye al SMT de hardware.**  
+   SMT Software fue más lento que la configuración SMT Hardware utilizada.
+
+5. **Coarse-Grained está condicionado por el costo de los eventos de bloqueo.**
+
+6. **Fine-Grained presenta un overhead elevado en esta implementación.**  
+   La frecuencia de scheduling y la administración de contextos hacen que sea más lento que el baseline secuencial.
+
+7. **El modelo de ejecución modifica significativamente el rendimiento aun cuando el problema matemático permanece idéntico.**
+
+---
+
+# 22. Reproducibilidad
+
+Para reproducir la validación completa:
+
+```bash
+make clean
+make release
+make test
+```
+
+Para ejecutar la campaña final:
+
+```bash
+make campaign-200-heat2d
+```
+
+Para ejecutar pruebas de estrés individuales:
+
+```bash
+make stress-fg
+make stress-cg CG_THREADS=8
+make stress-cmp
+make stress-smt
+```
+
+Después de una ejecución exitosa, los resultados de benchmark pueden consultarse en:
+
+```text
+proyecto1/problems/heat2d/metricas/
 ```
 
 ---
 
-# 15. Conclusión del Avance
+# 23. Conclusiones
 
-Para la **Demostración 2**, actualmente se cuenta con:
+El proyecto implementa una misma simulación de difusión térmica utilizando diferentes modelos de ejecución multithreading.
 
-- una implementación secuencial funcional;
-- una representación de memoria contigua;
-- un esquema numérico explícito de diferencias finitas;
-- double buffering;
-- condiciones de frontera de Dirichlet;
-- validación de estabilidad;
-- validación contra solución analítica;
-- stress test con más de $638$ millones de actualizaciones;
-- identificación del principal punto de paralelización;
-- identificación de las variables que aumentan el paralelismo;
-- dos propuestas preliminares de división del trabajo;
-- diagramas preliminares del sistema secuencial y paralelo.
+El diseño mantiene separados:
 
-El objetivo de las siguientes etapas será mantener:
-
-```math
-\text{Problema físico}
-+
-\text{Condiciones iniciales}
-+
-\text{Método numérico}
+```text
+Modelo físico
+      +
+Método numérico
+      +
+Representación de datos
 ```
 
-constantes, modificando únicamente:
+del:
 
-```math
-\boxed{
-\text{Modelo de ejecución}
-}
+```text
+Modelo de ejecución
 ```
 
-De esta manera será posible realizar una comparación experimental entre:
+permitiendo comparar las estrategias bajo una carga computacional común.
 
-```math
-\text{Sequential}
-\rightarrow
-\text{Fine-Grained}
-\rightarrow
-\text{Coarse-Grained}
-\rightarrow
-\text{CMP}
-\rightarrow
-\text{SMT}
+La campaña experimental de 200 ejecuciones mostró diferencias claras entre los modelos.
+
+La versión secuencial requirió aproximadamente:
+
+```text
+6.25 s
 ```
 
-manteniendo el mismo problema computacional como referencia.
+mientras que la configuración SMT Hardware con 16 threads redujo el tiempo hasta aproximadamente:
+
+```text
+0.87 s
+```
+
+alcanzando una aceleración cercana a:
+
+```text
+7.15x
+```
+
+CMP con ocho threads también obtuvo un resultado considerable:
+
+```text
+5.93x
+```
+
+Por otro lado, Coarse-Grained mostró el impacto del bloqueo y la sincronización, mientras que Fine-Grained permitió observar directamente el costo de una planificación extremadamente frecuente.
+
+En conjunto, los resultados muestran que el rendimiento no depende únicamente de la cantidad de trabajo paralelo disponible, sino también de:
+
+- granularidad;
+- scheduling;
+- sincronización;
+- afinidad;
+- topología del procesador;
+- utilización de hardware threads;
+- comportamiento de memoria y caché.
+
+El proyecto proporciona así una comparación experimental de distintos modelos de multithreading utilizando una misma carga numérica controlada y reproducible.
