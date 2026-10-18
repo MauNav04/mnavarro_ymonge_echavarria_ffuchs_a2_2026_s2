@@ -9,6 +9,14 @@
 
 namespace {
 
+/**
+ * @brief Enforces a test condition.
+ *
+ * @param condition Condition that must evaluate to true.
+ * @param message Error message reported if the condition fails.
+ *
+ * @throws std::runtime_error If the condition is false.
+ */
 void require(
     bool condition,
     const char* message
@@ -21,6 +29,11 @@ void require(
 }
 
 
+/**
+ * @brief Prints a sequence of logical CPU identifiers.
+ *
+ * @param cpus Logical CPU IDs to print.
+ */
 void printCpuList(
     const std::vector<int>& cpus
 ) {
@@ -39,6 +52,18 @@ void printCpuList(
 }
 
 
+/**
+ * @brief Validates the structural invariants of the detected CPU topology.
+ *
+ * The detected topology must contain at least one physical core and one
+ * logical CPU. Every allowed logical CPU must belong to exactly one detected
+ * physical core, and no core may reference a CPU outside the process affinity
+ * mask.
+ *
+ * @param topology CPU topology detected for the current process.
+ *
+ * @throws std::runtime_error If any topology invariant is violated.
+ */
 void testDetectedTopology(
     const heat2d::smt::CpuTopology& topology
 ) {
@@ -105,6 +130,18 @@ void testDetectedTopology(
 }
 
 
+/**
+ * @brief Validates the physical-core-first CPU ordering.
+ *
+ * The physical ordering must select exactly one logical CPU from every
+ * detected physical core, preserving the same core order stored in the
+ * topology representation.
+ *
+ * @param topology CPU topology used to build the placement order.
+ *
+ * @throws std::runtime_error If the physical CPU order violates the expected
+ *         topology mapping.
+ */
 void testPhysicalOrder(
     const heat2d::smt::CpuTopology& topology
 ) {
@@ -148,6 +185,18 @@ void testPhysicalOrder(
 }
 
 
+/**
+ * @brief Validates the topology-aware SMT CPU ordering.
+ *
+ * The SMT order must contain every allowed logical CPU exactly once. Its
+ * initial segment must first select one logical CPU from each physical core
+ * before additional hardware threads from those cores are considered.
+ *
+ * @param topology CPU topology used to build the SMT placement order.
+ *
+ * @throws std::runtime_error If the SMT order violates the expected placement
+ *         policy.
+ */
 void testSmtOrder(
     const heat2d::smt::CpuTopology& topology
 ) {
@@ -181,10 +230,8 @@ void testSmtOrder(
     );
 
     /*
-     * Critical SMT property:
-     *
-     * Before using a second hardware thread from any physical core,
-     * the placement must first use one CPU from every physical core.
+     * The placement policy must use one logical CPU from every physical
+     * core before assigning additional hardware threads from those cores.
      */
     require(
         smtOrder.size() >=
@@ -203,6 +250,15 @@ void testSmtOrder(
 }
 
 
+/**
+ * @brief Prints the detected CPU topology and generated placement orders.
+ *
+ * The diagnostic output includes the process-visible logical CPUs, physical
+ * core grouping, SMT characteristics, and the CPU orders used by the placement
+ * helpers.
+ *
+ * @param topology CPU topology to print.
+ */
 void printTopology(
     const heat2d::smt::CpuTopology& topology
 ) {
@@ -317,6 +373,15 @@ void printTopology(
 }  // namespace
 
 
+/**
+ * @brief Runs the CPU-topology validation suite.
+ *
+ * Detects the process-visible Linux CPU topology, validates the public topology
+ * representation, verifies both placement-order strategies, and prints the
+ * resulting topology for diagnostic inspection.
+ *
+ * @return EXIT_SUCCESS if every validation passes; EXIT_FAILURE otherwise.
+ */
 int main()
 {
     try {
@@ -324,8 +389,8 @@ int main()
             heat2d::smt::detectCpuTopology();
 
         /*
-         * detectCpuTopology() already validates internally, but calling
-         * the validator explicitly here also tests the public API.
+         * Detection performs its own validation, but invoking the public
+         * validator explicitly also exercises its external API contract.
          */
         heat2d::smt::validateCpuTopology(
             topology

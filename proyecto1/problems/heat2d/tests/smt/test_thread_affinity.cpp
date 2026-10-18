@@ -9,6 +9,14 @@
 
 namespace {
 
+/**
+ * @brief Enforces a test condition.
+ *
+ * @param condition Condition that must evaluate to true.
+ * @param message Error message reported if the condition fails.
+ *
+ * @throws std::runtime_error If the condition is false.
+ */
 void require(
     bool condition,
     const char* message
@@ -22,10 +30,19 @@ void require(
 
 
 /**
- * @brief Restores the original affinity even when the test fails.
+ * @brief Restores a thread affinity mask when leaving the current scope.
+ *
+ * The guard provides a best-effort safety net for tests that temporarily
+ * modify the calling thread's affinity. Tests still perform explicit
+ * restoration when restoration itself must be validated.
  */
 class AffinityRestoreGuard {
 public:
+    /**
+     * @brief Creates a guard for a previously captured affinity mask.
+     *
+     * @param originalAffinity Affinity mask to restore on destruction.
+     */
     explicit AffinityRestoreGuard(
         std::vector<int> originalAffinity
     )
@@ -45,6 +62,9 @@ public:
         const AffinityRestoreGuard&
     ) = delete;
 
+    /**
+     * @brief Attempts to restore the original affinity without propagating errors.
+     */
     ~AffinityRestoreGuard()
     {
         try {
@@ -53,10 +73,9 @@ public:
             );
         } catch (...) {
             /*
-             * Destructors must not propagate exceptions.
-             *
-             * The explicit restore performed by the test will still
-             * detect failures during the normal execution path.
+             * Destructors must not propagate exceptions. Explicit restoration
+             * inside the tests remains responsible for detecting failures on
+             * the normal execution path.
              */
         }
     }
@@ -66,6 +85,17 @@ private:
 };
 
 
+/**
+ * @brief Verifies pinning to one process-visible logical CPU.
+ *
+ * The test selects the first CPU from the physical-core-first placement order,
+ * pins the calling thread exclusively to it, validates the resulting affinity
+ * mask, and confirms that the original affinity can be restored.
+ *
+ * @param topology Detected CPU topology used to select a valid test CPU.
+ *
+ * @throws std::runtime_error If pinning or affinity restoration fails.
+ */
 void testPinningToAllowedCpu(
     const heat2d::smt::CpuTopology& topology
 ) {
@@ -124,8 +154,8 @@ void testPinningToAllowedCpu(
     );
 
     /*
-     * Restore the original mask explicitly so that restoration itself
-     * also becomes part of the test.
+     * Restore explicitly so restoration is validated as part of the test,
+     * rather than relying only on the scope guard.
      */
     setCurrentThreadAffinity(
         originalAffinity
@@ -147,6 +177,18 @@ void testPinningToAllowedCpu(
 }
 
 
+/**
+ * @brief Verifies affinity to multiple logical CPUs.
+ *
+ * When at least two physical cores are available, the test restricts the
+ * calling thread to two logical CPUs and verifies that both remain available
+ * without the thread being reported as exclusively pinned to either one.
+ *
+ * @param topology Detected CPU topology used to select the test CPUs.
+ *
+ * @throws std::runtime_error If the requested affinity mask is not applied
+ *         or restored correctly.
+ */
 void testMultipleCpuAffinity(
     const heat2d::smt::CpuTopology& topology
 ) {
@@ -165,8 +207,8 @@ void testMultipleCpuAffinity(
         );
 
     /*
-     * On a single-CPU environment there is nothing meaningful to test
-     * regarding a multi-CPU affinity mask.
+     * A multi-CPU affinity mask cannot be exercised when only one physical
+     * core is available to the process.
      */
     if (physicalOrder.size() < 2) {
         std::cout
@@ -234,6 +276,14 @@ void testMultipleCpuAffinity(
 }
 
 
+/**
+ * @brief Verifies rejection of invalid affinity specifications.
+ *
+ * The affinity API must reject negative CPU identifiers, empty affinity
+ * masks, and duplicate logical CPU identifiers.
+ *
+ * @throws std::runtime_error If any invalid input is accepted.
+ */
 void testInvalidCpuIdentifiers()
 {
     using namespace heat2d::smt;
@@ -300,6 +350,12 @@ void testInvalidCpuIdentifiers()
 }
 
 
+/**
+ * @brief Prints a labeled thread affinity mask.
+ *
+ * @param label Text displayed before the CPU identifiers.
+ * @param affinity Logical CPU IDs contained in the affinity mask.
+ */
 void printAffinity(
     const char* label,
     const std::vector<int>& affinity
@@ -328,6 +384,15 @@ void printAffinity(
 }  // namespace
 
 
+/**
+ * @brief Runs the thread-affinity integration test suite.
+ *
+ * The suite validates exclusive CPU pinning, multi-CPU affinity masks,
+ * invalid-input rejection, and restoration of the calling thread's original
+ * affinity after all tests complete.
+ *
+ * @return EXIT_SUCCESS if every test passes; EXIT_FAILURE otherwise.
+ */
 int main()
 {
     try {
@@ -371,6 +436,10 @@ int main()
 
         testInvalidCpuIdentifiers();
 
+        /*
+         * The complete suite must leave the caller with the same affinity
+         * mask that was active before testing began.
+         */
         require(
             getCurrentThreadAffinity() ==
                 initialAffinity,

@@ -28,6 +28,12 @@ constexpr double numericalTolerance =
     1e-12;
 
 
+/**
+ * @brief Stores numerical error metrics between two grid states.
+ *
+ * `l2Rms` represents the root-mean-square error over the complete grid,
+ * while `lInfinity` stores the maximum absolute cell-wise difference.
+ */
 struct NumericalDifference {
     double l2Rms{0.0};
 
@@ -36,7 +42,13 @@ struct NumericalDifference {
 
 
 /**
- * @brief Creates the common initial condition used by every execution.
+ * @brief Creates the common initial state used by every stress-test execution.
+ *
+ * Sequential and SMT runs start from independent copies of this same grid,
+ * ensuring equivalent initial and boundary conditions.
+ *
+ * @param config Simulation parameters used to initialize the grid.
+ * @return Initialized Heat2D grid.
  */
 heat2d::Grid createInitialGrid(
     const heat2d::SimulationConfig& config
@@ -64,7 +76,16 @@ heat2d::Grid createInitialGrid(
 
 
 /**
- * @brief Calculates numerical differences against the sequential result.
+ * @brief Computes numerical differences between a reference and candidate grid.
+ *
+ * Calculates both the root-mean-square error and the maximum absolute
+ * difference across all corresponding cells.
+ *
+ * @param reference Grid used as the numerical reference.
+ * @param candidate Grid whose result is being validated.
+ * @return Computed L2 RMS and L-infinity error metrics.
+ *
+ * @throws std::invalid_argument If the grids have different dimensions.
  */
 NumericalDifference calculateDifference(
     const heat2d::Grid& reference,
@@ -139,7 +160,15 @@ NumericalDifference calculateDifference(
 
 
 /**
- * @brief Returns the worker counts meaningful on the current machine.
+ * @brief Builds the set of SMT worker counts supported by the current topology.
+ *
+ * Standard experimental counts are included only when the machine exposes
+ * enough logical CPUs. If the maximum available logical CPU count is not one
+ * of those standard values, it is added explicitly so the detected topology
+ * is exercised at full capacity.
+ *
+ * @param availableLogicalCpus Number of logical CPUs visible to the process.
+ * @return Worker counts to use during the SMT stress test.
  */
 std::vector<std::size_t> createThreadCounts(
     std::size_t availableLogicalCpus
@@ -169,8 +198,8 @@ std::vector<std::size_t> createThreadCounts(
     }
 
     /*
-     * Also exercise the maximum available topology if it is not one
-     * of the standard experimental counts.
+     * Exercise the complete visible topology when its logical CPU count
+     * is not already represented by a standard experimental configuration.
      */
     if (
         !result.empty() &&
@@ -187,7 +216,19 @@ std::vector<std::size_t> createThreadCounts(
 
 
 /**
- * @brief Checks the metadata returned by one SMT execution.
+ * @brief Validates execution and CPU-placement metadata reported by SMT.
+ *
+ * The test checks worker pinning, timestep and cell-update counts, barrier
+ * phases, detected topology metadata, and the topology-aware logical CPU
+ * assignment produced by the SMT model.
+ *
+ * @param stats Statistics returned by the SMT execution.
+ * @param expectedThreads Expected number of worker threads.
+ * @param expectedSteps Expected number of simulation timesteps.
+ * @param expectedUpdates Expected number of interior cell updates.
+ * @param topology CPU topology used to derive the expected placement.
+ *
+ * @throws std::runtime_error If any execution or placement invariant fails.
  */
 void validateStats(
     const heat2d::smt::SmtStats& stats,
@@ -309,7 +350,9 @@ void validateStats(
 
 
 /**
- * @brief Prints the logical CPUs used by one execution.
+ * @brief Prints the logical CPU assignment of one SMT execution.
+ *
+ * @param cpuIds Logical CPU IDs assigned to the worker threads.
  */
 void printCpuAssignments(
     const std::vector<int>& cpuIds
@@ -340,13 +383,24 @@ void printCpuAssignments(
 }  // namespace
 
 
+/**
+ * @brief Runs the SMT stress-validation suite.
+ *
+ * Detects the available CPU topology, evaluates every supported SMT worker
+ * configuration, and compares each execution against a sequential numerical
+ * reference. The suite also validates worker pinning, topology-aware CPU
+ * placement, synchronization metadata, timing, throughput, and speedup.
+ *
+ * @return 0 if every SMT configuration passes; 1 otherwise.
+ */
 int main()
 {
     try {
         heat2d::SimulationConfig config;
 
         /*
-         * Same large workload used by the CMP stress campaign.
+         * Use the same large workload as the CMP stress campaign so both
+         * execution models are exercised under equivalent numerical work.
          */
         config.lengthX =
             1.0;
@@ -485,7 +539,8 @@ int main()
             << '\n';
 
         /*
-         * Every parallel execution starts from the exact same grid.
+         * Build one common initial state so every execution starts from
+         * identical numerical conditions.
          */
         const heat2d::Grid initialGrid =
             createInitialGrid(
@@ -493,7 +548,8 @@ int main()
             );
 
         /*
-         * Sequential numerical and timing reference.
+         * Compute the sequential numerical and timing reference once.
+         * Every SMT result is compared against this final grid.
          */
         heat2d::Grid sequentialCurrent =
             initialGrid;
@@ -536,7 +592,8 @@ int main()
             << " s\n";
 
         /*
-         * Execute every topology-supported SMT configuration.
+         * Exercise every worker count supported by the detected logical
+         * CPU topology while preserving the same workload and initial state.
          */
         for (
             const std::size_t threadCount :

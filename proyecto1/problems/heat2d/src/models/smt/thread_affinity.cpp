@@ -19,12 +19,12 @@ namespace heat2d::smt {
 namespace {
 
 /**
- * @brief Validates a Linux logical CPU ID against the system's `cpu_set_t` limits.
+ * @brief Validates that a logical CPU ID can be represented by `cpu_set_t`.
  *
- * Ensures that the ID can be safely manipulated by the POSIX thread affinity API 
- * without causing out-of-bounds memory accesses or silent truncation.
+ * @param logicalCpuId Linux logical CPU identifier.
  *
- * @throws std::invalid_argument If the ID is negative or exceeds `CPU_SETSIZE`.
+ * @throws std::invalid_argument If the ID is negative or exceeds
+ *         the capacity of `cpu_set_t`.
  */
 void validateLogicalCpuId(
     int logicalCpuId
@@ -44,11 +44,14 @@ void validateLogicalCpuId(
 
 
 /**
- * @brief Converts a pthread error code into a descriptive C++ exception.
+ * @brief Builds a descriptive exception from a pthread error code.
  *
- * POSIX thread functions (`pthread_*`) return their error numbers directly 
- * as integers, rather than setting the global `errno` variable. This helper 
- * safely translates those codes into readable `std::runtime_error` messages.
+ * POSIX pthread functions return error codes directly instead of relying
+ * on the global `errno` value.
+ *
+ * @param operation Name of the pthread operation that failed.
+ * @param errorNumber Error code returned by the pthread API.
+ * @return Runtime error containing the operation and error description.
  */
 std::runtime_error pthreadAffinityError(
     const char* operation,
@@ -65,10 +68,17 @@ std::runtime_error pthreadAffinityError(
 
 
 /**
- * @brief Constructs a POSIX `cpu_set_t` bitmask from a vector of CPU IDs.
+ * @brief Builds a CPU affinity mask from logical CPU identifiers.
  *
- * @throws std::invalid_argument If the input vector is empty, contains negative 
- *         values, out-of-bound IDs, or duplicate CPU assignments.
+ * Each CPU ID is validated before being inserted into the mask.
+ * Duplicate identifiers are rejected to keep the affinity specification
+ * unambiguous.
+ *
+ * @param logicalCpuIds Logical CPUs allowed by the affinity mask.
+ * @return Initialized `cpu_set_t` containing the requested CPUs.
+ *
+ * @throws std::invalid_argument If the input is empty, contains an invalid
+ *         CPU ID, or contains duplicate IDs.
  */
 cpu_set_t createCpuSet(
     const std::vector<int>& logicalCpuIds
@@ -81,7 +91,6 @@ cpu_set_t createCpuSet(
 
     cpu_set_t cpuSet;
 
-    // Clear the mask before setting specific bits.
     CPU_ZERO(
         &cpuSet
     );
@@ -107,7 +116,6 @@ cpu_set_t createCpuSet(
             );
         }
 
-        // Enable the bit corresponding to the logical CPU.
         CPU_SET(
             logicalCpuId,
             &cpuSet
@@ -120,13 +128,15 @@ cpu_set_t createCpuSet(
 }  // namespace
 
 /**
- * @brief Retrieves the current thread's CPU affinity mask.
- * 
- * Interrogates the Linux kernel scheduler to determine which logical CPUs 
- * the calling thread is currently permitted to execute on.
+ * @brief Returns the logical CPUs available to the calling thread.
  *
- * @throws std::runtime_error If the `pthread_getaffinity_np` syscall fails 
- *         or returns an inexplicably empty mask.
+ * Queries the current pthread affinity mask and converts the active CPU bits
+ * into a vector of Linux logical CPU identifiers.
+ *
+ * @return Logical CPU IDs present in the current affinity mask.
+ *
+ * @throws std::runtime_error If the pthread affinity query fails or if the
+ *         returned affinity mask is empty.
  */
 std::vector<int> getCurrentThreadAffinity()
 {
@@ -179,11 +189,15 @@ std::vector<int> getCurrentThreadAffinity()
 }
 
 /**
- * @brief Restricts the calling thread's execution to a specific subset of CPUs.
+ * @brief Restricts the calling thread to a set of logical CPUs.
  *
- * Instructs the Linux kernel scheduler to only migrate this thread between 
- * the provided logical CPU IDs. Used in NUMA architectures or when attempting 
- * to isolate workloads to prevent L1/L2 cache evictions.
+ * The resulting affinity mask limits the CPUs on which the Linux scheduler
+ * may execute the calling thread.
+ *
+ * @param logicalCpuIds Logical CPUs allowed for the calling thread.
+ *
+ * @throws std::invalid_argument If the requested affinity mask is invalid.
+ * @throws std::runtime_error If the pthread affinity operation fails.
  */
 void setCurrentThreadAffinity(
     const std::vector<int>& logicalCpuIds
@@ -209,12 +223,16 @@ void setCurrentThreadAffinity(
 }
 
 /**
- * @brief Binds the calling thread exclusively to a single logical CPU.
- * 
- * This is the core "Thread Pinning" function utilized by the SMT model. By 
- * restricting a worker thread to exactly one logical CPU, it eliminates 
- * OS-induced context migrations, guaranteeing maximum spatial locality and 
- * cache retention.
+ * @brief Pins the calling thread to one logical CPU.
+ *
+ * Restricting a worker to a single logical CPU provides explicit and
+ * deterministic CPU placement for the SMT execution model and prevents
+ * the scheduler from migrating that worker to another logical CPU.
+ *
+ * @param logicalCpuId Logical CPU to which the thread will be pinned.
+ *
+ * @throws std::invalid_argument If the logical CPU ID is invalid.
+ * @throws std::runtime_error If the affinity operation fails.
  */
 void pinCurrentThreadToCpu(
     int logicalCpuId
@@ -231,10 +249,14 @@ void pinCurrentThreadToCpu(
 }
 
 /**
- * @brief Verifies if the calling thread is strictly pinned to the specified CPU.
- * 
- * Returns true *only* if the thread's affinity mask contains exactly one 
- * allowed CPU, and that CPU matches the provided `logicalCpuId`.
+ * @brief Checks whether the calling thread is pinned exclusively to one CPU.
+ *
+ * @param logicalCpuId Logical CPU expected in the affinity mask.
+ * @return true if the affinity mask contains only the requested CPU;
+ *         false otherwise.
+ *
+ * @throws std::invalid_argument If the logical CPU ID is invalid.
+ * @throws std::runtime_error If the current affinity mask cannot be obtained.
  */
 bool currentThreadIsPinnedToCpu(
     int logicalCpuId
@@ -253,11 +275,13 @@ bool currentThreadIsPinnedToCpu(
 }
 
 /**
- * @brief Checks if the thread is permitted to run on the specified CPU.
- * 
- * Returns true if the provided `logicalCpuId` is present within the thread's 
- * current affinity mask, regardless of how many other CPUs it is also allowed 
- * to execute on.
+ * @brief Checks whether the calling thread may execute on a logical CPU.
+ *
+ * @param logicalCpuId Logical CPU to search for in the current affinity mask.
+ * @return true if the CPU is present in the affinity mask; false otherwise.
+ *
+ * @throws std::invalid_argument If the logical CPU ID is invalid.
+ * @throws std::runtime_error If the current affinity mask cannot be obtained.
  */
 bool currentThreadCanRunOnCpu(
     int logicalCpuId

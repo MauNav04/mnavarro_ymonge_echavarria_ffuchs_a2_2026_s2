@@ -22,6 +22,14 @@ constexpr double comparisonTolerance =
     1e-12;
 
 
+/**
+ * @brief Enforces a test condition.
+ *
+ * @param condition Condition that must evaluate to true.
+ * @param message Error message reported if the condition fails.
+ *
+ * @throws std::runtime_error If the condition is false.
+ */
 void require(
     bool condition,
     const char* message
@@ -34,6 +42,15 @@ void require(
 }
 
 
+/**
+ * @brief Computes the maximum absolute cell-wise difference between two grids.
+ *
+ * @param first First grid to compare.
+ * @param second Second grid to compare.
+ * @return Maximum absolute difference across all corresponding cells.
+ *
+ * @throws std::invalid_argument If the grids have different dimensions.
+ */
 double maximumGridDifference(
     const heat2d::Grid& first,
     const heat2d::Grid& second
@@ -75,6 +92,15 @@ double maximumGridDifference(
 }
 
 
+/**
+ * @brief Creates the common initial state used by the integration tests.
+ *
+ * Sequential and SMT executions start from independent copies of this grid,
+ * ensuring equivalent initial and boundary conditions.
+ *
+ * @param config Simulation parameters used to initialize the grid.
+ * @return Initialized Heat2D grid.
+ */
 heat2d::Grid createInitialGrid(
     const heat2d::SimulationConfig& config
 ) {
@@ -101,15 +127,14 @@ heat2d::Grid createInitialGrid(
 
 
 /**
- * @brief Builds useful worker counts supported by the current machine.
+ * @brief Builds the SMT worker counts supported by the current machine.
  *
- * UTM may produce:
+ * Standard experimental counts are included only when the process can access
+ * enough logical CPUs. This keeps the integration test portable across
+ * machines exposing different CPU topologies.
  *
- *   1, 2, 4
- *
- * while the target Ryzen should produce:
- *
- *   1, 2, 4, 8, 16
+ * @param availableLogicalCpus Number of logical CPUs visible to the process.
+ * @return Supported worker counts selected for the test suite.
  */
 std::vector<std::size_t> createTestThreadCounts(
     std::size_t availableLogicalCpus
@@ -142,6 +167,19 @@ std::vector<std::size_t> createTestThreadCounts(
 }
 
 
+/**
+ * @brief Validates one SMT configuration against the sequential reference.
+ *
+ * The test verifies numerical equivalence and checks the main SMT execution
+ * invariants: worker count, timesteps, cell updates, barrier phases, worker
+ * pinning, topology metadata, and topology-aware CPU placement.
+ *
+ * @param threadCount Number of SMT workers to test.
+ * @param topology CPU topology used to derive the expected placement.
+ *
+ * @throws std::runtime_error If any numerical, execution, or placement
+ *         invariant is violated.
+ */
 void testAgainstSequential(
     std::size_t threadCount,
     const heat2d::smt::CpuTopology& topology
@@ -149,10 +187,9 @@ void testAgainstSequential(
     heat2d::SimulationConfig config;
 
     /*
-     * Moderate workload:
-     *
-     * 51 x 51
-     * 100 timesteps
+     * Use a moderate workload that exercises parallel row partitioning and
+     * synchronization while keeping the integration test inexpensive enough
+     * for frequent execution.
      */
     config.rows =
         51;
@@ -178,7 +215,8 @@ void testAgainstSequential(
         );
 
     /*
-     * Sequential reference.
+     * Compute the sequential reference from the same initial state used by
+     * the SMT execution.
      */
     heat2d::Grid sequentialCurrent =
         initial;
@@ -200,9 +238,6 @@ void testAgainstSequential(
         config.boundaryTemperature
     );
 
-    /*
-     * SMT execution.
-     */
     heat2d::Grid smtCurrent =
         initial;
 
@@ -230,6 +265,11 @@ void testAgainstSequential(
             smtConfig
         );
 
+    /*
+     * Both models evaluate the same numerical stencil from equivalent initial
+     * states. Differences beyond the configured tolerance indicate an
+     * unexpected divergence in the SMT execution.
+     */
     const double maximumDifference =
         maximumGridDifference(
             sequentialCurrent,
@@ -242,6 +282,9 @@ void testAgainstSequential(
         "SMT result differs from sequential reference."
     );
 
+    /*
+     * Every interior cell must be updated exactly once per timestep.
+     */
     const std::uint64_t expectedUpdates =
         static_cast<std::uint64_t>(
             config.rows - 2
@@ -271,6 +314,10 @@ void testAgainstSequential(
         "Incorrect SMT cell-update count."
     );
 
+    /*
+     * SMT uses two synchronization phases per timestep:
+     * one after computation and one after the global state update.
+     */
     require(
         stats.barrierPhases ==
             2ULL *
@@ -280,6 +327,10 @@ void testAgainstSequential(
         "Incorrect SMT barrier-phase count."
     );
 
+    /*
+     * Every worker participating in a non-empty SMT execution must be pinned
+     * to the logical CPU selected by the topology-aware placement policy.
+     */
     require(
         stats.pinnedWorkerCount ==
             threadCount,
@@ -308,6 +359,10 @@ void testAgainstSequential(
         "Incorrect number of SMT CPU assignments."
     );
 
+    /*
+     * Hardware SMT placement assigns at most one worker to each selected
+     * logical CPU.
+     */
     const std::set<int> assignedCpus(
         stats.logicalCpuIds.begin(),
         stats.logicalCpuIds.end()
@@ -319,6 +374,10 @@ void testAgainstSequential(
         "SMT assigned the same logical CPU to multiple workers."
     );
 
+    /*
+     * Worker placement must follow the topology-aware order generated by the
+     * SMT subsystem.
+     */
     const std::vector<int> expectedCpuOrder =
         heat2d::smt::buildSmtCpuOrder(
             topology
@@ -367,6 +426,14 @@ void testAgainstSequential(
 }
 
 
+/**
+ * @brief Verifies the zero-timestep SMT execution path.
+ *
+ * A zero-step execution must leave the current grid unchanged, perform no
+ * cell updates or barrier phases, and avoid creating pinned worker threads.
+ *
+ * @throws std::runtime_error If any zero-step invariant is violated.
+ */
 void testZeroSteps()
 {
     heat2d::SimulationConfig config;
@@ -436,6 +503,11 @@ void testZeroSteps()
 }
 
 
+/**
+ * @brief Verifies that SMT rejects a configuration with zero workers.
+ *
+ * @throws std::runtime_error If the invalid configuration is accepted.
+ */
 void testRejectsZeroThreads()
 {
     heat2d::SimulationConfig config;
@@ -491,6 +563,17 @@ void testRejectsZeroThreads()
 }
 
 
+/**
+ * @brief Verifies that hardware SMT rejects unsupported oversubscription.
+ *
+ * The requested worker count is deliberately set one above the number of
+ * process-visible logical CPUs. With oversubscription disabled by the default
+ * SMT configuration, the execution must reject this request.
+ *
+ * @param topology Detected CPU topology used to determine the invalid count.
+ *
+ * @throws std::runtime_error If the oversubscribed configuration is accepted.
+ */
 void testRejectsOversubscription(
     const heat2d::smt::CpuTopology& topology
 ) {
@@ -552,6 +635,16 @@ void testRejectsOversubscription(
 }  // namespace
 
 
+/**
+ * @brief Runs the SMT integration test suite.
+ *
+ * The suite adapts its worker counts to the process-visible CPU topology,
+ * compares supported SMT configurations against the sequential reference,
+ * and validates edge cases for zero timesteps, invalid worker counts, and
+ * unsupported oversubscription.
+ *
+ * @return 0 if every integration test passes; 1 otherwise.
+ */
 int main()
 {
     try {

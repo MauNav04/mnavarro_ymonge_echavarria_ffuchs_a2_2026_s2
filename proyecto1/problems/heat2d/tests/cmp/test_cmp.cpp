@@ -17,7 +17,13 @@
 namespace {
 
 /**
- * @brief Returns the maximum absolute difference between two grids.
+ * @brief Computes the maximum absolute cell-wise difference between two grids.
+ *
+ * @param first First grid to compare.
+ * @param second Second grid to compare.
+ * @return Maximum absolute difference across all corresponding cells.
+ *
+ * @throws std::invalid_argument If the grids have different dimensions.
  */
 double maximumGridDifference(
     const heat2d::Grid& first,
@@ -61,7 +67,13 @@ double maximumGridDifference(
 
 
 /**
- * @brief Creates the common initial Heat2D state used by the tests.
+ * @brief Creates the common initial state used by the integration tests.
+ *
+ * Each execution starts from a copy of this grid so the sequential and CMP
+ * models use equivalent initial and boundary conditions.
+ *
+ * @param config Simulation parameters used to initialize the grid.
+ * @return Initialized Heat2D grid.
  */
 heat2d::Grid createInitialGrid(
     const heat2d::SimulationConfig& config
@@ -89,7 +101,16 @@ heat2d::Grid createInitialGrid(
 
 
 /**
- * @brief Verifies one CMP configuration against the sequential model.
+ * @brief Validates one CMP worker configuration against the sequential reference.
+ *
+ * The test verifies numerical equivalence with the sequential execution and
+ * checks the execution statistics reported by the CMP model, including cell
+ * updates, worker count, timesteps, and synchronization phases.
+ *
+ * @param threadCount Number of CMP worker threads to test.
+ *
+ * @throws std::runtime_error If the CMP result or reported statistics violate
+ *         the expected invariants.
  */
 void testAgainstSequential(
     std::size_t threadCount
@@ -97,10 +118,8 @@ void testAgainstSequential(
     heat2d::SimulationConfig config;
 
     /*
-     * Moderate grid:
-     *
-     * Large enough to exercise row partitioning while keeping
-     * the integration test fast.
+     * Use a moderate grid that exercises row partitioning while keeping
+     * the integration test inexpensive enough for frequent execution.
      */
     config.rows = 51;
     config.cols = 51;
@@ -118,7 +137,8 @@ void testAgainstSequential(
         );
 
     /*
-     * Sequential reference.
+     * Compute the sequential reference from the same initial state used
+     * by the CMP execution.
      */
     heat2d::Grid sequentialCurrent =
         initial;
@@ -140,9 +160,6 @@ void testAgainstSequential(
         config.boundaryTemperature
     );
 
-    /*
-     * CMP execution.
-     */
     heat2d::Grid cmpCurrent =
         initial;
 
@@ -171,8 +188,9 @@ void testAgainstSequential(
         );
 
     /*
-     * The result should be numerically identical because both
-     * execution models evaluate the same finite-difference kernel.
+     * Both implementations evaluate the same numerical stencil from equivalent
+     * states. Any difference above the tolerance indicates an unexpected
+     * divergence in the CMP execution.
      */
     const double maximumError =
         maximumGridDifference(
@@ -193,7 +211,7 @@ void testAgainstSequential(
     }
 
     /*
-     * Validate statistics.
+     * Each interior cell must be updated exactly once per timestep.
      */
     const std::uint64_t expectedUpdates =
         static_cast<std::uint64_t>(
@@ -233,6 +251,10 @@ void testAgainstSequential(
         );
     }
 
+    /*
+     * CMP uses two synchronization phases per timestep:
+     * one after computation and one after the global state update.
+     */
     const std::uint64_t expectedBarrierPhases =
         static_cast<std::uint64_t>(
             steps
@@ -262,7 +284,9 @@ void testAgainstSequential(
 
 
 /**
- * @brief CMP must reject a configuration with zero workers.
+ * @brief Verifies that CMP rejects a configuration with zero workers.
+ *
+ * @throws std::runtime_error If the invalid configuration is accepted.
  */
 void testRejectsZeroThreads() {
     heat2d::SimulationConfig config;
@@ -319,7 +343,12 @@ void testRejectsZeroThreads() {
 
 
 /**
- * @brief Zero timesteps must leave the grid unchanged.
+ * @brief Verifies the zero-timestep execution path.
+ *
+ * A zero-step execution must leave the grid unchanged and report no cell
+ * updates or synchronization phases.
+ *
+ * @throws std::runtime_error If the grid or execution statistics change.
  */
 void testZeroSteps() {
     heat2d::SimulationConfig config;
@@ -397,17 +426,24 @@ void testZeroSteps() {
 }  // namespace
 
 
+/**
+ * @brief Runs the CMP integration test suite.
+ *
+ * The suite exercises several worker counts, including configurations with
+ * more workers than interior rows, and validates edge cases such as zero
+ * timesteps and invalid worker counts.
+ *
+ * @return 0 if every test passes; 1 otherwise.
+ */
 int main() {
     try {
         std::cout
             << "\n=== Heat2D CMP Integration Test ===\n\n";
 
         /*
-         * 51 x 51 contains 49 interior rows.
-         *
-         * Testing 64 workers is intentional:
-         * some workers receive an empty row range but must still
-         * participate correctly in synchronization.
+         * A 51 x 51 grid contains 49 interior rows. Testing 64 workers is
+         * intentional: some workers receive empty row ranges but must still
+         * participate correctly in the synchronization protocol.
          */
         const std::vector<std::size_t> threadCounts{
             1,

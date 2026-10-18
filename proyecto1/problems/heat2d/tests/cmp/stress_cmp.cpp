@@ -18,12 +18,27 @@
 
 namespace {
 
+/**
+ * @brief Stores numerical error metrics between two grid states.
+ *
+ * `l2Rms` represents the root-mean-square error over the complete grid,
+ * while `lInfinity` stores the maximum absolute cell-wise difference.
+ */
 struct ErrorMetrics {
     double l2Rms{0.0};
     double lInfinity{0.0};
 };
 
 
+/**
+ * @brief Creates the common initial state used by the stress test.
+ *
+ * Every sequential and CMP execution starts from an independent copy of
+ * this same initialized grid, ensuring equivalent numerical conditions.
+ *
+ * @param config Simulation parameters used to construct the grid.
+ * @return Initialized grid with the configured boundary condition applied.
+ */
 heat2d::Grid createInitialGrid(
     const heat2d::SimulationConfig& config
 ) {
@@ -49,6 +64,18 @@ heat2d::Grid createInitialGrid(
 }
 
 
+/**
+ * @brief Computes numerical differences between a reference and candidate grid.
+ *
+ * Calculates both the root-mean-square error and the maximum absolute
+ * difference across all cells.
+ *
+ * @param reference Grid used as the numerical reference.
+ * @param candidate Grid whose result is being validated.
+ * @return Computed L2 RMS and L-infinity error metrics.
+ *
+ * @throws std::invalid_argument If the grids have different dimensions.
+ */
 ErrorMetrics calculateError(
     const heat2d::Grid& reference,
     const heat2d::Grid& candidate
@@ -113,6 +140,20 @@ ErrorMetrics calculateError(
 }
 
 
+/**
+ * @brief Validates execution statistics reported by the CMP model.
+ *
+ * The test verifies that the solver performed the expected number of cell
+ * updates and timesteps, used the requested number of workers, and completed
+ * exactly two barrier phases per timestep.
+ *
+ * @param stats Statistics returned by the CMP execution.
+ * @param config Simulation configuration used by the execution.
+ * @param threadCount Expected number of CMP worker threads.
+ *
+ * @throws std::runtime_error If any reported statistic violates the expected
+ *         execution invariants.
+ */
 void validateStats(
     const heat2d::CmpStats& stats,
     const heat2d::SimulationConfig& config,
@@ -175,12 +216,23 @@ void validateStats(
 }  // namespace
 
 
+/**
+ * @brief Runs the CMP stress-validation suite.
+ *
+ * Executes the same large Heat2D workload with several CMP worker counts and
+ * compares every result against a single sequential reference. The test checks
+ * numerical equivalence, internal execution statistics, timing, throughput,
+ * and observed speedup.
+ *
+ * @return 0 if every configuration passes; 1 if any validation fails.
+ */
 int main() {
     try {
         heat2d::SimulationConfig config;
 
         /*
-         * Same large workload used by the experimental pipeline.
+         * Use the same large workload employed by the experimental pipeline
+         * so the stress test exercises the production-scale configuration.
          */
         config.lengthX = 1.0;
         config.lengthY = 1.0;
@@ -251,7 +303,8 @@ int main() {
             << '\n';
 
         /*
-         * Build one common initial condition.
+         * Build one common initial state and copy it into each execution so
+         * all configurations begin from identical numerical conditions.
          */
         const heat2d::Grid initial =
             createInitialGrid(
@@ -259,10 +312,8 @@ int main() {
             );
 
         /*
-         * Sequential reference.
-         *
-         * It is calculated only once and then reused to verify every
-         * CMP configuration.
+         * Compute the sequential reference once. Every CMP result is compared
+         * against this final grid using the same physical and numerical setup.
          */
         heat2d::Grid sequentialCurrent =
             initial;
@@ -305,7 +356,8 @@ int main() {
             << " s\n";
 
         /*
-         * CMP configurations.
+         * Exercise multiple CMP worker counts while preserving the same
+         * workload and initial state for every repetition.
          */
         for (
             const std::size_t threadCount :

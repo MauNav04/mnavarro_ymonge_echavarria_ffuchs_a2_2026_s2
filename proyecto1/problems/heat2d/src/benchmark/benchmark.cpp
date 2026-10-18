@@ -23,13 +23,11 @@ namespace heat2d::benchmark {
 
 namespace {
 
-/** 
- * @brief Acceptable floating-point drift allowed between models.
- * 
- * Due to non-deterministic execution order in concurrent models, floating-point 
- * addition associativity (`(a+b)+c != a+(b+c)`) causes micro-deviations. 
- * 1e-12 safely accommodates these IEEE-754 variations while catching logical 
- * implementation errors.
+/**
+ * @brief Numerical tolerance used when comparing model outputs.
+ *
+ * A small tolerance is used to account for possible floating-point differences
+ * while still detecting meaningful deviations between execution models.
  */
 constexpr double validationTolerance =
     1e-12;
@@ -1173,7 +1171,7 @@ BenchmarkSample executeMeasured(
             end - start
         ).count();
 
-    // Catch system clock aberrations (e.g., NTP adjustments)
+    // Validate that the measured duration is finite and strictly positive.
     if (
         elapsedSeconds <= 0.0 ||
         !std::isfinite(
@@ -1545,10 +1543,10 @@ void validateBenchmarkCases(
 
 
 /**
- * @brief Primes the system by running discardable warmup phases.
- * 
- * Ensures CPU scaling governors trigger 'performance' mode and the necessary
- * memory pages are mapped by the OS.
+ * @brief Primes the system by running discardable warm-up phases.
+ *
+ * Warm-up executions help populate caches, map memory pages, and reduce
+ * transient effects associated with CPU frequency scaling before measurements.
  */
 void runWarmups(
     const BenchmarkConfig& config,

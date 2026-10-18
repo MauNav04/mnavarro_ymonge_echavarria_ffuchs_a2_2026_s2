@@ -7,16 +7,23 @@
 namespace heat2d {
 
 /**
- * @brief Evaluates the numerical stability of the Forward-Euler discretization.
+ * @brief Checks the stability condition of the explicit finite-difference scheme.
  *
- * Implements the Courant–Friedrichs–Lewy (CFL) condition for the 2D Heat Equation.
- * The explicit finite-difference method will mathematically diverge (producing 
- * infinite or NaN values) if the time step `dt` is too large relative to the 
- * spatial grid resolution (`dx`, `dy`). 
+ * For the two-dimensional heat equation, the explicit Forward-Euler
+ * discretization requires:
  *
- * The stability criterion is:  alpha * dt * (1/dx^2 + 1/dy^2) <= 0.5
+ *     alpha * dt * (1 / dx^2 + 1 / dy^2) <= 1 / 2
  *
- * @return true if the parameters guarantee a stable simulation.
+ * The condition relates the temporal step to the spatial resolution and
+ * thermal diffusivity. Invalid or non-positive physical parameters are
+ * considered unstable.
+ *
+ * @param alpha Thermal diffusivity.
+ * @param dt Time-step size.
+ * @param dx Spatial step along the X axis.
+ * @param dy Spatial step along the Y axis.
+ * @return true if the parameters satisfy the stability condition;
+ *         false otherwise.
  */
 bool isStable(
     double alpha,
@@ -49,14 +56,24 @@ bool isStable(
 }
 
 /**
- * @brief Precomputes the thermodynamic constants for the finite-difference stencil.
+ * @brief Computes the constant coefficients used by the diffusion stencil.
  *
- * Extracts the `(alpha * dt) / dx^2` and `(alpha * dt) / dy^2` terms. By calculating 
- * these once per simulation rather than inside the innermost `computeCell` loop, 
- * we eliminate millions of redundant floating-point multiplications and divisions, 
- * strictly optimizing for compute throughput.
+ * The coefficients
  *
- * @throws std::invalid_argument If physical dimensions are invalid or numerically unstable.
+ *     alpha * dt / dx^2
+ *     alpha * dt / dy^2
+ *
+ * remain constant throughout a simulation. Computing them once avoids
+ * repeating the same divisions for every cell update.
+ *
+ * @param alpha Thermal diffusivity.
+ * @param dt Time-step size.
+ * @param dx Spatial step along the X axis.
+ * @param dy Spatial step along the Y axis.
+ * @return Precomputed diffusion coefficients for both spatial directions.
+ *
+ * @throws std::invalid_argument If any parameter is non-positive or if the
+ *         resulting discretization violates the stability condition.
  */
 DiffusionCoefficients makeDiffusionCoefficients(
     double alpha,
@@ -82,7 +99,6 @@ DiffusionCoefficients makeDiffusionCoefficients(
         );
     }
 
-    // Fail-fast on unstable parameters to prevent wasted compute cycles.
     if (!isStable(alpha, dt, dx, dy)) {
         throw std::invalid_argument(
             "The selected alpha, dt, dx and dy values violate "
@@ -97,14 +113,20 @@ DiffusionCoefficients makeDiffusionCoefficients(
 }
 
 /**
- * @brief Executes the 5-point finite-difference stencil for a single spatial cell.
+ * @brief Computes the next temperature of one interior grid cell.
  *
- * Approximates the second spatial derivatives (Laplacian) using the central, top, 
- * bottom, left, and right neighboring cells from the `current` state. 
- * The result is written directly to the `next` state buffer.
+ * Applies the five-point finite-difference stencil using values exclusively
+ * from `current` and writes the result to the corresponding cell in `next`.
  *
- * This function must be lock-free and entirely stateless to guarantee thread safety 
- * when invoked concurrently by thousands of Fine/Coarse/CMP/SMT workers.
+ * Because each invocation only reads the current state and writes one output
+ * cell, multiple workers or logical contexts can safely process distinct
+ * cells in parallel without synchronization inside this function.
+ *
+ * @param current Grid containing the current thermal state.
+ * @param next Grid receiving the next thermal state.
+ * @param row Interior row to update.
+ * @param column Interior column to update.
+ * @param coefficients Precomputed diffusion coefficients.
  */
 void computeCell(
     const Grid& current,
@@ -113,7 +135,6 @@ void computeCell(
     std::size_t column,
     const DiffusionCoefficients& coefficients
 ) {
-    // Read the current state of the 5-point cross stencil.
     const double center =
         current(row, column);
 
@@ -129,7 +150,6 @@ void computeCell(
     const double bottom =
         current(row + 1, column);
 
-    // Calculate thermal gradient deltas over X and Y axes.
     const double diffusionX =
         coefficients.x *
         (right - 2.0 * center + left);
@@ -138,19 +158,29 @@ void computeCell(
         coefficients.y *
         (bottom - 2.0 * center + top);
 
-    // Apply the Forward-Euler temporal update.
     next(row, column) =
         center + diffusionX + diffusionY;
 }
 
 /**
- * @brief Helper function executing a complete sequential diffusion timestep.
+ * @brief Computes one complete sequential diffusion timestep.
  *
- * Integrates the spatial traversal and boundary condition enforcement into 
- * a single call. Internally iterates the grid in strict row-major order 
- * to guarantee optimal L1-D cache line utilization.
+ * Interior cells are traversed in row-major order, matching the contiguous
+ * storage layout of Grid and favoring spatial locality. Boundary cells are
+ * excluded from the stencil traversal and restored afterward using the fixed
+ * Dirichlet boundary condition.
  *
- * @throws std::invalid_argument If the source and destination grids are structurally mismatched.
+ * @param current Grid containing the current thermal state.
+ * @param next Grid receiving the next thermal state.
+ * @param alpha Thermal diffusivity.
+ * @param dt Time-step size.
+ * @param dx Spatial step along the X axis.
+ * @param dy Spatial step along the Y axis.
+ * @param boundaryTemperature Fixed temperature applied to the grid boundary.
+ *
+ * @throws std::invalid_argument If the grids have different dimensions,
+ *         are too small for the five-point stencil, or if the numerical
+ *         parameters are invalid or unstable.
  */
 void diffusionStep(
     const Grid& current,
@@ -184,7 +214,6 @@ void diffusionStep(
             dy
         );
 
-    // Iterate exclusively over the interior domain to avoid out-of-bounds neighbor access.
     for (
         std::size_t row = 1;
         row < current.rows() - 1;
@@ -205,7 +234,6 @@ void diffusionStep(
         }
     }
 
-    // Reinforce Dirichlet boundary conditions (constant temperature borders).
     applyFixedBoundary(
         next,
         boundaryTemperature

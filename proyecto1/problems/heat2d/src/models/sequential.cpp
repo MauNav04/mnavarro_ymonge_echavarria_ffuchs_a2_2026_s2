@@ -11,14 +11,17 @@ namespace heat2d {
 namespace {
 
 /**
- * @brief Validates the grid requirements shared by the sequential solver.
+ * @brief Validates the grids used by the sequential solver.
  *
- * Ensures that both the source and destination grids have identical dimensions
- * and are large enough to possess at least one interior cell (3x3 minimum). 
- * This is structurally required to evaluate the 5-point finite-difference stencil 
- * without reading out of bounds.
+ * Both grids must have identical dimensions and contain at least one
+ * interior cell so the five-point stencil can access all neighboring
+ * positions safely.
  *
- * @throws std::invalid_argument If the grids are mismatched or too small.
+ * @param current Grid containing the current thermal state.
+ * @param next Grid receiving the next thermal state.
+ *
+ * @throws std::invalid_argument If the grids have different dimensions
+ *         or contain fewer than three rows or columns.
  */
 void validateGrids(
     const Grid& current,
@@ -46,17 +49,23 @@ void validateGrids(
 }  // namespace
 
 /**
- * @brief Single-threaded baseline implementation of the Heat 2D diffusion equation.
- * 
- * This function serves as the strictly serial benchmark ("ground truth") against 
- * which all concurrent models (FG, CG, CMP, SMT) are evaluated. It calculates 
- * the discrete timestep evolution using a lock-free, synchronization-free 
- * nested loop structure.
- * 
- * Performance characteristics:
- * - Extremely high IPC due to zero thread-synchronization overhead.
- * - Maximum spatial locality in L1-D cache because the inner loop iterates 
- *   strictly in row-major order (contiguous memory).
+ * @brief Runs the sequential Heat2D diffusion simulation.
+ *
+ * This implementation provides the single-threaded reference used to validate
+ * and benchmark the multithreaded execution models. Interior cells are processed
+ * in row-major order using the same five-point stencil as the other models.
+ *
+ * @param current Grid containing the current thermal state.
+ * @param next Grid used as the destination buffer for the next state.
+ * @param steps Number of time steps to execute.
+ * @param alpha Thermal diffusivity.
+ * @param dt Time-step size.
+ * @param dx Spatial step along the X axis.
+ * @param dy Spatial step along the Y axis.
+ * @param boundaryTemperature Fixed temperature applied to the grid boundary.
+ *
+ * @throws std::invalid_argument If the grid dimensions or numerical
+ *         parameters are invalid.
  */
 void runSequential(
     Grid& current,
@@ -74,10 +83,10 @@ void runSequential(
     );
 
     /*
-     * Coefficients are invariant during the complete simulation.
-     * Computing them once keeps the sequential execution path
-     * comparable with the other execution models and prevents redundant
-     * floating-point divisions deep inside the tight nested loops.
+     * Diffusion coefficients remain constant throughout the simulation.
+     * Computing them once avoids repeating the same divisions for every
+     * cell update and keeps the numerical formulation consistent across
+     * execution models.
      */
     const DiffusionCoefficients coefficients =
         makeDiffusionCoefficients(
@@ -87,22 +96,19 @@ void runSequential(
             dy
         );
 
-    // Fast-path exit for zero-step simulations (no computation needed).
     if (steps == 0) {
         return;
     }
 
-    // Main temporal progression loop.
     for (
         std::size_t step = 0;
         step < steps;
         ++step
     ) {
         /*
-         * Spatial traversal over the strictly interior grid cells.
-         * The outer loop traverses rows and the inner loop traverses columns.
-         * This row-major access pattern prevents Cache Thrashing by ensuring
-         * contiguous hardware prefetching.
+         * Traverse interior cells in row-major order so consecutive column
+         * accesses correspond to contiguous locations in the Grid storage,
+         * favoring spatial locality.
          */
         for (
             std::size_t row = 1;
@@ -124,17 +130,14 @@ void runSequential(
             }
         }
 
-        // Enforce Dirichlet boundary conditions around the grid perimeter.
         applyFixedBoundary(
             next,
             boundaryTemperature
         );
 
         /*
-         * Double-buffering pointer swap.
-         * Promotes the newly calculated state to be the source for the next 
-         * iteration, completely avoiding massive memory allocations or deep 
-         * copies between timesteps.
+         * Swap the roles of the two buffers so the newly computed state
+         * becomes the source for the next timestep.
          */
         std::swap(
             current,

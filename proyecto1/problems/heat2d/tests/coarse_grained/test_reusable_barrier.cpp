@@ -11,7 +11,9 @@
 namespace {
 
 /**
- * @brief Verifica que una barrera no pueda crearse sin participantes.
+ * @brief Verifies that a barrier rejects an invalid participant count.
+ *
+ * @throws std::runtime_error If a barrier with zero participants is accepted.
  */
 void testRejectsZeroParticipants() {
     bool rejected = false;
@@ -30,10 +32,12 @@ void testRejectsZeroParticipants() {
 }
 
 /**
- * @brief Verifica el caso mínimo de una barrera con un participante.
+ * @brief Verifies the single-participant case and barrier reuse.
  *
- * Una barrera con un único participante debe permitir continuar
- * inmediatamente y debe poder reutilizarse múltiples veces.
+ * A barrier with one participant must release immediately and remain reusable
+ * across multiple generations.
+ *
+ * @throws std::runtime_error If the barrier reports an incorrect participant count.
  */
 void testSingleParticipant() {
     heat2d::ReusableBarrier barrier(1);
@@ -56,20 +60,20 @@ void testSingleParticipant() {
 }
 
 /**
- * @brief Verifica sincronización estricta y reutilización de la barrera.
+ * @brief Verifies strict synchronization and repeated barrier reuse.
  *
- * El thread 0 actúa como participante intencionalmente lento.
+ * One worker is intentionally delayed until every other worker reaches the
+ * point immediately before the barrier. The delayed worker then publishes the
+ * current generation before entering the barrier.
  *
- * Los demás threads anuncian que están listos y entran inmediatamente
- * a la barrera. El thread 0 no llega hasta comprobar que todos los
- * participantes rápidos alcanzaron el punto previo a wait().
+ * After leaving the barrier, every worker must observe that generation. This
+ * ensures that no participant can continue until all workers have reached the
+ * synchronization point.
  *
- * Antes de entrar, el thread lento publica el número de generación.
- * Después de salir de la barrera, todos los threads verifican que dicha
- * generación ya haya sido publicada.
+ * A second barrier separates consecutive rounds so validation from one
+ * generation cannot overlap with the next.
  *
- * Si wait() estuviera vacío, los threads rápidos cruzarían antes de que
- * thread 0 publicara la generación y el test fallaría.
+ * @throws std::runtime_error If synchronization or generation reuse fails.
  */
 void testStrictSynchronizationAndReuse() {
     constexpr std::size_t threadCount = 4;
@@ -80,20 +84,8 @@ void testStrictSynchronizationAndReuse() {
         threadCount
     );
 
-    /*
-     * Cantidad acumulada de llegadas de los threads rápidos al punto
-     * inmediatamente anterior a la barrera.
-     */
     std::atomic<std::size_t> fastArrivals{0};
-
-    /*
-     * Última generación publicada por el thread lento.
-     *
-     * Para la ronda r, después de la barrera todos los participantes
-     * deben observar al menos r + 1.
-     */
     std::atomic<std::size_t> publishedGeneration{0};
-
     std::atomic<bool> invariantViolation{false};
 
     std::vector<std::thread> workers;
@@ -113,12 +105,6 @@ void testStrictSynchronizationAndReuse() {
                     ++round
                 ) {
                     if (threadId == slowThreadId) {
-
-                        /*
-                         * Thread 0 espera intencionalmente hasta que
-                         * los otros threads hayan alcanzado el punto
-                         * previo a la barrera.
-                         */
                         const std::size_t expectedFastArrivals =
                             (round + 1) * (threadCount - 1);
 
@@ -130,38 +116,23 @@ void testStrictSynchronizationAndReuse() {
                             std::this_thread::yield();
                         }
 
-                        /*
-                         * Publica una marca que solamente puede existir
-                         * antes de que la barrera de esta ronda sea
-                         * liberada correctamente.
-                         */
                         publishedGeneration.store(
                             round + 1,
                             std::memory_order_release
                         );
 
                     } else {
-
-                        /*
-                         * Los threads rápidos anuncian que alcanzaron
-                         * el punto inmediatamente anterior a wait().
-                         */
                         fastArrivals.fetch_add(
                             1,
                             std::memory_order_acq_rel
                         );
                     }
 
-                    /*
-                     * Barrera que estamos probando.
-                     */
                     barrier.wait();
 
                     /*
-                     * INVARIANTE:
-                     *
-                     * Si un thread salió de la barrera, thread 0 ya
-                     * tuvo que llegar y publicar esta generación.
+                     * Any worker released from the barrier must observe the
+                     * generation published by the delayed participant.
                      */
                     const std::size_t observedGeneration =
                         publishedGeneration.load(
@@ -176,11 +147,8 @@ void testStrictSynchronizationAndReuse() {
                     }
 
                     /*
-                     * Segunda barrera para impedir que una generación
-                     * comience mientras otros participantes todavía
-                     * están validando la generación anterior.
-                     *
-                     * También verifica que la barrera sea reutilizable.
+                     * Separate consecutive generations so all workers finish
+                     * validating the current round before the next one begins.
                      */
                     barrier.wait();
                 }
@@ -227,7 +195,7 @@ void testStrictSynchronizationAndReuse() {
     }
 }
 
-} // namespace
+}  // namespace
 
 int main() {
     try {

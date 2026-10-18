@@ -78,3 +78,4 @@ benchmark_test.csv
 perf.data
 stress_coarse_grained
 test_coarse_grained
+heat2d_comments.diff

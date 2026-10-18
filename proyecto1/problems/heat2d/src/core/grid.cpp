@@ -7,19 +7,17 @@
 namespace heat2d {
 
 /**
- * @brief Constructs a densely packed 2D grid initialized to a baseline scalar.
+ * @brief Constructs a rectangular grid initialized to a uniform temperature.
  *
- * Allocates the entire thermodynamic surface as a single, contiguous 1D block 
- * of memory (`std::vector<double>`). This structure intentionally avoids 
- * "array of pointers" (e.g., `double**` or `std::vector<std::vector<double>>`) 
- * to eliminate pointer-chasing, prevent memory fragmentation, and guarantee 
- * predictable hardware prefetching.
+ * Grid values are stored contiguously in row-major order using a single
+ * `std::vector<double>`. Contiguous storage favors spatial locality when
+ * traversing consecutive columns.
  *
- * @param rows The vertical dimension of the computational domain.
- * @param cols The horizontal dimension of the computational domain.
- * @param initialTemperature The baseline scalar applied to all cells.
- * 
- * @throws std::invalid_argument If the requested grid has zero area.
+ * @param rows Number of rows in the grid.
+ * @param cols Number of columns in the grid.
+ * @param initialTemperature Initial temperature assigned to every cell.
+ *
+ * @throws std::invalid_argument If either grid dimension is zero.
  */
 Grid::Grid(
     std::size_t rows,
@@ -30,8 +28,6 @@ Grid::Grid(
       cols_(cols),
       data_(rows * cols, initialTemperature) {
 
-    // Fast-fail to prevent 0-byte allocations or division-by-zero 
-    // downstream during domain partitioning.
     if (rows == 0 || cols == 0) {
         throw std::invalid_argument(
             "Grid dimensions must be greater than zero."
@@ -40,10 +36,11 @@ Grid::Grid(
 }
 
 /**
- * @brief Grants mutable access to a specific cell in the grid.
- * 
- * Invokes the internal 2D-to-1D index mapping. Designed to be inlined 
- * by the compiler in release builds for zero-overhead element access.
+ * @brief Provides mutable access to a grid cell.
+ *
+ * @param row Row index.
+ * @param col Column index.
+ * @return Reference to the requested cell.
  */
 double& Grid::operator()(
     std::size_t row,
@@ -53,7 +50,11 @@ double& Grid::operator()(
 }
 
 /**
- * @brief Grants read-only access to a specific cell in the grid.
+ * @brief Provides read-only access to a grid cell.
+ *
+ * @param row Row index.
+ * @param col Column index.
+ * @return Constant reference to the requested cell.
  */
 const double& Grid::operator()(
     std::size_t row,
@@ -63,49 +64,54 @@ const double& Grid::operator()(
 }
 
 /**
- * @brief Retrieves the vertical dimension (number of rows).
+ * @brief Returns the number of rows in the grid.
  */
 std::size_t Grid::rows() const {
     return rows_;
 }
 
 /**
- * @brief Retrieves the horizontal dimension (number of columns).
+ * @brief Returns the number of columns in the grid.
  */
 std::size_t Grid::cols() const {
     return cols_;
 }
 
 /**
- * @brief Computes the absolute physical capacity of the grid in elements.
+ * @brief Returns the total number of cells stored in the grid.
  */
 std::size_t Grid::size() const {
     return data_.size();
 }
 
 /**
- * @brief Uniformly resets the entire grid to a specific scalar value.
- * 
- * Delegates to `std::fill` which is typically optimized by the standard 
- * library to utilize vectorized memory-set instructions (e.g., `memset` 
- * or AVX stores) for contiguous containers.
+ * @brief Assigns the same temperature to every grid cell.
+ *
+ * Uses `std::fill` over the contiguous storage, allowing the compiler and
+ * standard library implementation to optimize the write operation.
+ *
+ * @param temperature Temperature assigned to every cell.
  */
 void Grid::fill(double temperature) {
     std::fill(data_.begin(), data_.end(), temperature);
 }
 
 /**
- * @brief Converts 2D logical coordinates into a 1D physical memory offset.
+ * @brief Converts a two-dimensional coordinate into a linear array index.
  *
- * Enforces a strict row-major layout (`row * cols_ + col`). This is arguably 
- * the most performance-critical design decision in the framework, as traversing 
- * columns within the same row guarantees sequential memory access, maximizing 
- * L1-D cache line utilization and hardware prefetcher efficiency.
+ * The grid uses row-major storage:
  *
- * Bounds checking is deliberately performed using `assert` rather than throwing 
- * exceptions (e.g., `std::vector::at()`). This guarantees zero validation overhead 
- * in release builds (`NDEBUG`), which is mandatory since this function is invoked 
- * hundreds of millions of times per second inside the innermost stencil loops.
+ *     index = row * cols_ + col
+ *
+ * Consecutive columns therefore occupy consecutive memory locations, which
+ * favors spatial locality during row-wise traversal.
+ *
+ * Bounds are checked with `assert` in debug builds. When `NDEBUG` is defined,
+ * these assertions are removed.
+ *
+ * @param row Row index.
+ * @param col Column index.
+ * @return Linear index corresponding to the requested grid position.
  */
 std::size_t Grid::index(
     std::size_t row,
