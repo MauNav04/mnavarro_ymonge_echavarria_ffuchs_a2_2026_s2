@@ -158,3 +158,16 @@ analizar esos datos no constituye una medición física local.
 
 Las recetas con opciones individuales se conservan en
 [benchmarking](benchmarking.md) y [profiling](profiling.md).
+
+
+## Información incluida al compartir resultados
+
+Los manuales usan rutas de ejemplo relativas y no contienen credenciales. Los
+registros generados no están anonimizados: pueden incluir rutas absolutas con el
+nombre de usuario, comandos y sus salidas, versiones de sistema y un identificador
+de máquina derivado mediante hash. El ZIP conserva esos registros para reproducibilidad.
+
+Para una publicación externa, revisar una copia destinada a compartir y retirar
+identificadores personales que no hagan falta. Conservar los originales de evaluación:
+alterar metadatos o archivos invalida sus hashes y puede impedir repetir el análisis.
+La revisión de estos manuales no certifica el contenido de cada ZIP ni del historial Git.

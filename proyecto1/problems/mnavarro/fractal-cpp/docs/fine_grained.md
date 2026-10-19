@@ -90,5 +90,8 @@ CTest limita a 45 segundos la prueba del planificador para detectar bloqueos.
 
 Esta simulación cooperativa no reproduce alternancia por ciclo del hardware ni mide cambios
 de contexto del SO. Puede ser más lenta que la base debido a pthreads, mutex y despertares.
-No implementa afinidad, CMP, SMT, Coarse-Grained, métricas de hardware ni benchmarks de la etapa 7.
-Los resultados reales y cualquier limitación de herramientas se registran en el README principal.
+El planificador Fine no fija afinidad ni ejecuta las políticas CMP/SMT. Los otros
+modelos y la automatización de benchmarking/Perf están implementados por separado.
+Los [resultados físicos](../README.md#resultados-físicos-incluidos) muestran speedup
+0,255× con SMT ON y 0,274× con OFF para la configuración fija de 8 trabajadores.
+Las limitaciones de herramientas y las validaciones pendientes se conservan por separado.

@@ -9,7 +9,10 @@ individuales y los detalles metodológicos.
 Esta es la secuencia para obtener CSV, tablas y gráficas de rendimiento equivalentes
 al alcance de benchmarking de RayTracing. Las 200 corridas son **por modelo y
 configuración**: Make invoca el script y el script hace las repeticiones automáticamente.
-No ejecutar Make 200 veces. Las gráficas adicionales de contadores Perf se obtienen
+No ejecutar Make 200 veces. La campaña física ON/OFF del 2026-10-17 está incluida
+en `metrics/`; resultados y fuentes en el [README](../README.md#resultados-físicos-incluidos).
+Las recetas siguientes permiten repetirla en directorios nuevos.
+Las gráficas adicionales de contadores Perf se obtienen
 con la [receta de etapa 8](profiling.md).
 
 Ejecutar en Ubuntu nativo del Ryzen, desde `proyecto1/problems/mnavarro/fractal-cpp/`.
@@ -327,7 +330,7 @@ reutilizan las implementaciones principales.
 | Variable Make | Valor por defecto |
 |---|---|
 | `RUNS`, `RUNS_SCALING` | 200 por configuración |
-| `FAST_RUNS`, `WARMUPS`, `COOLDOWN` | 5, 1, 0.15 segundos |
+| `FAST_RUNS`, `WARMUPS`, `COOLDOWN` | 5 repeticiones, 1 calentamiento, 0.15 segundos |
 | `BENCHMARK_MODELS` | `all`; o `seq,cmp,smt,coarse,fine` y subconjuntos |
 | `TEAMS`, `THREADS_PER_TEAM` | 4, 2 |
 | `SMT_TEAMS`, `SMT_THREADS_PER_TEAM` | 4, 4 |
@@ -342,7 +345,7 @@ se comparten con la automatización anterior. `QUICK` corresponde a pruebas de e
 para benchmarks cortos usar `benchmark_fast`/`FAST_RUNS`. Una campaña formal con RUNS<200
 se rechaza. `TIMEOUT` limita cada proceso; aumentarlo para imágenes grandes/cooperativas.
 
-Las carpetas de campaña y análisis deben ser **nuevas**: no se sobrescriben ni se anexan
+Las carpetas de captura y de análisis de rendimiento deben ser **nuevas**: no se sobrescriben ni se anexan
 corridas incompatibles. Para repetir, elegir otra ruta. No se eliminan campañas con clean.
 Una falla o interrupción conserva CSV/logs parciales y no declara éxito. Cada muestra
 válida se guarda antes de calcular estadísticas. Un fallo queda señalado; no se incluye
@@ -351,7 +354,7 @@ como un tiempo cero ni se descarta silenciosamente para mejorar los resultados.
 Para inspeccionar una campaña interrumpida:
 
 ```bash
-python scripts/metrics.py --csv metrics/campaña-interrumpida/raw.csv --output-dir metrics/partial-analysis --allow-partial
+.venv/bin/python scripts/metrics.py --csv metrics/interrupted-campaign/raw.csv --output-dir metrics/partial-analysis --allow-partial
 ```
 
 Se etiqueta incompleta; no satisface la campaña formal. El analizador rechaza duplicados,
@@ -367,15 +370,15 @@ pero diagnósticas en los tres modelos portables y verifica límites/repeticione
 mezclas/incompletos y las nueve figuras. Sin las dependencias científicas esta última
 se omite en CTest con código 77; `make test_benchmarks` exige instalarlas.
 
-Pendientes: campañas físicas de 200 corridas por configuración en ON/OFF, escalabilidad,
-conservación de los CSV y análisis experimental de convergencia en el Ryzen. Los modelos
-individuales ya fueron confirmados por el usuario, pero esa confirmación no se presenta
-como una campaña de benchmarks realizada. Esta etapa mide rendimiento; la captura Perf se documenta en [etapa 8](profiling.md).
+La campaña física ON/OFF incluida registra 1.000 mediciones fijas y 4.000 de
+escalabilidad por estado: 200 repeticiones para cada configuración. Los CSV, metadatos,
+boxplots y análisis de convergencia están en `metrics/automatic/` y `metrics/reports/`.
+El informe físico contiene nueve figuras de rendimiento; se verificaron los recuentos,
+hashes FRC declarados y reportes de afinidad conservados. La deriva máxima de la última
+ventana fue 2,33 % y el semiancho relativo máximo del IC de la media fue 1,41 % en
+las 50 filas del resumen conjunto; son indicadores descriptivos de esta campaña.
 
-
-Validación local de esta implementación: Release con OpenCV, 16 pruebas aprobadas y
-2 físicas omitidas; solo núcleo, 7 aprobadas y 2 omitidas. Se ejecutaron campañas
-**diagnósticas**, nunca formales: 9 mediciones de campaña fija y 22 de escalabilidad
-con los tres modelos portables. Make generó resúmenes y figuras combinadas desde sus
-CSV. Los tests gráficos usaron datos sintéticos identificados para cubrir también
-las comparativas SMT y la figura de Amdahl. No hay resultados físicos nuevos del Ryzen.
+Las mediciones fueron realizadas por el usuario en el Ryzen. Las pruebas locales y
+los gráficos sintéticos validan las herramientas, no representan nuevas mediciones
+físicas. El [README](../README.md) conserva el estado final y los pendientes reales.
+La captura de contadores se documenta por separado en [profiling](profiling.md).

@@ -36,7 +36,8 @@ cuantum: la duración de cada ráfaga depende de las mejoras y de la finalizaci�
 
 `src/cooperative_encoder.cpp` comparte el mecanismo de equipos, mutex, condición por trabajador,
 compuerta de inicio, cancelación y joins entre ambas políticas, conservando su diferencia.
-Solo un hilo realiza búsqueda a la vez; los demás esperan sin sondeo. No se introduce CMP ni SMT.
+Sólo un hilo realiza búsqueda a la vez; los demás esperan sin sondeo. Esta política
+se diferencia de la búsqueda concurrente de CMP y SMT, disponibles en sus ejecutables.
 Cada main delega en `app/cli.cpp`. La reconstrucción permanece en `fractal_seq`.
 
 ## Uso y traza

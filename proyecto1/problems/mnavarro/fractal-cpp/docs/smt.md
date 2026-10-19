@@ -2,11 +2,12 @@
 
 Destino: Ubuntu nativo, AMD Ryzen de 8 núcleos físicos y 16 hilos lógicos con SMT
 habilitado. Los diagnósticos recibidos confirman Ryzen 7 7730U y Ubuntu 25.10.
-La topología de WSL no valida este destino. Revisión en [ryzen_diagnostics.md](ryzen_diagnostics.md).
+La topología de WSL no valida este destino. La campaña física ON/OFF y sus fuentes
+están en el [README](../README.md#resultados-físicos-incluidos).
 
 ## Ejecución y referencia
 
-Se adapta `../../echavarria/RayTracing/SMT/main.cpp`: mantener 16 pthreads tanto
+Se adapta [RayTracing SMT](../../../echavarria/RayTracing/SMT/main.cpp): mantener 16 pthreads tanto
 con SMT activo (16 CPU lógicas) como inactivo (16 trabajadores sobre 8 núcleos).
 Se conserva la arquitectura fractal aprobada: equipos por range, dominios divididos entre
 miembros y reducción determinista de mínimos. No se asigna un range independiente a cada hilo.
@@ -75,7 +76,8 @@ identificador de máquina para comparar la misma computadora después del reinic
 no producen un registro exitoso. `compare` exige estados opuestos, misma máquina,
 entrada, binarios y parámetros, integridad de artefactos y resultados exactos.
 Los hashes sirven para detectar cambios accidentales, no certifican mediciones externas.
-No se generan estadísticas, speedup ni resultados Perf: pertenecen a etapas posteriores.
+Este registrador funcional no calcula estadísticas ni Perf. Esas métricas se
+obtienen con las campañas de [benchmarking](benchmarking.md) y [profiling](profiling.md).
 
 Ejecución manual equivalente:
 
@@ -106,5 +108,12 @@ reconstrucciones y afinidad real para el estado actual. Ejecutarlo una vez con c
 El usuario confirmó el 2026-10-16 una prueba SMT satisfactoria en el Ryzen y el
 funcionamiento de todos los modelos. Esta confirmación corresponde a validación funcional
 realizada por el usuario, no a una prueba física ejecutada por el asistente.
-Pendientes: incorporar los registros reales ON/OFF y su comparación, confirmar el modelo
-de CPU y documentar las mediciones experimentales. Las etapas 6–8 no se implementan aquí.
+La campaña del 2026-10-17 ya incorpora ON/OFF, hardware identificado y comparación
+estadística. Con 4×4 trabajadores, SMT obtuvo medias de 46,320 ms en ON y 57,394 ms
+en OFF sobre la carga documentada. El manifiesto registra restauración final a ON.
+Los CSV finales de afinidad están incluidos y se revisaron para ambos estados.
+
+Esta evidencia no equivale a un registro independiente del protocolo
+`SMT/verify_smt.py` ni de toda la matriz `make test`: esos ejecutores tienen su propio
+alcance. Los resultados actuales se consultan en el README, sin atribuir al asistente
+nuevas ejecuciones físicas.

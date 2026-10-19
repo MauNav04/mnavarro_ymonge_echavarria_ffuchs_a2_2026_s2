@@ -6,13 +6,18 @@
 
 El compresor procesa los canales rojo, verde y azul mediante búsquedas independientes. Para cada bloque pequeño (*range*), compara los dominios candidatos y sus ocho simetrías, ajusta contraste y brillo y guarda la regla con menor error.
 
-La paralelización se concentrará en esta búsqueda. Se consideran dos formas de distribuir los ranges entre los equipos de hilos de un procesador multinúcleo con memoria compartida.
+Este documento conserva las alternativas de diseño estudiadas. La implementación final
+concentra el trabajo en esta búsqueda y adopta el reparto estático entre equipos.
+El [README](../README.md) contiene el estado y los resultados vigentes.
 
 ## 1. Propuesta 1: asignación estática de ranges
 
 **Descripción:** los ranges se enumeran por filas y se reparten en grupos contiguos de tamaño similar. Cada equipo conoce desde el inicio los bloques que debe procesar; sus miembros se reparten los dominios de cada bloque y reducen sus mínimos locales. Los canales se procesan en orden R, G y B, aplicando el reparto dentro de cada canal.
 
-**Sincronización:** se quiere poder probar los casos en los que la paralelización no se dé solamente en los ranges sino también en los dominios. Por ejemplo si se dispone de 10 hilos se quiere hacer 5 ranges y el dominio se divide en 2 para usar los 10 hilos en un momento determinado y ver si eso mejora la eficiencia. Para este caso concreto si se necesita sincronización ya que considerando un "equipo" de 2 hilos para cada range, si uno de los hilos termina debe esperar al otro, para luego poder definir cual de los dos obtuvo el menor error y crear la regla respectiva.
+**Sincronización:** los miembros de cada equipo reparten los dominios de su range,
+esperan sus resultados y reducen mínimos antes de publicar la regla. Por ejemplo,
+10 hilos forman 5 equipos de 2. CMP/SMT permiten búsqueda concurrente; Fine/Coarse
+conservan ese reparto, pero sus turnos cooperativos serializan la búsqueda global.
 
 **Escritura en memoria:** el vector de reglas se dimensiona con `resize` antes de iniciar los hilos. Un miembro designado del equipo publica la regla en el índice exclusivo de su range, tras reducir mínimos. La imagen y los dominios se comparten para lectura; el mejor candidato y los cálculos temporales son privados de cada hilo.
 
@@ -93,12 +98,12 @@ Ambas propuestas recorren el mismo catálogo de dominios. Si este supera la capa
 **Decisión aprobada (2026-10-13): asignación estática de ranges a equipos de hilos.**
 
 Cada equipo procesa un range a la vez y reparte sus dominios candidatos entre los miembros.
-Ejemplo: 10 hilos forman 5 equipos de 2; pueden buscar sobre 5 ranges simultáneamente.
+Ejemplo: 10 hilos forman 5 equipos de 2; en CMP/SMT pueden buscar sobre 5 ranges simultáneamente.
 Cada hilo evalúa las ocho simetrías de sus dominios y obtiene un mínimo local. El equipo
 espera a sus miembros y reduce esos mínimos para publicar una única regla por range.
 Los empates se resuelven por índice global de dominio y después por simetría, manteniendo
-la regla que hubiera seleccionado la ejecución secuencial. Equipos e hilos por equipo serán
-configurables; la etapa 1 únicamente ejecuta un equipo de un hilo.
+la regla que hubiera seleccionado la ejecución secuencial. Equipos e hilos por equipo son
+configurables; la versión secuencial exige un equipo de un hilo.
 
 La razón principal es que cada range realiza una búsqueda de tamaño similar: recorre los mismos dominios, prueba ocho simetrías y compara la misma cantidad de píxeles. Por ello, repartir una cantidad semejante de ranges entre los equipos permite distribuir el trabajo sin solicitar nuevas tareas durante la ejecución.
 
@@ -107,6 +112,6 @@ Cada hilo obtiene un candidato local del range del equipo. Es obligatorio combin
 parciales antes de publicar la regla y pasar al siguiente range; también se espera a todos
 los equipos al terminar el canal.
 
-En la etapa 1 ya se dimensiona `rules` previamente y se escribe por índice exclusivo. Las etapas concurrentes reutilizarán esta disposición. Los dominios permanecerán disponibles para lectura y cada hilo tendrá sus propios temporales de búsqueda. Así se conserva el formato del archivo y el orden de las reglas.
+El vector `rules` se dimensiona previamente y se escribe por índice exclusivo. Los modelos concurrentes reutilizan esta disposición: los dominios se comparten para lectura y cada hilo mantiene sus temporales de búsqueda. Así se conserva el formato del archivo y el orden de las reglas.
 
-La asignación dinámica queda como alternativa estudiada. Para la carga uniforme de esta versión, su coordinación adicional no ofrece una ventaja demostrada que justifique elegirla como diseño del proyecto. La selección está definida; la aceleración obtenida se determinará al ejecutar la implementación paralela.
+La asignación dinámica queda como alternativa estudiada. Para la carga uniforme de esta versión, su coordinación adicional no ofrece una ventaja demostrada que justifique elegirla como diseño del proyecto. Las campañas físicas del diseño seleccionado ya están incorporadas en el [README](../README.md#resultados-físicos-incluidos); la alternativa dinámica no está implementada ni comparada experimentalmente.

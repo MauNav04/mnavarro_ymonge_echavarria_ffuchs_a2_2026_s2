@@ -7,8 +7,9 @@ Las recetas de esta página permiten ejecutar cada parte por separado.
 El destino es Ubuntu nativo, AMD Ryzen con 8 núcleos físicos y 16 CPU lógicas con SMT
 activo (8 con SMT inactivo). Se utiliza la misma validación de topología y afinidad
 que CMP/SMT. No hay perfil local ni un modo que omita esa comprobación. Un diagnóstico
-corto también necesita esa máquina. Esta guía deja la campaña preparada; no afirma
-que ya se hayan recolectado contadores físicos.
+corto también necesita esa máquina. La campaña física ON/OFF del 2026-10-17 ya está
+incluida, con 20 repeticiones por modelo/grupo; el [README](../README.md#resultados-físicos-incluidos)
+resume resultados y fuentes. Esta guía explica cómo repetir capturas o analizar sus CSV.
 
 ## Preparación
 
@@ -213,8 +214,9 @@ La prueba `perf_hardware_tests` ejecuta un diagnóstico de una muestra secuencia
 si la máquina y los permisos lo permiten; de otro modo CTest la muestra omitida.
 No sustituye la campaña completa de cinco modelos en los dos estados.
 
-Para obtener **todas** las figuras del proyecto se necesitan las campañas y `make plot`
-de la [etapa 7](benchmarking.md), más estas dos capturas Perf y `make profile_plot`.
+`make report` genera ambos conjuntos desde las campañas existentes compatibles.
+En el flujo manual se necesitan las campañas y `make plot` de
+[benchmarking](benchmarking.md), más las capturas Perf y `make profile_plot`.
 Etapa 8 aporta contadores microarquitectónicos; no reemplaza los benchmarks de tiempo,
 speedup, eficiencia o escalabilidad.
 
@@ -230,9 +232,11 @@ Los eventos genéricos `LLC-loads` y `LLC-load-misses` no están disponibles en 
 configuración recibida; continúan N/D. Esto no significa que el procesador carezca de
 caché L3. No se sustituyen esos contadores por los de caché genérica.
 
-Las capturas anteriores excluyeron los dos eventos de tiempo de las pasadas por modelo.
-No se pueden recuperar las CPU efectivas de todos los modelos a partir del sondeo
-secuencial. Repetir únicamente el diagnóstico Perf en directorios nuevos:
+El diagnóstico inicial anterior a esa corrección excluyó los dos eventos temporales.
+Esos datos antiguos no permiten recuperar las CPU efectivas de todos los modelos a
+partir del sondeo secuencial. La campaña final ON/OFF ya usa el lector corregido e
+incluye task-clock y duration_time; no necesita repetirse por aquel fallo histórico.
+Para comprobar una instalación o reemplazar sólo un diagnóstico antiguo, usar directorios nuevos:
 
 ```bash
 make setup_perf PERF_CHECK_DIR=metrics/perf-check-on-v2 SMT_STATE=on
@@ -240,8 +244,8 @@ make profile_fast PERF_FAST_DIR=metrics/perf-diagnostic-on-v2 SMT_STATE=on
 make profile_plot PERF_CSV_FILES="metrics/perf-diagnostic-on-v2/events.csv" PERF_PLOT_DIR=metrics/perf-check-plots-v2
 ```
 
-Estos ejemplos usan `build` y el Python activo; activar antes `.venv` o indicar
-`PYTHON=.venv/bin/python`. Los datos originales se conservan para auditar la corrección.
+Estos ejemplos usan `build` y Make selecciona `.venv/bin/python` si existe; también
+se puede indicar `PYTHON=.venv/bin/python`. Los datos originales se conservan para auditar.
 
 ## Cantidad de archivos y exportación completa
 
@@ -274,12 +278,11 @@ La regla global `*.csv` de Git excluía esos archivos al compartir el repositori
 añadió una excepción limitada a `fractal-cpp/metrics/`; incluir los CSV en el commit o
 transferir el ZIP completo. Los JSON y PNG por sí solos no sustituyen los datos originales.
 
-Los archivos de `build/` son el caché, objetos, dependencias, Makefiles generados y pruebas
-de CMake. En la revisión local había 323 archivos y unos 4,9 MB. No se crean otros 323
-por cada corrida. Mantener un único build y compartir los resultados mediante el ZIP;
-no hace falta copiar el build a la otra computadora ni borrar internamente sus archivos.
-
-Revisión detallada de los datos recibidos: [ryzen_diagnostics.md](ryzen_diagnostics.md).
+Los archivos de `build/` son caché, objetos, dependencias, Makefiles generados y pruebas
+de CMake. Su cantidad depende de la configuración, no del número de mediciones.
+Compartir resultados mediante el ZIP y compilar de nuevo en la computadora de destino;
+no copiar un build con rutas de otro equipo. El [README](../README.md) enlaza las fuentes
+revisadas de la campaña final.
 
 ## Campañas anteriores con miles de .stat
 
@@ -296,18 +299,17 @@ esa variable aunque se escriba en el comando.
 Para reducir los archivos de una captura antigua ya finalizada, sin repetirla:
 
 ```bash
-make compact_perf PERF_DIR=metrics/perf-on REMOVE_STAT_FILES=1
+make compact_perf PERF_DIR=metrics/legacy-perf-on
 ```
 
-El comando exige `success=true`, conserva el texto exacto de cada `.stat` en un único
-`perf-stat.jsonl`, verifica cada copia por SHA-256 y crea `perf-compaction.json` antes
-de retirar los `.stat`. No altera CSV, FRC, gráficas, metadatos ni valores medidos.
+Por defecto el comando sólo copia y verifica; conserva los `.stat` originales.
+Exige `success=true`, guarda el texto exacto en `perf-stat.jsonl`, verifica las copias
+por SHA-256 y crea `perf-compaction.json`. No altera CSV, FRC, gráficas, metadatos ni valores medidos.
 Rechaza capturas fallidas y no sobrescribe un JSONL o manifiesto previo.
 
-Si sólo se desea copiar y verificar, usar `make compact_perf PERF_DIR=metrics/perf-on`
-sin `REMOVE_STAT_FILES=1`: en ese caso los `.stat` permanecen. Elegir una de las dos
-modalidades desde el principio; la segunda ejecución sobre el mismo destino no
-sobrescribe la primera. Las capturas que ya usan JSONL no necesitan compactarse.
+Para retirar los `.stat` después de verificar sus copias, elegir explícitamente
+`REMOVE_STAT_FILES=1` en la primera ejecución. Elegir la modalidad desde el principio:
+una segunda ejecución sobre el mismo destino no sobrescribe el JSONL ni el manifiesto. Las capturas que ya usan JSONL no necesitan compactarse.
 
 La compactación cambia almacenamiento, no corrige contadores que no se capturaron.
 Si los eventos de tiempo fueron excluidos por el lector antiguo, CPU efectivas seguirá
@@ -321,8 +323,8 @@ Las figuras 01–09 se generan con `plot`, usando los CSV de benchmarking y esca
 la 06 requiere el CSV del barrido de hilos. No deben buscarse todas en la carpeta de Perf.
 
 Los tres comandos `benchmark_full`, `scalability` y `profile_perf` recolectan datos y
-tablas; después deben ejecutarse los comandos de gráficos. Para las campañas ON que
-el usuario ya ejecutó, generar ambos conjuntos en una sola llamada:
+tablas; después se ejecutan los comandos de gráficos. Ejemplo para campañas manuales
+ON guardadas en las rutas indicadas:
 
 ```bash
 make plot_all \
@@ -339,5 +341,6 @@ El comando sólo lee CSV y metadatos; no compila ni ejecuta de nuevo la compresi
 Usar `perf-on/events.csv` para el perfilado completo, no `perf-diagnostic-on/events.csv`.
 La carpeta de salida por sí sola no determina qué campaña se está graficando.
 
-Cuando existan las campañas OFF, añadir sus CSV a las listas correspondientes. Los
-CSV y sus `metadata.json` deben acompañarse para poder validar compatibilidad.
+Para combinar ON/OFF manualmente, añadir los CSV de ambos estados a sus listas.
+La campaña final incluida ya tiene ambos estados; `make report` los detecta sin
+escribir sus rutas a mano. Los CSV y sus `metadata.json` deben conservarse juntos.
