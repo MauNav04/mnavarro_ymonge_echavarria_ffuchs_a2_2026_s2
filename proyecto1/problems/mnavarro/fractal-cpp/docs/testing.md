@@ -27,7 +27,8 @@ las dependencias desde la terminal de esa máquina:
 
 ```bash
 sudo apt update
-sudo apt install build-essential cmake libopencv-dev python3
+sudo apt install build-essential cmake libopencv-dev python3 python3-venv
+make setup
 make help
 make all JOBS=2
 ```
@@ -109,13 +110,13 @@ no los registros únicos de integración. No se calculan speedups ni estadístic
 Ejecutar con otra imagen, geometría o modo gris:
 
 ```bash
-make run_cmp INPUT=/ruta/imagen.png RANGE=8 STRIDE=8 GRAY=1
+make run_cmp INPUT=assets/color128.png RANGE=8 STRIDE=8 GRAY=1
 make verify_cmp QUICK=1
-make verify_fine TEST_INPUT=/ruta/imagen.png RANGE=8 STRIDE=8 TIMEOUT=600
+make verify_fine TEST_INPUT=assets/color128.png RANGE=8 STRIDE=8 TIMEOUT=600
 make -C scripts verify_all SMT_STATE=on QUICK=1
 ```
 
-`INPUT` afecta demostraciones y registros SMT; `TEST_INPUT` sustituye las imágenes
+`INPUT` afecta demostraciones, registros SMT y campañas estadísticas; `TEST_INPUT` sustituye las imágenes
 pequeñas generadas por la matriz integrada. Sin `TEST_INPUT`, se generan imágenes
 16×24 constantes y con patrón, en RGB y gris, con `(range,stride)=(4,3),(8,16)`.
 Esto cubre empates, intervalos desiguales, pocos dominios y equipos sin ranges.
@@ -126,7 +127,7 @@ grande puede necesitar más tiempo, especialmente con planificación cooperativa
 |---|---|
 | `BUILD_DIR` | `<raíz>/build` |
 | `BUILD_TYPE`, `JOBS` | `Release`, `2` |
-| `PYTHON` | `python3` |
+| `PYTHON` | `.venv/bin/python` si existe; de lo contrario, `python3` |
 | `RESULTS_DIR` | `<raíz>/results` |
 | `INPUT` | `assets/color128.png` |
 | `RANGE`, `STRIDE`, `ITERATIONS` | `8`, `8`, `80` |
@@ -197,7 +198,7 @@ make compare_smt
 ```
 
 Estos objetivos reutilizan `SMT/verify_smt.py`; los directorios ON/OFF deben ser nuevos.
-Para otra campaña usar `SMT_RECORD_DIR=/ruta/campaña`. La comparación exige la misma
+Para otra campaña usar `SMT_RECORD_DIR=results/smt-repeat`. La comparación exige la misma
 máquina, entrada, parámetros y binarios. Ver [smt.md](smt.md).
 
 ## Validación local y pendiente físico
@@ -206,14 +207,16 @@ En WSL se puede ejecutar `make test_local`; esto no añade un modelo CMP local.
 El comando `make test` completo debe fallar fuera del destino. Las fixtures y las pruebas
 del orquestador validan automatización, no se presentan como pruebas SMT físicas.
 
-La funcionalidad anterior de CMP/SMT fue confirmada por el usuario en el Ryzen. La nueva
-matriz integrada de etapa 6 aún debe ejecutarse allí en ON y OFF y conservar sus registros.
-Esta etapa prepara pruebas funcionales; no implementa las 200 repeticiones, estadísticas,
-gráficas ni Perf de las etapas 7 y 8.
+El usuario ejecutó la campaña física completa ON/OFF de benchmark, escalabilidad y
+Perf, con sus comprobaciones por corrida. No se ha adjuntado un reporte independiente
+de la matriz funcional completa de `make test` en ambos estados; ése sigue siendo el
+pendiente específico, junto con la validación adicional de ThreadSanitizer.
+Las campañas estadísticas y sus resultados están documentados en el
+[README](../README.md); no equivalen automáticamente a ejecutar esta matriz funcional.
 
 
-Validación de la automatización en este desarrollo (WSL2): `make test_local` con
-`BUILD_DIR=/tmp/fractal-stage6-release` aprobó 13/13; CTest completo aprobó 13 y omitió
+Registro histórico de validación al implementar la etapa 6 (WSL2): `make test_local` con
+un build temporal aprobó 13/13; CTest completo aprobó 13 y omitió
 las 2 pruebas físicas. La matriz completa de los tres modelos portables aprobó 88 casos
 FRC/PNG. Demostraciones Make de seq/fine/coarse dieron archivos idénticos; `verify_all`
 falló correctamente por falta del Ryzen y conservó un registro con `success: false`.
@@ -224,5 +227,5 @@ No se ejecutó aquí la matriz nueva CMP/SMT.
 
 `make test_profiles PYTHON=.venv/bin/python` ejecuta los contratos de contadores y
 análisis, y el diagnóstico físico opcional. Sus omisiones se informan explícitamente.
-La [guía de etapa 8](profiling.md) documenta `setup_perf`, las capturas de 200
-repeticiones por modelo/grupo y las cinco figuras complementarias.
+La [guía de etapa 8](profiling.md) documenta `setup_perf`, las capturas de 20
+repeticiones por modelo/grupo (mínimo 15) y las cinco figuras complementarias.

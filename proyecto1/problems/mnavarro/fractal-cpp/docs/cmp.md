@@ -10,8 +10,9 @@ de evaluación el 2026-10-16 y solicitó retirar la variante local.
 La selección exige el destino de evaluación: rechaza WSL, hipervisores/contenedores
 reconocidos, otras distribuciones/familias de CPU y topologías fuera del contrato.
 La ausencia de señales de virtualización no demuestra por sí sola hardware físico.
-Los diagnósticos recibidos confirman Ryzen 7 7730U y Ubuntu 25.10; las campañas
-formales ON/OFF permanecen pendientes. Revisión en [ryzen_diagnostics.md](ryzen_diagnostics.md).
+La evaluación utilizó Ryzen 7 7730U y Ubuntu 25.10. Las campañas físicas ON/OFF
+incluyen 200 repeticiones por configuración y un barrido de 1, 2, 4 y 8 trabajadores;
+resultados y fuentes en el [README](../README.md#resultados-físicos-incluidos).
 
 Se adapta el reparto contiguo y afinidad de [RayTracing CMP](../../../echavarria/RayTracing/CMP/main.cpp).
 Sysfs proporciona CPU online, `physical_package_id` y `core_id`; `sched_getaffinity`
@@ -22,7 +23,8 @@ No se asumen IDs pares/impares ni IDs de núcleo únicos entre sockets.
 Cada pthread fija afinidad y verifica una máscara de exactamente una CPU con
 `pthread_getaffinity_np`; `sched_getcpu` debe coincidir antes y después del trabajo.
 Los errores cancelan el cálculo. CMP no activa/desactiva SMT. No hace falta desactivarlo
-para seleccionar un único trabajador por núcleo; la comparación ON/OFF pertenece a SMT.
+para seleccionar un único trabajador por núcleo. Las campañas también miden CMP
+en ambos estados para observar el efecto de la configuración del equipo.
 
 ## Motor compartido
 
@@ -71,7 +73,11 @@ cmake --build build -j2
 ctest --test-dir build -R 'cmp|cli' --output-on-failure
 ```
 
-La confirmación funcional del usuario no se presenta como una ejecución del asistente.
-Escalabilidad y mediciones estadísticas siguen pendientes de documentar. Las pruebas
-WSL de contratos no sustituyen mediciones físicas. El historial del README conserva
-el contexto de la variante anterior; sus comandos ya no están vigentes.
+Las mediciones físicas fueron ejecutadas por el usuario y sus archivos están en
+`metrics/automatic/`; las tablas y figuras están en `metrics/reports/`. En la campaña
+fija CMP obtuvo 5,355× de speedup en ON y 5,527× en OFF, respecto a la referencia del
+mismo estado. Esos valores corresponden a la carga y configuración documentadas;
+las pruebas WSL de contratos no sustituyen esa evaluación física.
+
+El reporte independiente de la matriz funcional completa de `make test` en ambos
+estados sigue sin adjuntarse; no se deduce su ejecución de las campañas estadísticas.

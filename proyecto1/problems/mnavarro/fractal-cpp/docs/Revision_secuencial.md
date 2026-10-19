@@ -1,12 +1,15 @@
 # Revisión de la implementación secuencial
 
-Fecha: 2026-10-13. Alcance: revisión y extracción de la etapa 1; sin cambios en el algoritmo matemático.
+Revisión inicial: 2026-10-13, durante la extracción de la etapa 1. Este documento
+explica el núcleo secuencial compartido; el [README](../README.md) describe los cinco
+modelos y las campañas finales. No se modifica el algoritmo matemático.
 
 ## Flujo y responsabilidades
 
 - `app/cli.cpp` valida argumentos, carga imágenes, llama al codec y mide tiempo
   de cómputo separado del tiempo total. Comandos: `compress`, `compress-gray`, `decompress`,
-  `compare` y `compare-gray`; cada `main.cpp` fija su modelo y utiliza el controlador compartido; en etapa 1 solo admite `sequential`, un equipo y un hilo.
+  `compare` y `compare-gray`; cada `main.cpp` fija su modelo y utiliza el controlador compartido. La versión
+  secuencial exige un equipo y un hilo; los otros ejecutables tienen sus propias políticas.
 - `app/image_io.cpp` convierte BGR de OpenCV a planos RGB normalizados y viceversa.
 - `src/codec.cpp` valida geometría y muestras, precalcula dominios de lado `2*range`
   reducidos por promedio 2×2 y busca exhaustivamente una regla por range.
@@ -33,19 +36,22 @@ Los canales ofrecen hasta tres tareas independientes. En decodificación se pued
 ranges leyendo `current` y escribiendo regiones disjuntas de `next`, con sincronización antes
 del intercambio y de la siguiente iteración. Las iteraciones dependen unas de otras.
 
-La búsqueda exhaustiva es el cuello de botella esperado, pendiente de profiling. `transform`
-crea un vector por candidato y repite cálculos; no se han optimizado ni medido estos costos.
+La búsqueda exhaustiva concentra el trabajo que se reparte entre hilos. La revisión
+inicial identificó asignaciones temporales y cálculos repetidos en `transform`. El
+perfilado final mide contadores del comando completo, sin atribuir porcentajes a
+funciones concretas; no demuestra por sí solo el costo individual de esas operaciones.
 
 ## Estado del diseño y limitaciones
 
 La biblioteca única `fractal_codec` reside en `src/` e `include/`, sin dependencia de OpenCV.
 `search.hpp` expone preparación del catálogo, preparación de ranges, búsqueda sobre un
 intervalo semiabierto de dominios y reducción determinista de candidatos. El modelo secuencial
-utiliza estas mismas funciones; la etapa 1 no incorpora pthreads ni planificación concurrente.
+utiliza estas mismas funciones; las políticas pthreads reutilizan el núcleo desde
+sus respectivos motores.
 
 `execution.hpp` define modelos, equipos e hilos por equipo y una interfaz común de codificación
-mono/RGB y reconstrucción RGB/gris. Los modelos futuros se reconocen y rechazan explícitamente
-como pendientes; no ejecutan silenciosamente el modelo secuencial.
+mono/RGB y reconstrucción RGB/gris. Los cinco modelos de codificación están
+implementados; la reconstrucción continúa disponible únicamente en `fractal_seq`.
 
 La contradicción queda resuelta por decisión del usuario: equipos de hilos por range,
 con dominios repartidos y reducción de mínimos antes de publicar la regla. Ejemplo: 5 equipos
