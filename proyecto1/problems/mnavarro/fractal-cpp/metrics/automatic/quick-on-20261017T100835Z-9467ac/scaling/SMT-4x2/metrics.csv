@@ -1,0 +1,2 @@
+model,teams,threads_per_team,threads,quantum,range,stride,width,height,channels,time_ms,turns,scheduler_switches,stalls,frc_bytes
+SMT,4,2,8,1,8,8,128,128,3,55.276345999999997,0,0,0,13080

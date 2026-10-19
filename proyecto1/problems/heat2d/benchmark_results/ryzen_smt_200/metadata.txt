@@ -1,0 +1,156 @@
+=== Heat2D Experimental Metadata ===
+
+Timestamp:
+2026-10-11T12:58:50-06:00
+
+Result tag:
+ryzen_smt_200
+
+Campaign model:
+smt
+
+Git commit:
+2837fbdcc06ea768cb91c7be787fc1874e5bde7b
+
+Git branch:
+feature/heat2d-smt
+
+Git status:
+ M Makefile
+
+Compiler:
+g++ (Ubuntu 15.2.0-4ubuntu4) 15.2.0
+Copyright (C) 2025 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+
+Compilation flags:
+-std=c++17 -Wall -Wextra -Wpedantic -Iproyecto1/problems/heat2d/include -O3 -DNDEBUG -pthread
+
+Benchmark binary SHA256:
+a24a552145d66f020653d5e65f5e2470ff431dd3eb1b84b046b8159a6ba7bb16  build/bin/heat2d_benchmark
+
+Kernel:
+Linux emalinux-Vivobook-ASUSLaptop-M1405YA-M1405YA 6.17.0-41-generic #41-Ubuntu SMP PREEMPT_DYNAMIC Sat Jun 20 18:01:40 UTC 2026 x86_64 GNU/Linux
+
+Operating system:
+PRETTY_NAME="Ubuntu 25.10"
+NAME="Ubuntu"
+VERSION_ID="25.10"
+VERSION="25.10 (Questing Quokka)"
+VERSION_CODENAME=questing
+ID=ubuntu
+ID_LIKE=debian
+HOME_URL="https://www.ubuntu.com/"
+SUPPORT_URL="https://help.ubuntu.com/"
+BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
+PRIVACY_POLICY_URL="https://www.ubuntu.com/legal/terms-and-policies/privacy-policy"
+UBUNTU_CODENAME=questing
+LOGO=ubuntu-logo
+
+Virtualization:
+unknown
+
+CPU topology:
+Architecture:                            x86_64
+CPU op-mode(s):                          32-bit, 64-bit
+Address sizes:                           48 bits physical, 48 bits virtual
+Byte Order:                              Little Endian
+CPU(s):                                  16
+On-line CPU(s) list:                     0-15
+Vendor ID:                               AuthenticAMD
+Model name:                              AMD Ryzen 7 7730U with Radeon Graphics
+CPU family:                              25
+Model:                                   80
+Thread(s) per core:                      2
+Core(s) per socket:                      8
+Socket(s):                               1
+Stepping:                                0
+Frequency boost:                         enabled
+CPU(s) scaling MHz:                      77%
+CPU max MHz:                             4547.9458
+CPU min MHz:                             410.9590
+BogoMIPS:                                3992.34
+Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpb cat_l3 cdp_l3 hw_pstate ssbd mba ibrs ibpb stibp vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local user_shstk clzero irperf xsaveerptr rdpru wbnoinvd cppc arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold avic v_vmsave_vmload vgif v_spec_ctrl umip pku ospke vaes vpclmulqdq rdpid overflow_recov succor smca fsrm debug_swap
+Virtualization:                          AMD-V
+L1d cache:                               256 KiB (8 instances)
+L1i cache:                               256 KiB (8 instances)
+L2 cache:                                4 MiB (8 instances)
+L3 cache:                                16 MiB (1 instance)
+NUMA node(s):                            1
+NUMA node0 CPU(s):                       0-15
+Vulnerability Gather data sampling:      Not affected
+Vulnerability Ghostwrite:                Not affected
+Vulnerability Indirect target selection: Not affected
+Vulnerability Itlb multihit:             Not affected
+Vulnerability L1tf:                      Not affected
+Vulnerability Mds:                       Not affected
+Vulnerability Meltdown:                  Not affected
+Vulnerability Mmio stale data:           Not affected
+Vulnerability Old microcode:             Not affected
+Vulnerability Reg file data sampling:    Not affected
+Vulnerability Retbleed:                  Not affected
+Vulnerability Spec rstack overflow:      Mitigation; Safe RET
+Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+Vulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+Vulnerability Spectre v2:                Mitigation; Retpolines; IBPB conditional; IBRS_FW; STIBP always-on; RSB filling; PBRSB-eIBRS Not affected; BHI Not affected
+Vulnerability Srbds:                     Not affected
+Vulnerability Tsa:                       Mitigation; Clear CPU buffers
+Vulnerability Tsx async abort:           Not affected
+Vulnerability Vmscape:                   Mitigation; IBPB before exit to userspace
+
+CPU/core mapping:
+CPU CORE SOCKET NODE ONLINE
+  0    0      0    0    yes
+  1    0      0    0    yes
+  2    1      0    0    yes
+  3    1      0    0    yes
+  4    2      0    0    yes
+  5    2      0    0    yes
+  6    3      0    0    yes
+  7    3      0    0    yes
+  8    4      0    0    yes
+  9    4      0    0    yes
+ 10    5      0    0    yes
+ 11    5      0    0    yes
+ 12    6      0    0    yes
+ 13    6      0    0    yes
+ 14    7      0    0    yes
+ 15    7      0    0    yes
+
+Linux SMT control:
+on
+
+Process-visible logical CPUs (nproc):
+16
+
+Memory:
+               total        used        free      shared  buff/cache   available
+Mem:            14Gi       5.1Gi       4.6Gi       357Mi       5.5Gi       9.5Gi
+Swap:          4.0Gi          0B       4.0Gi
+
+perf version:
+perf version 6.17.13
+
+perf_event_paranoid:
+4
+
+=== Benchmark Configuration ===
+Grid: 801 x 801
+Interior cells: 799 x 799 = 638401
+Steps: 1000
+alpha: 0.05
+dt: 0.000005
+Cell updates per execution: 638401000
+Measured rounds: 200
+Warm-up rounds: 5
+Cases per measured round: 6
+Cases: Sequential + SMT {1 2 4 8 16}
+SMT implementation: persistent std::thread workers
+SMT topology discovery: sched_getaffinity + Linux sysfs
+SMT affinity: pthread_setaffinity_np
+SMT placement: one logical CPU per physical core before sibling threads
+SMT oversubscription: disabled
+SMT synchronization: reusable timestep barrier
+SMT barrier phases per timestep: 2

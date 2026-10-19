@@ -1,0 +1,4 @@
+profile,channel,worker,team,cpu,socket,core,observed_before,observed_after,smt_state,smt_control,smt_active,online_cpus
+target,0,0,0,0,0,0,0,0,off,off,0,8
+target,1,0,0,0,0,0,0,0,off,off,0,8
+target,2,0,0,0,0,0,0,0,off,off,0,8

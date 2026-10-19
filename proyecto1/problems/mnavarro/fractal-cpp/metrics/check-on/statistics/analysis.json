@@ -1,0 +1,14 @@
+{
+  "success": true,
+  "source_csv": [
+    "/home/emalinux/Desktop/TEC_2026_II/Arqui2/Proyecto1/mnavarro_ymonge_echavarria_ffuchs_a2_2026_s2/proyecto1/problems/mnavarro/fractal-cpp/metrics/check-on/raw.csv"
+  ],
+  "measurement_kind": "diagnostic",
+  "complete": true,
+  "dependencies": {
+    "scipy": "1.18.1",
+    "matplotlib": "3.11.2"
+  },
+  "ci_method": "Student-t; speedup approximate log-delta + Welch, independent means",
+  "notes": "Sin eliminar outliers; Amdahl es referencia teorica; convergencia descriptiva."
+}

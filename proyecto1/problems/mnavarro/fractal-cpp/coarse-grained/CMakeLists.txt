@@ -1,0 +1,11 @@
+cmake_minimum_required(VERSION 3.16)
+# Permite construir desde este modelo reutilizando las bibliotecas de la raíz.
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND NOT TARGET fractal_codec)
+    project(FractalCoarseGrained LANGUAGES CXX)
+    enable_testing()
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/.." "${CMAKE_CURRENT_BINARY_DIR}/shared")
+elseif(BUILD_APP)
+    add_executable(fractal_coarse main.cpp)
+    target_link_libraries(fractal_coarse PRIVATE fractal_app)
+    set_target_properties(fractal_coarse PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+endif()

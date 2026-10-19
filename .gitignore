@@ -1,0 +1,80 @@
+# macOS
+.DS_Store
+
+# Python virtual environments & cache
+venv/
+.venv/
+env/
+__pycache__/
+*.pyc
+
+# C / C++
+*.o
+*.out
+*.exe
+
+# Compilation
+build/
+build-evaluation/
+bin/
+
+# Benchmark output
+results/
+*.csv
+*.log
+
+# Generated graphs
+*.pdf
+
+# Allow tracking curated project metrics and graphs
+!proyecto1/problems/gray-scott/metricas/*.csv
+!proyecto1/problems/gray-scott/metricas/graficas/*.png
+!proyecto1/problems/echavarria/RayTracing/metricas/*.csv
+!proyecto1/problems/echavarria/RayTracing/metricas/graficas/*.png
+!proyecto1/problems/gray-scott/metricas/graficas/*.pdf
+!proyecto1/problems/heat2d/benchmark_results/ryzen_smt_200/*.csv
+!proyecto1/problems/heat2d/benchmark_results/ryzen_smt_200/plots/*.png
+!proyecto1/problems/heat2d/benchmark_results/heat2d_perf_metrics.csv
+!proyecto1/problems/heat2d/metricas/*.csv
+!proyecto1/problems/heat2d/metricas/graficas/*.png
+
+# Fractal: conservar los CSV de campañas junto con sus metadatos y figuras.
+!proyecto1/problems/mnavarro/fractal-cpp/metrics/**/*.csv
+
+# Gray-Scott compilation output
+proyecto1/problems/gray-scott/scripts/gray_scott_seq
+proyecto1/problems/gray-scott/scripts/gray_scott_cmp
+proyecto1/problems/gray-scott/scripts/gray_scott_smt
+proyecto1/problems/gray-scott/scripts/gray_scott_coarse
+proyecto1/problems/gray-scott/scripts/gray_scott_fine
+
+# Gray-Scott generated videos and temporary frames
+test_logical_thread
+test_round_robin_scheduler
+heat2d_stress_test
+heat2d_sequential
+test_fine_grained
+heat2d_fine_grained.vscode/
+heat2d_fine_grained_stress
+heat2d_fine_grained
+.vscode/c_cpp_properties.json.venv/
+heat2d_benchmark
+# Local development
+.venv/
+.vscode/
+
+# Heat2D benchmark generated artifacts (ignore temporary/smoke runs, allow curated ryzen_smt_200)
+proyecto1/problems/heat2d/benchmark_results/*
+!proyecto1/problems/heat2d/benchmark_results/ryzen_smt_200/
+!proyecto1/problems/heat2d/benchmark_results/heat2d_perf_metrics.csv
+
+# Generated benchmark executables / temporary CSVs
+heat2d_benchmark
+benchmark_test.csv
+# heat2d_benchmark.csv (permitido en metricas/)
+
+# perf profiling output
+perf.data
+stress_coarse_grained
+test_coarse_grained
+heat2d_comments.diff

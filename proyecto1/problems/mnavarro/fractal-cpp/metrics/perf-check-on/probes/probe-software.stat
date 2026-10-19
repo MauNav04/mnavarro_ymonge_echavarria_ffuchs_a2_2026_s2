@@ -1,0 +1,7 @@
+# started on Fri Oct 16 19:06:38 2026
+
+327532597;;task-clock;327532597;100.00;0.985;CPUs utilized
+15;;context-switches;327532597;100.00;45.797;/sec
+5;;cpu-migrations;327532597;100.00;15.266;/sec
+4646;;page-faults;327532597;100.00;14.185;K/sec
+332559518;;duration_time;1;100.00;1.015;G/sec

@@ -1,0 +1,43 @@
+# Directorios de compilación / Build outputs
+build/
+bin/
+obj/
+
+# Archivos temporales de CMake
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+build/Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+
+# Binarios y objetos compilados
+inOneWeekend
+raytracing_seq
+raytracing_cmp
+raytracing_smt
+raytracing_coarse
+raytracing_fine
+scripts/raytracing_*
+*.o
+*.obj
+*.exe
+*.out
+*.app
+
+# Archivos de salida de render (imágenes generadas)
+*.ppm
+
+# Archivos del sistema y editor
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Permitir imágenes de documentación y diagramas
+!images/*.png
+!docs/*.png
+
+# Excluir renders temporales de pruebas
+images/output_*
+output_*
