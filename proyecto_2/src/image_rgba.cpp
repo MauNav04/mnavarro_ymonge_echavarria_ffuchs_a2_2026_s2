@@ -1,5 +1,6 @@
 #include "image_rgba.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <stdexcept>
@@ -156,6 +157,119 @@ bool save_ppm(const std::string& path, const ImageRGBA& img) {
         out.write(reinterpret_cast<const char*>(rgb_row.data()),
                   static_cast<std::streamsize>(rgb_row.size()));
     }
+    return static_cast<bool>(out);
+}
+
+namespace {
+
+uint32_t crc32_update(uint32_t crc, const uint8_t* data, std::size_t len) {
+    crc = ~crc;
+    for (std::size_t i = 0; i < len; ++i) {
+        crc ^= data[i];
+        for (int b = 0; b < 8; ++b) {
+            const uint32_t mask = static_cast<uint32_t>(-static_cast<int32_t>(crc & 1U));
+            crc = (crc >> 1) ^ (0xEDB88320U & mask);
+        }
+    }
+    return ~crc;
+}
+
+uint32_t adler32_compute(const uint8_t* data, std::size_t len) {
+    uint32_t s1 = 1;
+    uint32_t s2 = 0;
+    constexpr uint32_t kMod = 65521U;
+    for (std::size_t i = 0; i < len; ++i) {
+        s1 = (s1 + data[i]) % kMod;
+        s2 = (s2 + s1) % kMod;
+    }
+    return (s2 << 16) | s1;
+}
+
+void write_be32(std::vector<uint8_t>& buf, uint32_t v) {
+    buf.push_back(static_cast<uint8_t>((v >> 24) & 0xFFU));
+    buf.push_back(static_cast<uint8_t>((v >> 16) & 0xFFU));
+    buf.push_back(static_cast<uint8_t>((v >> 8) & 0xFFU));
+    buf.push_back(static_cast<uint8_t>(v & 0xFFU));
+}
+
+void append_png_chunk(std::vector<uint8_t>& png, const char type[4],
+                      const uint8_t* payload, std::size_t len) {
+    write_be32(png, static_cast<uint32_t>(len));
+    const std::size_t type_pos = png.size();
+    png.insert(png.end(), type, type + 4);
+    if (len > 0) {
+        png.insert(png.end(), payload, payload + len);
+    }
+    const uint32_t crc = crc32_update(0, png.data() + type_pos, 4 + len);
+    write_be32(png, crc);
+}
+
+}  // namespace
+
+bool save_png(const std::string& path, const ImageRGBA& img) {
+    if (!img.is_valid()) {
+        return false;
+    }
+
+    const std::size_t row_bytes = static_cast<std::size_t>(img.width) * 4U;
+    const std::size_t raw_size = static_cast<std::size_t>(img.height) * (1U + row_bytes);
+    std::vector<uint8_t> raw(raw_size);
+
+    for (int y = 0; y < img.height; ++y) {
+        const std::size_t dst_row = static_cast<std::size_t>(y) * (1U + row_bytes);
+        raw[dst_row] = 0;  // Filter type 0 (None)
+        const std::size_t src_row = static_cast<std::size_t>(y) * row_bytes;
+        std::copy(img.data.begin() + static_cast<std::ptrdiff_t>(src_row),
+                  img.data.begin() + static_cast<std::ptrdiff_t>(src_row + row_bytes),
+                  raw.begin() + static_cast<std::ptrdiff_t>(dst_row + 1U));
+    }
+
+    // Stream zlib con bloques DEFLATE sin comprimir (BTYPE=00).
+    std::vector<uint8_t> zlib_stream;
+    zlib_stream.reserve(raw_size + (raw_size / 65535U + 1U) * 5U + 6U);
+    zlib_stream.push_back(0x78);
+    zlib_stream.push_back(0x01);
+
+    std::size_t offset = 0;
+    while (offset < raw_size) {
+        const std::size_t chunk = std::min<std::size_t>(65535U, raw_size - offset);
+        const bool is_last = (offset + chunk) == raw_size;
+        zlib_stream.push_back(is_last ? 0x01 : 0x00);
+        const uint16_t len16 = static_cast<uint16_t>(chunk);
+        const uint16_t nlen16 = static_cast<uint16_t>(~len16);
+        zlib_stream.push_back(static_cast<uint8_t>(len16 & 0xFFU));
+        zlib_stream.push_back(static_cast<uint8_t>((len16 >> 8) & 0xFFU));
+        zlib_stream.push_back(static_cast<uint8_t>(nlen16 & 0xFFU));
+        zlib_stream.push_back(static_cast<uint8_t>((nlen16 >> 8) & 0xFFU));
+        zlib_stream.insert(zlib_stream.end(),
+                           raw.begin() + static_cast<std::ptrdiff_t>(offset),
+                           raw.begin() + static_cast<std::ptrdiff_t>(offset + chunk));
+        offset += chunk;
+    }
+    write_be32(zlib_stream, adler32_compute(raw.data(), raw.size()));
+
+    std::vector<uint8_t> png;
+    static constexpr uint8_t kSig[8] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+    png.insert(png.end(), kSig, kSig + 8);
+
+    std::vector<uint8_t> ihdr;
+    write_be32(ihdr, static_cast<uint32_t>(img.width));
+    write_be32(ihdr, static_cast<uint32_t>(img.height));
+    ihdr.push_back(8);  // bit depth
+    ihdr.push_back(6);  // color type: RGBA
+    ihdr.push_back(0);  // compression
+    ihdr.push_back(0);  // filter
+    ihdr.push_back(0);  // interlace
+    append_png_chunk(png, "IHDR", ihdr.data(), ihdr.size());
+    append_png_chunk(png, "IDAT", zlib_stream.data(), zlib_stream.size());
+    append_png_chunk(png, "IEND", nullptr, 0);
+
+    std::ofstream out(path, std::ios::binary);
+    if (!out) {
+        return false;
+    }
+    out.write(reinterpret_cast<const char*>(png.data()),
+              static_cast<std::streamsize>(png.size()));
     return static_cast<bool>(out);
 }
 

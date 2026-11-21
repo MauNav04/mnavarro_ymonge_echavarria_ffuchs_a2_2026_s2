@@ -109,6 +109,12 @@ ImageRGBA make_deterministic_pattern(int width, int height, uint32_t seed = 42);
  */
 bool save_ppm(const std::string& path, const ImageRGBA& img);
 
+/**
+ * @brief Guarda una imagen RGBA32 en formato PNG estándar (sin dependencias externas).
+ * @return true si el archivo se escribió correctamente.
+ */
+bool save_png(const std::string& path, const ImageRGBA& img);
+
 }  // namespace sobel
 
 #endif  // SOBEL_DLP_IMAGE_RGBA_HPP

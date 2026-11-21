@@ -2,18 +2,36 @@
 
 **Curso:** CE 4302 — Arquitectura de Computadores II (TEC)
 
-## Estructura
+## Estructura de `proyecto_2/`
 
-* `include/` — Encabezados públicos (estructura de imagen, kernels, validación).
-* `src/` — Implementaciones (secuencial, y posteriormente SIMD CPU / GPU).
-* `tests/` — Pruebas unitarias de correctitud bit a bit (`secuencial == paralelo`).
-* `docs/` — Diagramas y documentación técnica.
-
-## Compilación
-
-```bash
-cmake -S proyecto_2 -B proyecto_2/build -DCMAKE_BUILD_TYPE=Release
-cmake --build proyecto_2/build -j
+```text
+proyecto_2/
+├── include/          # Encabezados compartidos (ImageRGBA, sobel_sequential, validacion)
+├── src/
+│   ├── image_rgba.cpp        # Contenedor RGBA32, generadores, compare_images, save_png/ppm
+│   ├── sobel_sequential.cpp  # Baseline secuencial de referencia
+│   ├── main.cpp              # CLI de ejecucion y benchmark del baseline
+│   ├── simd/                 # Implementacion CPU SIMD (AVX2 / NEON)
+│   └── gpu/                  # Implementacion GPU (CUDA / OpenCL / tiling 18x18)
+├── fpga/             # Acelerador FPGA (DE1-SoC Cyclone V, ISA minimo, JTAG)
+├── tests/            # Pruebas unitarias de correctitud bit a bit
+├── scripts/          # Benchmarking, profiling (perf/Nsight) y graficas
+├── docs/             # Diagramas y documentacion tecnica
+├── Makefile          # Compilacion y ejecucion rapida (make seq, make test, ...)
+└── CMakeLists.txt    # Build multiplataforma con CMake + CTest
 ```
 
-En Windows con MinGW-W64 si no hay `make` en el PATH, usar el generador `"MinGW Makefiles"` o `"Ninja"`, o especificar `CMAKE_MAKE_PROGRAM` si aplica.
+## Uso rápido con Makefile
+
+Desde `proyecto_2/` (en Linux usa `make`, en Windows con MinGW usa `mingw32-make`):
+
+```powershell
+cd proyecto_2
+
+mingw32-make test       # Compila y corre las pruebas unitarias
+mingw32-make seq        # Compila y corre el baseline (512x512, 1920x1080, 3840x2160)
+mingw32-make seq-save   # Corre 512x512 y guarda PNGs en bin/demo_512x512_*.png
+mingw32-make clean      # Limpia archivos compilados
+```
+
+*(También puedes correrlo desde la raíz agregando `-C proyecto_2`, por ejemplo: `mingw32-make -C proyecto_2 seq`).*
