@@ -25,3 +25,13 @@ add_executable(sobel_seq
 )
 
 target_link_libraries(sobel_seq PRIVATE sobel_core)
+
+enable_testing()
+
+add_executable(test_sobel_sequential
+    tests/test_sobel_sequential.cpp
+)
+
+target_link_libraries(test_sobel_sequential PRIVATE sobel_core)
+
+add_test(NAME sobel_sequential_unit_tests COMMAND test_sobel_sequential)
