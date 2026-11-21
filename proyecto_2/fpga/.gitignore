@@ -1,0 +1,22 @@
+# Artefactos generados por Quartus Prime y ModelSim (no versionar)
+db/
+incremental_db/
+output_files/
+simulation/
+greybox_tmp/
+work/
+transcript
+*.rpt
+*.sof
+*.pof
+*.jdi
+*.smsg
+*.summary
+*.qws
+*.bak
+*.wlf
+*.vcd
+*.pin
+*.done
+*.qdf
+*.sld
