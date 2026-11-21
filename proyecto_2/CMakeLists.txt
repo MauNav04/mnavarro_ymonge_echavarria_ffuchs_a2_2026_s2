@@ -13,6 +13,7 @@ add_compile_options(-Wall -Wextra -Wpedantic)
 
 add_library(sobel_core STATIC
     src/image_rgba.cpp
+    src/sobel_sequential.cpp
 )
 
 target_include_directories(sobel_core PUBLIC
