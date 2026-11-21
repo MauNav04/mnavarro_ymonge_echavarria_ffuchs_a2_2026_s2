@@ -13,23 +13,27 @@ ifeq ($(OS),Windows_NT)
 	MKDIR_P  = if not exist "$(subst /,\,$(1))" mkdir "$(subst /,\,$(1))"
 	RM_F     = if exist "$(subst /,\,$(1))" del /Q "$(subst /,\,$(1))"
 	RUN_BIN  = $(subst /,\,$(1))
+	DL_FLAGS :=
 else
 	EXE     :=
 	MKDIR_P  = mkdir -p $(1)
 	RM_F     = rm -f $(1)
 	RUN_BIN  = ./$(1)
+	DL_FLAGS := -ldl
 endif
 
 CORE_OBJS := $(OUT_DIR)/image_rgba.o $(OUT_DIR)/sobel_sequential.o
+GPU_OBJS  := $(OUT_DIR)/opencl_loader.o
 
 SEQ_BIN  := $(OUT_DIR)/sobel_seq$(EXE)
+GPU_BIN  := $(OUT_DIR)/sobel_gpu$(EXE)
 TEST_BIN := $(OUT_DIR)/test_sobel_sequential$(EXE)
 
-.PHONY: all build seq seq-save test clean help
+.PHONY: all build seq seq-save gpu test clean help
 
 all: build
 
-build: $(SEQ_BIN) $(TEST_BIN)
+build: $(SEQ_BIN) $(GPU_BIN) $(TEST_BIN)
 
 $(OUT_DIR):
 	$(call MKDIR_P,$(OUT_DIR))
@@ -46,6 +50,12 @@ $(SEQ_BIN): src/main.cpp $(CORE_OBJS) | $(OUT_DIR)
 $(TEST_BIN): tests/test_sobel_sequential.cpp $(CORE_OBJS) | $(OUT_DIR)
 	$(CXX) $(CXXFLAGS) $< $(CORE_OBJS) -o $@
 
+$(OUT_DIR)/opencl_loader.o: src/gpu/opencl_loader.cpp src/gpu/opencl_loader.hpp | $(OUT_DIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(GPU_BIN): src/gpu/main_gpu.cpp $(GPU_OBJS) $(CORE_OBJS) | $(OUT_DIR)
+	$(CXX) $(CXXFLAGS) -Isrc/gpu $< $(GPU_OBJS) $(CORE_OBJS) -o $@ $(DL_FLAGS)
+
 test: $(TEST_BIN)
 	$(call RUN_BIN,$(TEST_BIN))
 
@@ -55,9 +65,13 @@ seq: $(SEQ_BIN)
 seq-save: $(SEQ_BIN)
 	$(call RUN_BIN,$(SEQ_BIN)) --width 512 --height 512 --runs 5 --save $(OUT_DIR)/demo
 
+gpu: $(GPU_BIN)
+	$(call RUN_BIN,$(GPU_BIN))
+
 clean:
 	$(call RM_F,$(OUT_DIR)/*.o)
 	$(call RM_F,$(SEQ_BIN))
+	$(call RM_F,$(GPU_BIN))
 	$(call RM_F,$(TEST_BIN))
 	$(call RM_F,$(OUT_DIR)/demo_*.png)
 
