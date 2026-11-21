@@ -78,3 +78,31 @@ perf.data
 stress_coarse_grained
 test_coarse_grained
 heat2d_comments.diff
+
+# contexto 
+proyecto_2/contexto
+
+# FPGA / Quartus Prime & ModelSim (artefactos generados y cache)
+proyecto_2/fpga/db/
+proyecto_2/fpga/incremental_db/
+proyecto_2/fpga/output_files/
+proyecto_2/fpga/simulation/
+proyecto_2/fpga/greybox_tmp/
+proyecto_2/fpga/work/
+proyecto_2/fpga/transcript
+proyecto_2/fpga/c5_pin_model_dump.txt
+proyecto_2/fpga/*.rpt
+proyecto_2/fpga/*.sof
+proyecto_2/fpga/*.pof
+proyecto_2/fpga/*.cdf
+proyecto_2/fpga/*.jdi
+proyecto_2/fpga/*.smsg
+proyecto_2/fpga/*.summary
+proyecto_2/fpga/*.qws
+proyecto_2/fpga/*.wlf
+proyecto_2/fpga/*.vcd
+proyecto_2/fpga/*.pin
+proyecto_2/fpga/*.done
+proyecto_2/fpga/*.qdf
+proyecto_2/fpga/*.sld
+proyecto_2/fpga/*.bak
