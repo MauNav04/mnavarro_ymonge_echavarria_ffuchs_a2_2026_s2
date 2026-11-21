@@ -29,7 +29,7 @@ SEQ_BIN  := $(OUT_DIR)/sobel_seq$(EXE)
 GPU_BIN  := $(OUT_DIR)/sobel_gpu$(EXE)
 TEST_BIN := $(OUT_DIR)/test_sobel_sequential$(EXE)
 
-.PHONY: all build seq seq-save gpu test clean help
+.PHONY: all build seq seq-save gpu gpu-save test clean help
 
 all: build
 
@@ -71,6 +71,9 @@ seq-save: $(SEQ_BIN)
 gpu: $(GPU_BIN)
 	$(call RUN_BIN,$(GPU_BIN))
 
+gpu-save: $(GPU_BIN)
+	$(call RUN_BIN,$(GPU_BIN)) --save $(OUT_DIR)/demo_gpu
+
 clean:
 	$(call RM_F,$(OUT_DIR)/*.o)
 	$(call RM_F,$(SEQ_BIN))
@@ -84,4 +87,6 @@ help:
 	@echo   make test      - Ejecuta las pruebas unitarias
 	@echo   make seq       - Ejecuta el baseline secuencial (512x512, 1920x1080, 3840x2160)
 	@echo   make seq-save  - Ejecuta 512x512 y guarda PNGs en bin/demo_*
+	@echo   make gpu       - Ejecuta el dummy OpenCL en GPU y valida contra secuencial
+	@echo   make gpu-save  - Ejecuta GPU y guarda PNGs en bin/demo_gpu_*
 	@echo   make clean     - Limpia binarios e imagenes generadas
