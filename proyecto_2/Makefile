@@ -23,7 +23,7 @@ else
 endif
 
 CORE_OBJS := $(OUT_DIR)/image_rgba.o $(OUT_DIR)/sobel_sequential.o
-GPU_OBJS  := $(OUT_DIR)/opencl_loader.o
+GPU_OBJS  := $(OUT_DIR)/opencl_loader.o $(OUT_DIR)/sobel_gpu.o
 
 SEQ_BIN  := $(OUT_DIR)/sobel_seq$(EXE)
 GPU_BIN  := $(OUT_DIR)/sobel_gpu$(EXE)
@@ -52,6 +52,9 @@ $(TEST_BIN): tests/test_sobel_sequential.cpp $(CORE_OBJS) | $(OUT_DIR)
 
 $(OUT_DIR)/opencl_loader.o: src/gpu/opencl_loader.cpp src/gpu/opencl_loader.hpp | $(OUT_DIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(OUT_DIR)/sobel_gpu.o: src/gpu/sobel_gpu.cpp include/sobel_gpu.hpp include/image_rgba.hpp src/gpu/opencl_loader.hpp | $(OUT_DIR)
+	$(CXX) $(CXXFLAGS) -Isrc/gpu -c $< -o $@
 
 $(GPU_BIN): src/gpu/main_gpu.cpp $(GPU_OBJS) $(CORE_OBJS) | $(OUT_DIR)
 	$(CXX) $(CXXFLAGS) -Isrc/gpu $< $(GPU_OBJS) $(CORE_OBJS) -o $@ $(DL_FLAGS)
