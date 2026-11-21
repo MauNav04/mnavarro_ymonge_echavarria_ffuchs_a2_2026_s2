@@ -11,10 +11,16 @@ endif()
 
 add_compile_options(-Wall -Wextra -Wpedantic)
 
+add_library(sobel_core STATIC
+    src/image_rgba.cpp
+)
+
+target_include_directories(sobel_core PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
 add_executable(sobel_seq
     src/main.cpp
 )
 
-target_include_directories(sobel_seq PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
+target_link_libraries(sobel_seq PRIVATE sobel_core)
