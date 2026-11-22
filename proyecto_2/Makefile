@@ -14,12 +14,14 @@ ifeq ($(OS),Windows_NT)
 	MKDIR_P  = if not exist "$(subst /,\,$(1))" mkdir "$(subst /,\,$(1))"
 	RM_F     = if exist "$(subst /,\,$(1))" del /Q "$(subst /,\,$(1))"
 	RUN_BIN  = $(subst /,\,$(1))
+	DL_FLAGS :=
 else
 	EXE     :=
 	LDFLAGS :=
 	MKDIR_P  = mkdir -p $(1)
 	RM_F     = rm -f $(1)
 	RUN_BIN  = ./$(1)
+	DL_FLAGS := -ldl
 endif
 
 ifeq ($(OS),Windows_NT)
@@ -35,6 +37,18 @@ else
 endif
 
 CORE_OBJS := $(OUT_DIR)/image_rgba.o $(OUT_DIR)/sobel_sequential.o
+GPU_OBJS  := $(OUT_DIR)/opencl_loader.o $(OUT_DIR)/sobel_gpu.o
+
+SEQ_BIN      := $(OUT_DIR)/sobel_seq$(EXE)
+GPU_BIN      := $(OUT_DIR)/sobel_gpu$(EXE)
+TEST_BIN     := $(OUT_DIR)/test_sobel_sequential$(EXE)
+TEST_GPU_BIN := $(OUT_DIR)/test_sobel_gpu$(EXE)
+
+.PHONY: all build seq seq-save gpu gpu-save test test-gpu clean help
+
+all: build
+
+build: $(SEQ_BIN) $(GPU_BIN) $(TEST_BIN) $(TEST_GPU_BIN)
 SIMD_OBJS := $(OUT_DIR)/sobel_simd.o
 
 SEQ_BIN       := $(OUT_DIR)/sobel_seq$(EXE)
@@ -72,6 +86,19 @@ $(TEST_BIN): tests/test_sobel_sequential.cpp $(CORE_OBJS) | $(OUT_DIR)
 $(TEST_SIMD_BIN): tests/test_sobel_simd.cpp $(CORE_OBJS) $(SIMD_OBJS) | $(OUT_DIR)
 	$(CXX) $(CXXFLAGS) $(SIMD_FLAGS) $< $(CORE_OBJS) $(SIMD_OBJS) $(LDFLAGS) -o $@
 
+$(OUT_DIR)/opencl_loader.o: src/gpu/opencl_loader.cpp src/gpu/opencl_loader.hpp | $(OUT_DIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(OUT_DIR)/sobel_gpu.o: src/gpu/sobel_gpu.cpp include/sobel_gpu.hpp include/image_rgba.hpp src/gpu/opencl_loader.hpp | $(OUT_DIR)
+	$(CXX) $(CXXFLAGS) -Isrc/gpu -c $< -o $@
+
+$(GPU_BIN): src/gpu/main_gpu.cpp $(GPU_OBJS) $(CORE_OBJS) | $(OUT_DIR)
+	$(CXX) $(CXXFLAGS) -Isrc/gpu $< $(GPU_OBJS) $(CORE_OBJS) -o $@ $(DL_FLAGS)
+
+$(TEST_GPU_BIN): tests/test_sobel_gpu.cpp $(GPU_OBJS) $(CORE_OBJS) | $(OUT_DIR)
+	$(CXX) $(CXXFLAGS) -Isrc/gpu $< $(GPU_OBJS) $(CORE_OBJS) -o $@ $(DL_FLAGS)
+
+test: $(TEST_BIN)
 test: $(TEST_BIN) $(TEST_SIMD_BIN)
 	$(call RUN_BIN,$(TEST_BIN))
 	$(call RUN_BIN,$(TEST_SIMD_BIN))
@@ -79,12 +106,20 @@ test: $(TEST_BIN) $(TEST_SIMD_BIN)
 test-simd: $(TEST_SIMD_BIN)
 	$(call RUN_BIN,$(TEST_SIMD_BIN))
 
+test-gpu: $(TEST_GPU_BIN)
+	$(call RUN_BIN,$(TEST_GPU_BIN))
+
 seq: $(SEQ_BIN)
 	$(call RUN_BIN,$(SEQ_BIN))
 
 seq-save: $(SEQ_BIN)
 	$(call RUN_BIN,$(SEQ_BIN)) --width 512 --height 512 --runs 5 --save $(OUT_DIR)/demo
 
+gpu: $(GPU_BIN)
+	$(call RUN_BIN,$(GPU_BIN))
+
+gpu-save: $(GPU_BIN)
+	$(call RUN_BIN,$(GPU_BIN)) --save $(OUT_DIR)/demo_gpu
 simd: $(SIMD_BIN)
 	$(call RUN_BIN,$(SIMD_BIN))
 
@@ -94,6 +129,9 @@ simd-save: $(SIMD_BIN)
 clean:
 	$(call RM_F,$(OUT_DIR)/*.o)
 	$(call RM_F,$(SEQ_BIN))
+	$(call RM_F,$(GPU_BIN))
+	$(call RM_F,$(TEST_BIN))
+	$(call RM_F,$(TEST_GPU_BIN))
 	$(call RM_F,$(SIMD_BIN))
 	$(call RM_F,$(TEST_BIN))
 	$(call RM_F,$(TEST_SIMD_BIN))
@@ -101,6 +139,13 @@ clean:
 
 help:
 	@echo Reglas disponibles (desde proyecto_2/):
+	@echo   make all       - Compila ejecutables y pruebas
+	@echo   make test      - Ejecuta las pruebas unitarias secuenciales
+	@echo   make test-gpu  - Ejecuta las pruebas unitarias GPU (OpenCL vs secuencial)
+	@echo   make seq       - Ejecuta el baseline secuencial (512x512, 1920x1080, 3840x2160)
+	@echo   make seq-save  - Ejecuta 512x512 y guarda PNGs en bin/demo_*
+	@echo   make gpu       - Ejecuta el dummy OpenCL en GPU y valida contra secuencial
+	@echo   make gpu-save  - Ejecuta GPU y guarda PNGs en bin/demo_gpu_*
 	@echo   make all       - Compila ejecutables (secuencial + SIMD) y pruebas
 	@echo   make test      - Ejecuta todas las pruebas unitarias (secuencial + SIMD)
 	@echo   make test-simd - Ejecuta las pruebas unitarias SIMD
