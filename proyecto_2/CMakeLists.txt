@@ -90,5 +90,4 @@ add_executable(test_sobel_simd
 
 target_link_libraries(test_sobel_simd PRIVATE sobel_simd_core)
 
-add_test(NAME sobel_sequential_unit_tests COMMAND test_sobel_sequential)
 add_test(NAME sobel_simd_unit_tests COMMAND test_sobel_simd)

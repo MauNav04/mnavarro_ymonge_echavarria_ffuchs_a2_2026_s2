@@ -38,29 +38,20 @@ endif
 
 CORE_OBJS := $(OUT_DIR)/image_rgba.o $(OUT_DIR)/sobel_sequential.o
 GPU_OBJS  := $(OUT_DIR)/opencl_loader.o $(OUT_DIR)/sobel_gpu.o
-
-SEQ_BIN      := $(OUT_DIR)/sobel_seq$(EXE)
-GPU_BIN      := $(OUT_DIR)/sobel_gpu$(EXE)
-TEST_BIN     := $(OUT_DIR)/test_sobel_sequential$(EXE)
-TEST_GPU_BIN := $(OUT_DIR)/test_sobel_gpu$(EXE)
-
-.PHONY: all build seq seq-save gpu gpu-save test test-gpu clean help
-
-all: build
-
-build: $(SEQ_BIN) $(GPU_BIN) $(TEST_BIN) $(TEST_GPU_BIN)
 SIMD_OBJS := $(OUT_DIR)/sobel_simd.o
 
 SEQ_BIN       := $(OUT_DIR)/sobel_seq$(EXE)
+GPU_BIN       := $(OUT_DIR)/sobel_gpu$(EXE)
 SIMD_BIN      := $(OUT_DIR)/sobel_simd$(EXE)
 TEST_BIN      := $(OUT_DIR)/test_sobel_sequential$(EXE)
+TEST_GPU_BIN  := $(OUT_DIR)/test_sobel_gpu$(EXE)
 TEST_SIMD_BIN := $(OUT_DIR)/test_sobel_simd$(EXE)
 
-.PHONY: all build seq seq-save simd simd-save test test-simd clean help
+.PHONY: all build seq seq-save gpu gpu-save simd simd-save test test-gpu test-simd clean help
 
 all: build
 
-build: $(SEQ_BIN) $(SIMD_BIN) $(TEST_BIN) $(TEST_SIMD_BIN)
+build: $(SEQ_BIN) $(GPU_BIN) $(SIMD_BIN) $(TEST_BIN) $(TEST_GPU_BIN) $(TEST_SIMD_BIN)
 
 $(OUT_DIR):
 	$(call MKDIR_P,$(OUT_DIR))
@@ -130,27 +121,22 @@ clean:
 	$(call RM_F,$(OUT_DIR)/*.o)
 	$(call RM_F,$(SEQ_BIN))
 	$(call RM_F,$(GPU_BIN))
-	$(call RM_F,$(TEST_BIN))
-	$(call RM_F,$(TEST_GPU_BIN))
 	$(call RM_F,$(SIMD_BIN))
 	$(call RM_F,$(TEST_BIN))
+	$(call RM_F,$(TEST_GPU_BIN))
 	$(call RM_F,$(TEST_SIMD_BIN))
 	$(call RM_F,$(OUT_DIR)/demo_*.png)
 
 help:
 	@echo Reglas disponibles (desde proyecto_2/):
-	@echo   make all       - Compila ejecutables y pruebas
-	@echo   make test      - Ejecuta las pruebas unitarias secuenciales
+	@echo   make all       - Compila ejecutables (secuencial + SIMD + GPU) y pruebas
+	@echo   make test      - Ejecuta las pruebas unitarias (secuencial + SIMD)
+	@echo   make test-simd - Ejecuta las pruebas unitarias SIMD
 	@echo   make test-gpu  - Ejecuta las pruebas unitarias GPU (OpenCL vs secuencial)
 	@echo   make seq       - Ejecuta el baseline secuencial (512x512, 1920x1080, 3840x2160)
-	@echo   make seq-save  - Ejecuta 512x512 y guarda PNGs en bin/demo_*
+	@echo   make seq-save  - Ejecuta secuencial 512x512 y guarda PNGs en bin/demo_*
+	@echo   make simd      - Ejecuta el benchmark SIMD y compara speedup vs secuencial
+	@echo   make simd-save - Ejecuta SIMD 512x512 y guarda PNGs en bin/demo_*
 	@echo   make gpu       - Ejecuta el dummy OpenCL en GPU y valida contra secuencial
 	@echo   make gpu-save  - Ejecuta GPU y guarda PNGs en bin/demo_gpu_*
-	@echo   make all       - Compila ejecutables (secuencial + SIMD) y pruebas
-	@echo   make test      - Ejecuta todas las pruebas unitarias (secuencial + SIMD)
-	@echo   make test-simd - Ejecuta las pruebas unitarias SIMD
-	@echo   make seq       - Ejecuta el baseline secuencial (512x512, 1920x1080, 3840x2160)
-	@echo   make simd      - Ejecuta el benchmark SIMD y compara speedup vs secuencial
-	@echo   make seq-save  - Ejecuta secuencial 512x512 y guarda PNGs en bin/demo_*
-	@echo   make simd-save - Ejecuta SIMD 512x512 y guarda PNGs en bin/demo_*
 	@echo   make clean     - Limpia binarios e imagenes generadas
