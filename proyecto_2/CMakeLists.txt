@@ -20,11 +20,32 @@ target_include_directories(sobel_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
+add_library(sobel_gpu_lib STATIC
+    src/gpu/opencl_loader.cpp
+    src/gpu/sobel_gpu.cpp
+)
+
+target_include_directories(sobel_gpu_lib PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gpu
+)
+
+target_link_libraries(sobel_gpu_lib PUBLIC
+    sobel_core
+    $<$<NOT:$<BOOL:${WIN32}>>:dl>
+)
+
 add_executable(sobel_seq
     src/main.cpp
 )
 
 target_link_libraries(sobel_seq PRIVATE sobel_core)
+
+add_executable(sobel_gpu
+    src/gpu/main_gpu.cpp
+)
+
+target_link_libraries(sobel_gpu PRIVATE sobel_gpu_lib)
 
 enable_testing()
 
@@ -34,4 +55,11 @@ add_executable(test_sobel_sequential
 
 target_link_libraries(test_sobel_sequential PRIVATE sobel_core)
 
+add_executable(test_sobel_gpu
+    tests/test_sobel_gpu.cpp
+)
+
+target_link_libraries(test_sobel_gpu PRIVATE sobel_gpu_lib)
+
 add_test(NAME sobel_sequential_unit_tests COMMAND test_sobel_sequential)
+add_test(NAME sobel_gpu_unit_tests COMMAND test_sobel_gpu)

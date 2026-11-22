@@ -25,15 +25,16 @@ endif
 CORE_OBJS := $(OUT_DIR)/image_rgba.o $(OUT_DIR)/sobel_sequential.o
 GPU_OBJS  := $(OUT_DIR)/opencl_loader.o $(OUT_DIR)/sobel_gpu.o
 
-SEQ_BIN  := $(OUT_DIR)/sobel_seq$(EXE)
-GPU_BIN  := $(OUT_DIR)/sobel_gpu$(EXE)
-TEST_BIN := $(OUT_DIR)/test_sobel_sequential$(EXE)
+SEQ_BIN      := $(OUT_DIR)/sobel_seq$(EXE)
+GPU_BIN      := $(OUT_DIR)/sobel_gpu$(EXE)
+TEST_BIN     := $(OUT_DIR)/test_sobel_sequential$(EXE)
+TEST_GPU_BIN := $(OUT_DIR)/test_sobel_gpu$(EXE)
 
-.PHONY: all build seq seq-save gpu gpu-save test clean help
+.PHONY: all build seq seq-save gpu gpu-save test test-gpu clean help
 
 all: build
 
-build: $(SEQ_BIN) $(GPU_BIN) $(TEST_BIN)
+build: $(SEQ_BIN) $(GPU_BIN) $(TEST_BIN) $(TEST_GPU_BIN)
 
 $(OUT_DIR):
 	$(call MKDIR_P,$(OUT_DIR))
@@ -59,8 +60,14 @@ $(OUT_DIR)/sobel_gpu.o: src/gpu/sobel_gpu.cpp include/sobel_gpu.hpp include/imag
 $(GPU_BIN): src/gpu/main_gpu.cpp $(GPU_OBJS) $(CORE_OBJS) | $(OUT_DIR)
 	$(CXX) $(CXXFLAGS) -Isrc/gpu $< $(GPU_OBJS) $(CORE_OBJS) -o $@ $(DL_FLAGS)
 
+$(TEST_GPU_BIN): tests/test_sobel_gpu.cpp $(GPU_OBJS) $(CORE_OBJS) | $(OUT_DIR)
+	$(CXX) $(CXXFLAGS) -Isrc/gpu $< $(GPU_OBJS) $(CORE_OBJS) -o $@ $(DL_FLAGS)
+
 test: $(TEST_BIN)
 	$(call RUN_BIN,$(TEST_BIN))
+
+test-gpu: $(TEST_GPU_BIN)
+	$(call RUN_BIN,$(TEST_GPU_BIN))
 
 seq: $(SEQ_BIN)
 	$(call RUN_BIN,$(SEQ_BIN))
@@ -79,12 +86,14 @@ clean:
 	$(call RM_F,$(SEQ_BIN))
 	$(call RM_F,$(GPU_BIN))
 	$(call RM_F,$(TEST_BIN))
+	$(call RM_F,$(TEST_GPU_BIN))
 	$(call RM_F,$(OUT_DIR)/demo_*.png)
 
 help:
 	@echo Reglas disponibles (desde proyecto_2/):
-	@echo   make all       - Compila el ejecutable secuencial y las pruebas
-	@echo   make test      - Ejecuta las pruebas unitarias
+	@echo   make all       - Compila ejecutables y pruebas
+	@echo   make test      - Ejecuta las pruebas unitarias secuenciales
+	@echo   make test-gpu  - Ejecuta las pruebas unitarias GPU (OpenCL vs secuencial)
 	@echo   make seq       - Ejecuta el baseline secuencial (512x512, 1920x1080, 3840x2160)
 	@echo   make seq-save  - Ejecuta 512x512 y guarda PNGs en bin/demo_*
 	@echo   make gpu       - Ejecuta el dummy OpenCL en GPU y valida contra secuencial
