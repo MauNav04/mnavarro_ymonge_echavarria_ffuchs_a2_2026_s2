@@ -15,7 +15,7 @@ include(CheckCXXCompilerFlag)
 
 add_library(sobel_core STATIC
     src/image_rgba.cpp
-    src/sobel_sequential.cpp
+    src/secuencial/sobel_sequential.cpp
 )
 
 target_include_directories(sobel_core PUBLIC
@@ -52,7 +52,7 @@ elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|amd64|i.86")
 endif()
 
 add_executable(sobel_seq
-    src/main.cpp
+    src/secuencial/main.cpp
 )
 
 target_link_libraries(sobel_seq PRIVATE sobel_core)

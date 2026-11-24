@@ -59,13 +59,13 @@ $(OUT_DIR):
 $(OUT_DIR)/image_rgba.o: src/image_rgba.cpp include/image_rgba.hpp | $(OUT_DIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-$(OUT_DIR)/sobel_sequential.o: src/sobel_sequential.cpp include/sobel_sequential.hpp include/image_rgba.hpp | $(OUT_DIR)
+$(OUT_DIR)/sobel_sequential.o: src/secuencial/sobel_sequential.cpp include/sobel_sequential.hpp include/image_rgba.hpp | $(OUT_DIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 $(OUT_DIR)/sobel_simd.o: src/simd/sobel_simd.cpp include/sobel_simd.hpp include/image_rgba.hpp | $(OUT_DIR)
 	$(CXX) $(CXXFLAGS) $(SIMD_FLAGS) -c $< -o $@
 
-$(SEQ_BIN): src/main.cpp $(CORE_OBJS) | $(OUT_DIR)
+$(SEQ_BIN): src/secuencial/main.cpp $(CORE_OBJS) | $(OUT_DIR)
 	$(CXX) $(CXXFLAGS) $< $(CORE_OBJS) $(LDFLAGS) -o $@
 
 $(SIMD_BIN): src/simd/main_simd.cpp $(CORE_OBJS) $(SIMD_OBJS) | $(OUT_DIR)

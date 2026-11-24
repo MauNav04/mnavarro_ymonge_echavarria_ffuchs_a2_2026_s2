@@ -9,8 +9,7 @@ proyecto_2/
 ├── include/          # Encabezados compartidos (ImageRGBA, sobel_sequential, validacion)
 ├── src/
 │   ├── image_rgba.cpp        # Contenedor RGBA32, generadores, compare_images, save_png/ppm
-│   ├── sobel_sequential.cpp  # Baseline secuencial de referencia
-│   ├── main.cpp              # CLI de ejecucion y benchmark del baseline
+│   ├── secuencial/           # Baseline secuencial de referencia (sobel_sequential.cpp, main.cpp)
 │   ├── simd/                 # Implementacion CPU SIMD (AVX2 / NEON)
 │   └── gpu/                  # Implementacion GPU (CUDA / OpenCL / tiling 18x18)
 ├── fpga/             # Acelerador FPGA (DE1-SoC Cyclone V, ISA minimo, JTAG)
