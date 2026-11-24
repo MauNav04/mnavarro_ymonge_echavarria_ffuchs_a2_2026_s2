@@ -35,11 +35,16 @@ using cl_context_properties = intptr_t;
 using cl_command_queue_properties = cl_bitfield;
 using cl_mem_flags = cl_bitfield;
 using cl_program_build_info = cl_uint;
+using cl_profiling_info = cl_uint;
 
 constexpr cl_int CL_SUCCESS = 0;
+constexpr cl_bool CL_FALSE = 0;
+constexpr cl_bool CL_TRUE = 1;
 constexpr cl_device_type CL_DEVICE_TYPE_CPU = (1ULL << 1);
 constexpr cl_device_type CL_DEVICE_TYPE_GPU = (1ULL << 2);
 constexpr cl_device_type CL_DEVICE_TYPE_ALL = 0xFFFFFFFFULL;
+
+constexpr cl_command_queue_properties CL_QUEUE_PROFILING_ENABLE = (1ULL << 1);
 
 constexpr cl_platform_info CL_PLATFORM_NAME = 0x0902;
 constexpr cl_platform_info CL_PLATFORM_VENDOR = 0x0903;
@@ -58,6 +63,11 @@ constexpr cl_mem_flags CL_MEM_READ_ONLY = (1ULL << 2);
 constexpr cl_mem_flags CL_MEM_COPY_HOST_PTR = (1ULL << 5);
 
 constexpr cl_program_build_info CL_PROGRAM_BUILD_LOG = 0x1183;
+
+constexpr cl_profiling_info CL_PROFILING_COMMAND_QUEUED = 0x1280;
+constexpr cl_profiling_info CL_PROFILING_COMMAND_SUBMIT = 0x1281;
+constexpr cl_profiling_info CL_PROFILING_COMMAND_START = 0x1282;
+constexpr cl_profiling_info CL_PROFILING_COMMAND_END = 0x1283;
 
 /**
  * @brief Cargador dinámico de funciones estándar OpenCL 1.2 (Windows OpenCL.dll / Linux libOpenCL.so).
@@ -101,6 +111,10 @@ struct OpenCLApi {
                                                 const std::size_t*, const std::size_t*, cl_uint,
                                                 const cl_event*, cl_event*) = nullptr;
     cl_int(CL_API_CALL* clReleaseKernel)(cl_kernel) = nullptr;
+
+    cl_int(CL_API_CALL* clWaitForEvents)(cl_uint, const cl_event*) = nullptr;
+    cl_int(CL_API_CALL* clReleaseEvent)(cl_event) = nullptr;
+    cl_int(CL_API_CALL* clGetEventProfilingInfo)(cl_event, cl_profiling_info, std::size_t, void*, std::size_t*) = nullptr;
 
     bool load(std::string& error_out);
     void unload();
