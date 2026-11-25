@@ -1,6 +1,7 @@
 #include "image_rgba.hpp"
 #include "sobel_gpu.hpp"
 #include "sobel_sequential.hpp"
+#include "sobel_simd.hpp"
 
 #include <iomanip>
 #include <iostream>
@@ -21,13 +22,22 @@ struct CliOptions {
     int runs = 5;
     VariantSelection variant = VariantSelection::Both;
     bool list_devices = false;
+    bool run_validate = false;
     bool show_help = false;
     std::string save_prefix;
 };
 
+struct ValidationCase {
+    std::string name;
+    sobel::ImageRGBA input;
+    bool check_zero_interior = false;
+    int isolated_channel = -1;  // 0=R, 1=G, 2=B si es caso de canal aislado.
+};
+
 void print_usage(const char* prog) {
     std::cout << "Uso: " << prog << " [opciones]\n\n"
-              << "Opciones (Fase 2 - Kernels uchar4 Naive y Tiled 18x18 en memoria local):\n"
+              << "Opciones (Fase 3 - Kernels GPU + Bateria de Validacion Unificada):\n"
+              << "  --validate                  Ejecuta la bateria de correctitud (Seq vs SIMD, GPU Naive y GPU Tiled)\n"
               << "  --list-devices              Lista todas las GPUs OpenCL detectadas y sale\n"
               << "  --device <idx>              Selecciona el indice de GPU OpenCL (default: auto Intel Iris Xe)\n"
               << "  --variant <naive|tiled|both> Variante de kernel GPU a ejecutar (default: both)\n"
@@ -52,6 +62,8 @@ bool parse_args(int argc, char** argv, CliOptions& opts) {
             return true;
         } else if (arg == "--list-devices") {
             opts.list_devices = true;
+        } else if (arg == "--validate") {
+            opts.run_validate = true;
         } else if (arg == "--device") {
             const char* v = need_val(arg);
             if (!v) return false;
@@ -116,6 +128,157 @@ std::vector<sobel::GpuKernelVariant> resolve_variants(VariantSelection sel) {
     return {sobel::GpuKernelVariant::Naive, sobel::GpuKernelVariant::Tiled18x18};
 }
 
+bool verify_zero_interior(const sobel::ImageRGBA& img) {
+    for (int y = 1; y < img.height - 1; ++y) {
+        for (int x = 1; x < img.width - 1; ++x) {
+            if (img.at(x, y, 0) != 0 || img.at(x, y, 1) != 0 ||
+                img.at(x, y, 2) != 0 || img.at(x, y, 3) != 255) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+bool verify_isolated_channel(const sobel::ImageRGBA& img, int active_channel) {
+    for (int y = 0; y < img.height; ++y) {
+        for (int x = 0; x < img.width; ++x) {
+            for (int c = 0; c < 3; ++c) {
+                if (c != active_channel && img.at(x, y, c) != 0) {
+                    return false;
+                }
+            }
+            if (img.at(x, y, 3) != 255) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+std::vector<ValidationCase> build_validation_cases() {
+    std::vector<ValidationCase> cases;
+
+    // 1. Imagen constante (interior == 0, bordes segun zero-padding).
+    cases.push_back({"constant_32x32", sobel::make_constant_image(32, 32, 100, 150, 200, 128), true, -1});
+
+    // 2. Borde vertical puro y borde horizontal puro (orientacion de Kx y Ky).
+    cases.push_back({"vertical_edge_32x32", sobel::make_vertical_edge_image(32, 32), false, -1});
+    cases.push_back({"horizontal_edge_32x32", sobel::make_horizontal_edge_image(32, 32), false, -1});
+
+    // 3. Impulso unitario en el centro.
+    cases.push_back({"impulse_center_31x31", sobel::make_impulse_image(31, 31, 15, 15, 255, 128, 64), false, -1});
+
+    // 4. Canales aislados (R, G, B) sin mezcla entre canales.
+    cases.push_back({"isolated_R_24x24", sobel::make_isolated_channel_image(24, 24, 0, 120), false, 0});
+    cases.push_back({"isolated_G_24x24", sobel::make_isolated_channel_image(24, 24, 1, 120), false, 1});
+    cases.push_back({"isolated_B_24x24", sobel::make_isolated_channel_image(24, 24, 2, 120), false, 2});
+
+    // 5. Esquinas: (0,0), (W-1,0), (0,H-1), (W-1,H-1) en dimensiones no multiplo de 8 ni 16.
+    constexpr int cw = 25;
+    constexpr int ch = 19;
+    cases.push_back({"corner_tl_25x19", sobel::make_impulse_image(cw, ch, 0, 0, 80, 140, 200), false, -1});
+    cases.push_back({"corner_tr_25x19", sobel::make_impulse_image(cw, ch, cw - 1, 0, 80, 140, 200), false, -1});
+    cases.push_back({"corner_bl_25x19", sobel::make_impulse_image(cw, ch, 0, ch - 1, 80, 140, 200), false, -1});
+    cases.push_back({"corner_br_25x19", sobel::make_impulse_image(cw, ch, cw - 1, ch - 1, 80, 140, 200), false, -1});
+
+    // 6. Dimensiones no multiplos de 16 ni del ancho SIMD (8).
+    cases.push_back({"non_mult_18x18", sobel::make_deterministic_pattern(18, 18, 101), false, -1});
+    cases.push_back({"non_mult_100x77", sobel::make_deterministic_pattern(100, 77, 202), false, -1});
+    cases.push_back({"non_mult_513x513", sobel::make_deterministic_pattern(513, 513, 303), false, -1});
+
+    return cases;
+}
+
+/**
+ * @brief Bateria completa de validacion de correctitud bit a bit (Fase 3).
+ *
+ * Compara sobel_sequential contra SIMD, GPU Naive y GPU Tiled 18x18 reportando
+ * max_abs_diff y MAE por cada caso y variante.
+ */
+bool run_validation_suite(sobel::SobelGpuContext& gpu_ctx) {
+    const std::string simd_label = std::string("SIMD(") + sobel::sobel_simd_backend() + ")";
+    const auto cases = build_validation_cases();
+
+    std::cout << "=== Bateria de Validacion de Correctitud (Fase 3) ===\n";
+    print_device_details(gpu_ctx.device_info());
+    std::cout << "  Backend SIMD       : " << sobel::sobel_simd_backend() << "\n";
+    if (gpu_ctx.build_log().empty()) {
+        std::cout << "  Build OpenCL       : OK (sin warnings)\n\n";
+    } else {
+        std::cout << "  Build OpenCL log   :\n" << gpu_ctx.build_log() << "\n\n";
+    }
+
+    std::cout << std::left
+              << std::setw(24) << "Caso"
+              << std::setw(10) << "Dims"
+              << std::setw(14) << "Variante"
+              << std::right
+              << std::setw(14) << "max_abs_diff"
+              << std::setw(14) << "MAE"
+              << std::setw(10) << "Estado" << "\n";
+    std::cout << std::string(86, '-') << "\n";
+
+    int total_checks = 0;
+    int passed_checks = 0;
+    bool all_passed = true;
+
+    for (const auto& tc : cases) {
+        const auto expected = sobel::sobel_sequential(tc.input);
+        const std::string dims = std::to_string(tc.input.width) + "x" + std::to_string(tc.input.height);
+
+        // Validar las propiedades estructurales sobre la referencia secuencial tambien.
+        const bool ref_struct_ok =
+            (!tc.check_zero_interior || verify_zero_interior(expected)) &&
+            (tc.isolated_channel < 0 || verify_isolated_channel(expected, tc.isolated_channel));
+
+        sobel::ImageRGBA simd_out(tc.input.width, tc.input.height);
+        sobel::ImageRGBA naive_out(tc.input.width, tc.input.height);
+        sobel::ImageRGBA tiled_out(tc.input.width, tc.input.height);
+
+        sobel::sobel_simd_into(tc.input, simd_out);
+        gpu_ctx.run(tc.input, naive_out, sobel::GpuKernelVariant::Naive);
+        gpu_ctx.run(tc.input, tiled_out, sobel::GpuKernelVariant::Tiled18x18);
+
+        const std::vector<std::pair<std::string, const sobel::ImageRGBA*>> outputs = {
+            {simd_label, &simd_out},
+            {"gpu_naive", &naive_out},
+            {"gpu_tiled", &tiled_out},
+        };
+
+        for (const auto& [label, out_ptr] : outputs) {
+            ++total_checks;
+            const auto diff = sobel::compare_images(expected, *out_ptr);
+            const bool struct_ok =
+                ref_struct_ok &&
+                (!tc.check_zero_interior || verify_zero_interior(*out_ptr)) &&
+                (tc.isolated_channel < 0 || verify_isolated_channel(*out_ptr, tc.isolated_channel));
+            const bool ok = diff.exact_match() && diff.mae == 0.0 && struct_ok;
+
+            if (ok) {
+                ++passed_checks;
+            } else {
+                all_passed = false;
+            }
+
+            std::cout << std::left
+                      << std::setw(24) << tc.name
+                      << std::setw(10) << dims
+                      << std::setw(14) << label
+                      << std::right
+                      << std::setw(14) << static_cast<int>(diff.max_abs_diff)
+                      << std::setw(14) << std::fixed << std::setprecision(6) << diff.mae
+                      << std::setw(10) << (ok ? "PASS" : "FAIL") << "\n";
+        }
+    }
+
+    std::cout << std::string(86, '-') << "\n";
+    std::cout << (all_passed ? "[PASS] " : "[FAIL] ")
+              << "Validacion completada: " << passed_checks << "/" << total_checks
+              << " verificaciones (" << cases.size() << " casos x 3 variantes) con max |O_seq - O_par| == 0.\n";
+    return all_passed;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -147,7 +310,11 @@ int main(int argc, char** argv) {
         // Un solo contexto OpenCL persistente: compila sobel_rgba_naive y sobel_rgba_tiled una sola vez.
         sobel::SobelGpuContext gpu_ctx(opts.device_index);
 
-        std::cout << "=== Sobel RGBA32 GPU (OpenCL - Fase 2: Naive uchar4 vs Tiled 18x18) ===\n";
+        if (opts.run_validate) {
+            return run_validation_suite(gpu_ctx) ? 0 : 1;
+        }
+
+        std::cout << "=== Sobel RGBA32 GPU (OpenCL - Naive uchar4 vs Tiled 18x18) ===\n";
         print_device_details(gpu_ctx.device_info());
         if (gpu_ctx.build_log().empty()) {
             std::cout << "  Build OpenCL       : OK (sin warnings)\n";
