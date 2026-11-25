@@ -12,6 +12,19 @@
 namespace sobel {
 
 /**
+ * @brief Variantes de kernel OpenCL disponibles en el módulo GPU.
+ */
+enum class GpuKernelVariant {
+    Naive,       ///< Propuesta 1: acceso directo a memoria global coalescente (uchar4).
+    Tiled18x18,  ///< Propuesta 2: carga cooperativa de tile 18x18 en memoria local (SLM) + barrier.
+};
+
+/**
+ * @brief Retorna un nombre legible para la variante de kernel GPU.
+ */
+const char* gpu_kernel_variant_name(GpuKernelVariant variant) noexcept;
+
+/**
  * @brief Metadatos de un dispositivo GPU OpenCL detectado en el sistema.
  */
 struct GpuDeviceInfo {
@@ -42,8 +55,8 @@ struct GpuTimingResult {
  * @brief Contexto persistente RAII para ejecución de Sobel RGBA32 en GPU vía OpenCL.
  *
  * Centraliza la carga de OpenCL, selección de dispositivo, creación del contexto,
- * cola de comandos con CL_QUEUE_PROFILING_ENABLE, compilación JIT única de kernels
- * y reutilización de buffers de dispositivo entre múltiples ejecuciones.
+ * cola de comandos con CL_QUEUE_PROFILING_ENABLE, compilación JIT única de los kernels
+ * (Naive y Tiled 18x18) y reutilización de buffers de dispositivo entre ejecuciones.
  */
 class SobelGpuContext {
 public:
@@ -54,7 +67,7 @@ public:
      *                     selecciona automáticamente priorizando GPUs Intel (Iris Xe)
      *                     y haciendo fallback a la primera GPU OpenCL disponible.
      * @throws std::runtime_error si no se puede cargar OpenCL, no existe la GPU solicitada
-     *                            o falla la compilación del kernel.
+     *                            o falla la compilación de los kernels.
      */
     explicit SobelGpuContext(int device_index = -1);
     ~SobelGpuContext();
@@ -75,6 +88,11 @@ public:
     const GpuDeviceInfo& device_info() const;
 
     /**
+     * @brief Retorna el log de compilación OpenCL (vacío si compiló sin warnings ni notas).
+     */
+    const std::string& build_log() const;
+
+    /**
      * @brief Asegura que los buffers de entrada/salida en GPU estén asignados para (width, height).
      *
      * Si las dimensiones coinciden con las ya asignadas, reutiliza los buffers existentes sin realocar.
@@ -88,10 +106,11 @@ public:
     double upload(const ImageRGBA& input);
 
     /**
-     * @brief Ejecuta el kernel Sobel sobre los buffers ya asignados para (width, height).
+     * @brief Ejecuta el kernel Sobel seleccionado sobre los buffers ya asignados para (width, height).
      * @return Tiempo de ejecución del kernel medido por evento OpenCL (ms).
      */
-    double execute_kernel(int width, int height);
+    double execute_kernel(int width, int height,
+                          GpuKernelVariant variant = GpuKernelVariant::Naive);
 
     /**
      * @brief Lee el resultado desde el buffer de salida en GPU al host (Device -> Host).
@@ -102,11 +121,14 @@ public:
     /**
      * @brief Ejecuta el flujo completo (Write -> Kernel -> Read -> clFinish) reutilizando buffers.
      *
-     * @param input  Imagen de entrada válida en formato RGBA32.
-     * @param output Buffer de salida prealocado con las mismas dimensiones que @p input.
-     * @param timing Opcional: si no es nullptr, se rellenan h2d_ms, kernel_ms, d2h_ms y total_ms.
+     * @param input   Imagen de entrada válida en formato RGBA32.
+     * @param output  Buffer de salida prealocado con las mismas dimensiones que @p input.
+     * @param variant Variante de kernel GPU a ejecutar (Naive o Tiled18x18).
+     * @param timing  Opcional: si no es nullptr, se rellenan h2d_ms, kernel_ms, d2h_ms y total_ms.
      */
-    void run(const ImageRGBA& input, ImageRGBA& output, GpuTimingResult* timing = nullptr);
+    void run(const ImageRGBA& input, ImageRGBA& output,
+             GpuKernelVariant variant = GpuKernelVariant::Naive,
+             GpuTimingResult* timing = nullptr);
 
     /**
      * @brief Libera explícitamente todos los recursos OpenCL asociados al contexto.
@@ -123,24 +145,22 @@ private:
  *
  * Función de conveniencia compatible con llamadas simples (crea un contexto temporal).
  * Para múltiples ejecuciones o benchmarking, reutilizar una instancia de SobelGpuContext.
- *
- * @param input  Imagen de entrada válida en formato RGBA32.
- * @param output Buffer de salida prealocado con las mismas dimensiones que @p input.
- * @throws std::invalid_argument si @p input o @p output no tienen dimensiones válidas/coincidentes.
- * @throws std::runtime_error si falla la inicialización o ejecución en el dispositivo OpenCL.
  */
-void sobel_gpu_into(const ImageRGBA& input, ImageRGBA& output);
+void sobel_gpu_into(const ImageRGBA& input, ImageRGBA& output,
+                    GpuKernelVariant variant = GpuKernelVariant::Naive);
 
 /**
  * @brief Sobrecarga que reutiliza un SobelGpuContext existente sin recompilar kernels.
  */
 void sobel_gpu_into(SobelGpuContext& ctx, const ImageRGBA& input, ImageRGBA& output,
+                    GpuKernelVariant variant = GpuKernelVariant::Naive,
                     GpuTimingResult* timing = nullptr);
 
 /**
  * @brief Variante de conveniencia que reserva y retorna la imagen resultante.
  */
-ImageRGBA sobel_gpu(const ImageRGBA& input);
+ImageRGBA sobel_gpu(const ImageRGBA& input,
+                    GpuKernelVariant variant = GpuKernelVariant::Naive);
 
 }  // namespace sobel
 

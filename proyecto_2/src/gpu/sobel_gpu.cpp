@@ -13,13 +13,65 @@
 
 namespace sobel {
 
+const char* gpu_kernel_variant_name(GpuKernelVariant variant) noexcept {
+    switch (variant) {
+        case GpuKernelVariant::Naive:
+            return "gpu_naive";
+        case GpuKernelVariant::Tiled18x18:
+            return "gpu_tiled";
+    }
+    return "unknown";
+}
+
 namespace {
 
-// Kernel OpenCL preliminar (Propuesta 1: memoria global, 1 work-item por píxel).
-constexpr const char* kSobelNaiveKernelSource = R"CLC(
+// Kernels OpenCL 1.2 coalescentes con uchar4:
+//  - sobel_rgba_naive: lectura directa desde memoria global (1 transaccion de 32 bits/pixel).
+//  - sobel_rgba_tiled: carga cooperativa de tile 18x18 (1296 bytes) en memoria local (SLM) + barrier.
+constexpr const char* kSobelKernelsSource = R"CLC(
+static inline uchar4 load_zero_padded(
+    __global const uchar4* input,
+    const int x,
+    const int y,
+    const int width,
+    const int height)
+{
+    if (x < 0 || x >= width || y < 0 || y >= height) {
+        return (uchar4)(0, 0, 0, 0);
+    }
+    return input[y * width + x];
+}
+
+static inline uchar4 compute_sobel_pixel(
+    const uchar4 tl, const uchar4 tc, const uchar4 tr,
+    const uchar4 ml,                  const uchar4 mr,
+    const uchar4 bl, const uchar4 bc, const uchar4 br)
+{
+    const int3 p_tl = convert_int3(tl.xyz);
+    const int3 p_tc = convert_int3(tc.xyz);
+    const int3 p_tr = convert_int3(tr.xyz);
+    const int3 p_ml = convert_int3(ml.xyz);
+    const int3 p_mr = convert_int3(mr.xyz);
+    const int3 p_bl = convert_int3(bl.xyz);
+    const int3 p_bc = convert_int3(bc.xyz);
+    const int3 p_br = convert_int3(br.xyz);
+
+    // Kx = [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]
+    const int3 gx = (p_tr - p_tl) + ((p_mr - p_ml) * 2) + (p_br - p_bl);
+
+    // Ky = [[-1, -2, -1], [0, 0, 0], [1, 2, 1]]
+    const int3 gy = (p_bl - p_tl) + ((p_bc - p_tc) * 2) + (p_br - p_tr);
+
+    // Norma L1 (Manhattan) saturada a [0, 255]; canal alfa fijo en 255.
+    const uint3 mag = min(abs(gx) + abs(gy), (uint3)(255U));
+    return (uchar4)(convert_uchar3(mag), (uchar)255);
+}
+
+// Propuesta 1: kernel coalescente en memoria global (uchar4, 1 work-item por pixel).
+__attribute__((reqd_work_group_size(16, 16, 1)))
 __kernel void sobel_rgba_naive(
-    __global const uchar* input,
-    __global uchar* output,
+    __global const uchar4* input,
+    __global uchar4* output,
     const int width,
     const int height)
 {
@@ -29,56 +81,67 @@ __kernel void sobel_rgba_naive(
         return;
     }
 
-    const int kx[3][3] = {
-        {-1, 0, 1},
-        {-2, 0, 2},
-        {-1, 0, 1}
-    };
-    const int ky[3][3] = {
-        {-1, -2, -1},
-        { 0,  0,  0},
-        { 1,  2,  1}
-    };
+    const uchar4 tl = load_zero_padded(input, x - 1, y - 1, width, height);
+    const uchar4 tc = load_zero_padded(input, x,     y - 1, width, height);
+    const uchar4 tr = load_zero_padded(input, x + 1, y - 1, width, height);
+    const uchar4 ml = load_zero_padded(input, x - 1, y,     width, height);
+    const uchar4 mr = load_zero_padded(input, x + 1, y,     width, height);
+    const uchar4 bl = load_zero_padded(input, x - 1, y + 1, width, height);
+    const uchar4 bc = load_zero_padded(input, x,     y + 1, width, height);
+    const uchar4 br = load_zero_padded(input, x + 1, y + 1, width, height);
 
-    int gx0 = 0, gx1 = 0, gx2 = 0;
-    int gy0 = 0, gy1 = 0, gy2 = 0;
+    output[y * width + x] = compute_sobel_pixel(tl, tc, tr, ml, mr, bl, bc, br);
+}
 
-    for (int i = -1; i <= 1; ++i) {
-        const int sy = y + i;
-        if (sy < 0 || sy >= height) {
-            continue;
-        }
-        const int kr = i + 1;
+// Propuesta 2: kernel con tiling cooperativo 18x18 (halo de 1 pixel) en memoria local (SLM).
+__attribute__((reqd_work_group_size(16, 16, 1)))
+__kernel void sobel_rgba_tiled(
+    __global const uchar4* input,
+    __global uchar4* output,
+    const int width,
+    const int height)
+{
+    __local uchar4 tile[18][18];
 
-        for (int j = -1; j <= 1; ++j) {
-            const int sx = x + j;
-            if (sx < 0 || sx >= width) {
-                continue;
-            }
-            const int kc = j + 1;
-            const int wx = kx[kr][kc];
-            const int wy = ky[kr][kc];
+    const int lx = (int)get_local_id(0);
+    const int ly = (int)get_local_id(1);
+    const int group_x = (int)get_group_id(0) * 16;
+    const int group_y = (int)get_group_id(1) * 16;
 
-            const int off = (sy * width + sx) * 4;
-            const int r = (int)input[off + 0];
-            const int g = (int)input[off + 1];
-            const int b = (int)input[off + 2];
+    // Carga cooperativa de los 324 pixeles (18x18) sin return temprano para evitar deadlocks.
+    const int lid = ly * 16 + lx;
+    for (int idx = lid; idx < 324; idx += 256) {
+        const int ty = idx / 18;
+        const int tx = idx - ty * 18;
+        const int gx = group_x + tx - 1;
+        const int gy = group_y + ty - 1;
 
-            gx0 += r * wx; gy0 += r * wy;
-            gx1 += g * wx; gy1 += g * wy;
-            gx2 += b * wx; gy2 += b * wy;
+        if (gx >= 0 && gx < width && gy >= 0 && gy < height) {
+            tile[ty][tx] = input[gy * width + gx];
+        } else {
+            tile[ty][tx] = (uchar4)(0, 0, 0, 0);
         }
     }
 
-    const int m0 = abs(gx0) + abs(gy0);
-    const int m1 = abs(gx1) + abs(gy1);
-    const int m2 = abs(gx2) + abs(gy2);
+    // Todos los 256 hilos del work-group alcanzan esta barrera.
+    barrier(CLK_LOCAL_MEM_FENCE);
 
-    const int dst = (y * width + x) * 4;
-    output[dst + 0] = (uchar)(m0 > 255 ? 255 : m0);
-    output[dst + 1] = (uchar)(m1 > 255 ? 255 : m1);
-    output[dst + 2] = (uchar)(m2 > 255 ? 255 : m2);
-    output[dst + 3] = (uchar)255;
+    const int x = group_x + lx;
+    const int y = group_y + ly;
+    if (x >= width || y >= height) {
+        return;
+    }
+
+    const uchar4 tl = tile[ly + 0][lx + 0];
+    const uchar4 tc = tile[ly + 0][lx + 1];
+    const uchar4 tr = tile[ly + 0][lx + 2];
+    const uchar4 ml = tile[ly + 1][lx + 0];
+    const uchar4 mr = tile[ly + 1][lx + 2];
+    const uchar4 bl = tile[ly + 2][lx + 0];
+    const uchar4 bc = tile[ly + 2][lx + 1];
+    const uchar4 br = tile[ly + 2][lx + 2];
+
+    output[y * width + x] = compute_sobel_pixel(tl, tc, tr, ml, mr, bl, bc, br);
 }
 )CLC";
 
@@ -95,6 +158,18 @@ std::string to_lower_copy(const std::string& text) {
 
 bool contains_ci(const std::string& haystack, const std::string& needle) {
     return to_lower_copy(haystack).find(to_lower_copy(needle)) != std::string::npos;
+}
+
+std::string trim_copy(const std::string& text) {
+    std::size_t start = 0;
+    while (start < text.size() && std::isspace(static_cast<unsigned char>(text[start]))) {
+        ++start;
+    }
+    std::size_t end = text.size();
+    while (end > start && std::isspace(static_cast<unsigned char>(text[end - 1]))) {
+        --end;
+    }
+    return text.substr(start, end - start);
 }
 
 struct EnumeratedGpu {
@@ -222,17 +297,29 @@ struct SobelGpuContext::Impl {
     gpu::OpenCLApi cl;
     gpu::cl_device_id device = nullptr;
     GpuDeviceInfo info;
+    std::string program_build_log;
 
     gpu::cl_context ctx = nullptr;
     gpu::cl_command_queue queue = nullptr;
     gpu::cl_program program = nullptr;
     gpu::cl_kernel kernel_naive = nullptr;
+    gpu::cl_kernel kernel_tiled = nullptr;
 
     // Buffers reutilizables para un tamaño (buf_width, buf_height) dado.
     gpu::cl_mem buf_in = nullptr;
     gpu::cl_mem buf_out = nullptr;
     int buf_width = 0;
     int buf_height = 0;
+
+    gpu::cl_kernel select_kernel(GpuKernelVariant variant) const {
+        switch (variant) {
+            case GpuKernelVariant::Naive:
+                return kernel_naive;
+            case GpuKernelVariant::Tiled18x18:
+                return kernel_tiled;
+        }
+        throw std::invalid_argument("Variante de kernel GPU desconocida");
+    }
 
     void release_buffers() noexcept {
         if (buf_out) {
@@ -249,6 +336,10 @@ struct SobelGpuContext::Impl {
 
     void cleanup() noexcept {
         release_buffers();
+        if (kernel_tiled) {
+            cl.clReleaseKernel(kernel_tiled);
+            kernel_tiled = nullptr;
+        }
         if (kernel_naive) {
             cl.clReleaseKernel(kernel_naive);
             kernel_naive = nullptr;
@@ -299,28 +390,40 @@ SobelGpuContext::SobelGpuContext(int device_index) : impl_(std::make_unique<Impl
             throw std::runtime_error("Error al crear command queue OpenCL con CL_QUEUE_PROFILING_ENABLE");
         }
 
-        const char* src_ptr = kSobelNaiveKernelSource;
+        const char* src_ptr = kSobelKernelsSource;
         impl_->program = impl_->cl.clCreateProgramWithSource(impl_->ctx, 1, &src_ptr, nullptr, &rc);
         if (!impl_->program || rc != gpu::CL_SUCCESS) {
             throw std::runtime_error("Error al crear programa OpenCL");
         }
 
         rc = impl_->cl.clBuildProgram(impl_->program, 1, &impl_->device, nullptr, nullptr, nullptr);
-        if (rc != gpu::CL_SUCCESS) {
-            std::size_t log_size = 0;
+
+        // Captura el build log incluso si compila con éxito para inspeccionar posibles warnings.
+        std::size_t log_size = 0;
+        impl_->cl.clGetProgramBuildInfo(impl_->program, impl_->device, gpu::CL_PROGRAM_BUILD_LOG,
+                                        0, nullptr, &log_size);
+        if (log_size > 0) {
+            std::string raw_log(log_size, '\0');
             impl_->cl.clGetProgramBuildInfo(impl_->program, impl_->device, gpu::CL_PROGRAM_BUILD_LOG,
-                                            0, nullptr, &log_size);
-            std::string log(log_size, '\0');
-            if (log_size > 0) {
-                impl_->cl.clGetProgramBuildInfo(impl_->program, impl_->device, gpu::CL_PROGRAM_BUILD_LOG,
-                                                log_size, log.data(), nullptr);
+                                            log_size, raw_log.data(), nullptr);
+            while (!raw_log.empty() && raw_log.back() == '\0') {
+                raw_log.pop_back();
             }
-            throw std::runtime_error("Error compilando kernel OpenCL:\n" + log);
+            impl_->program_build_log = trim_copy(raw_log);
+        }
+
+        if (rc != gpu::CL_SUCCESS) {
+            throw std::runtime_error("Error compilando kernels OpenCL:\n" + impl_->program_build_log);
         }
 
         impl_->kernel_naive = impl_->cl.clCreateKernel(impl_->program, "sobel_rgba_naive", &rc);
         if (!impl_->kernel_naive || rc != gpu::CL_SUCCESS) {
             throw std::runtime_error("Error al crear kernel sobel_rgba_naive");
+        }
+
+        impl_->kernel_tiled = impl_->cl.clCreateKernel(impl_->program, "sobel_rgba_tiled", &rc);
+        if (!impl_->kernel_tiled || rc != gpu::CL_SUCCESS) {
+            throw std::runtime_error("Error al crear kernel sobel_rgba_tiled");
         }
     } catch (...) {
         impl_->cleanup();
@@ -359,6 +462,13 @@ const GpuDeviceInfo& SobelGpuContext::device_info() const {
         throw std::runtime_error("SobelGpuContext no esta inicializado");
     }
     return impl_->info;
+}
+
+const std::string& SobelGpuContext::build_log() const {
+    if (!impl_ || !impl_->ctx) {
+        throw std::runtime_error("SobelGpuContext no esta inicializado");
+    }
+    return impl_->program_build_log;
 }
 
 void SobelGpuContext::ensure_buffers(int width, int height) {
@@ -409,7 +519,7 @@ double SobelGpuContext::upload(const ImageRGBA& input) {
     return event_duration_ms(impl_->cl, ev_h2d.ev);
 }
 
-double SobelGpuContext::execute_kernel(int width, int height) {
+double SobelGpuContext::execute_kernel(int width, int height, GpuKernelVariant variant) {
     if (!impl_ || !impl_->ctx) {
         throw std::runtime_error("SobelGpuContext no esta inicializado");
     }
@@ -417,15 +527,16 @@ double SobelGpuContext::execute_kernel(int width, int height) {
         throw std::runtime_error("Los buffers GPU no coinciden con las dimensiones solicitadas");
     }
 
-    gpu::cl_int rc = impl_->cl.clSetKernelArg(impl_->kernel_naive, 0, sizeof(gpu::cl_mem), &impl_->buf_in);
-    rc |= impl_->cl.clSetKernelArg(impl_->kernel_naive, 1, sizeof(gpu::cl_mem), &impl_->buf_out);
-    rc |= impl_->cl.clSetKernelArg(impl_->kernel_naive, 2, sizeof(int), &width);
-    rc |= impl_->cl.clSetKernelArg(impl_->kernel_naive, 3, sizeof(int), &height);
+    gpu::cl_kernel kernel = impl_->select_kernel(variant);
+    gpu::cl_int rc = impl_->cl.clSetKernelArg(kernel, 0, sizeof(gpu::cl_mem), &impl_->buf_in);
+    rc |= impl_->cl.clSetKernelArg(kernel, 1, sizeof(gpu::cl_mem), &impl_->buf_out);
+    rc |= impl_->cl.clSetKernelArg(kernel, 2, sizeof(int), &width);
+    rc |= impl_->cl.clSetKernelArg(kernel, 3, sizeof(int), &height);
     if (rc != gpu::CL_SUCCESS) {
         throw std::runtime_error("Error al asignar argumentos del kernel OpenCL");
     }
 
-    // Work-groups 16x16 (256 work-items) con redondeo del Global Work Size.
+    // Work-groups fijos 16x16 (256 work-items) con redondeo seguro del Global Work Size.
     const std::size_t local[2] = {16U, 16U};
     const std::size_t global[2] = {
         round_up(static_cast<std::size_t>(width), 16U),
@@ -434,7 +545,7 @@ double SobelGpuContext::execute_kernel(int width, int height) {
 
     EventGuard ev_kernel{impl_->cl};
     rc = impl_->cl.clEnqueueNDRangeKernel(
-        impl_->queue, impl_->kernel_naive, 2, nullptr, global, local, 0, nullptr, &ev_kernel.ev);
+        impl_->queue, kernel, 2, nullptr, global, local, 0, nullptr, &ev_kernel.ev);
     if (rc != gpu::CL_SUCCESS) {
         throw std::runtime_error("Error al encolar kernel OpenCL");
     }
@@ -463,7 +574,8 @@ double SobelGpuContext::download(ImageRGBA& output) {
     return event_duration_ms(impl_->cl, ev_d2h.ev);
 }
 
-void SobelGpuContext::run(const ImageRGBA& input, ImageRGBA& output, GpuTimingResult* timing) {
+void SobelGpuContext::run(const ImageRGBA& input, ImageRGBA& output,
+                          GpuKernelVariant variant, GpuTimingResult* timing) {
     if (!input.is_valid()) {
         throw std::invalid_argument("Input image is not valid");
     }
@@ -475,10 +587,11 @@ void SobelGpuContext::run(const ImageRGBA& input, ImageRGBA& output, GpuTimingRe
 
     const int width = input.width;
     const int height = input.height;
-    gpu::cl_int rc = impl_->cl.clSetKernelArg(impl_->kernel_naive, 0, sizeof(gpu::cl_mem), &impl_->buf_in);
-    rc |= impl_->cl.clSetKernelArg(impl_->kernel_naive, 1, sizeof(gpu::cl_mem), &impl_->buf_out);
-    rc |= impl_->cl.clSetKernelArg(impl_->kernel_naive, 2, sizeof(int), &width);
-    rc |= impl_->cl.clSetKernelArg(impl_->kernel_naive, 3, sizeof(int), &height);
+    gpu::cl_kernel kernel = impl_->select_kernel(variant);
+    gpu::cl_int rc = impl_->cl.clSetKernelArg(kernel, 0, sizeof(gpu::cl_mem), &impl_->buf_in);
+    rc |= impl_->cl.clSetKernelArg(kernel, 1, sizeof(gpu::cl_mem), &impl_->buf_out);
+    rc |= impl_->cl.clSetKernelArg(kernel, 2, sizeof(int), &width);
+    rc |= impl_->cl.clSetKernelArg(kernel, 3, sizeof(int), &height);
     if (rc != gpu::CL_SUCCESS) {
         throw std::runtime_error("Error al asignar argumentos del kernel OpenCL");
     }
@@ -503,7 +616,7 @@ void SobelGpuContext::run(const ImageRGBA& input, ImageRGBA& output, GpuTimingRe
     }
 
     rc = impl_->cl.clEnqueueNDRangeKernel(
-        impl_->queue, impl_->kernel_naive, 2, nullptr, global, local, 0, nullptr, &ev_kernel.ev);
+        impl_->queue, kernel, 2, nullptr, global, local, 0, nullptr, &ev_kernel.ev);
     if (rc != gpu::CL_SUCCESS) {
         throw std::runtime_error("Error al encolar kernel OpenCL");
     }
@@ -537,21 +650,21 @@ void SobelGpuContext::cleanup() noexcept {
 }
 
 void sobel_gpu_into(SobelGpuContext& ctx, const ImageRGBA& input, ImageRGBA& output,
-                    GpuTimingResult* timing) {
-    ctx.run(input, output, timing);
+                    GpuKernelVariant variant, GpuTimingResult* timing) {
+    ctx.run(input, output, variant, timing);
 }
 
-void sobel_gpu_into(const ImageRGBA& input, ImageRGBA& output) {
+void sobel_gpu_into(const ImageRGBA& input, ImageRGBA& output, GpuKernelVariant variant) {
     SobelGpuContext ctx;
-    ctx.run(input, output);
+    ctx.run(input, output, variant);
 }
 
-ImageRGBA sobel_gpu(const ImageRGBA& input) {
+ImageRGBA sobel_gpu(const ImageRGBA& input, GpuKernelVariant variant) {
     if (!input.is_valid()) {
         throw std::invalid_argument("Input image is not valid");
     }
     ImageRGBA output(input.width, input.height);
-    sobel_gpu_into(input, output);
+    sobel_gpu_into(input, output, variant);
     return output;
 }
 
