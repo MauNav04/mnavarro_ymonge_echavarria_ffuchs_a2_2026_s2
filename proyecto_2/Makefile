@@ -47,7 +47,7 @@ TEST_BIN      := $(OUT_DIR)/test_sobel_sequential$(EXE)
 TEST_GPU_BIN  := $(OUT_DIR)/test_sobel_gpu$(EXE)
 TEST_SIMD_BIN := $(OUT_DIR)/test_sobel_simd$(EXE)
 
-.PHONY: all build seq seq-save gpu gpu-save validate simd simd-save test test-gpu test-simd clean help
+.PHONY: all build seq seq-save gpu gpu-save validate benchmark simd simd-save test test-gpu test-simd clean help
 
 all: build
 
@@ -115,6 +115,9 @@ gpu-save: $(GPU_BIN)
 validate: $(GPU_BIN)
 	$(call RUN_BIN,$(GPU_BIN)) --validate
 
+benchmark: $(GPU_BIN)
+	$(call RUN_BIN,$(GPU_BIN)) --benchmark --csv $(OUT_DIR)/benchmark_results
+
 simd: $(SIMD_BIN)
 	$(call RUN_BIN,$(SIMD_BIN))
 
@@ -144,4 +147,5 @@ help:
 	@echo   make gpu       - Ejecuta GPU (Naive vs Tiled 18x18) y valida contra secuencial
 	@echo   make gpu-save  - Ejecuta GPU y guarda PNGs en bin/demo_gpu_*
 	@echo   make validate  - Ejecuta la bateria --validate (Seq vs SIMD, GPU Naive y GPU Tiled)
+	@echo   make benchmark - Ejecuta --benchmark (512x512, 1080p, 4K) y exporta CSVs en bin/
 	@echo   make clean     - Limpia binarios e imagenes generadas

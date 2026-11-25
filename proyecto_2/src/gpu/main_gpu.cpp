@@ -3,8 +3,13 @@
 #include "sobel_sequential.hpp"
 #include "sobel_simd.hpp"
 
+#include <algorithm>
+#include <chrono>
+#include <cmath>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <numeric>
 #include <string>
 #include <utility>
 #include <vector>
@@ -20,11 +25,16 @@ enum class VariantSelection {
 struct CliOptions {
     int device_index = -1;
     int runs = 5;
+    int iters = 30;
+    int warmup = 3;
+    int simd_lanes = 0;  // 0 => autodeteccion segun backend (8 para AVX2, 4 para NEON, 1 para Scalar)
     VariantSelection variant = VariantSelection::Both;
     bool list_devices = false;
     bool run_validate = false;
+    bool run_benchmark = false;
     bool show_help = false;
     std::string save_prefix;
+    std::string csv_base = "bin/benchmark_results";
 };
 
 struct ValidationCase {
@@ -34,16 +44,62 @@ struct ValidationCase {
     int isolated_channel = -1;  // 0=R, 1=G, 2=B si es caso de canal aislado.
 };
 
+struct SampleStats {
+    double median = 0.0;
+    double stddev = 0.0;
+};
+
+struct RawSample {
+    std::string resolution;
+    int width = 0;
+    int height = 0;
+    std::string variant;
+    int iter = 0;
+    double total_ms = 0.0;
+    double kernel_ms = 0.0;
+    double h2d_ms = 0.0;
+    double d2h_ms = 0.0;
+};
+
+struct SummaryRow {
+    std::string resolution;
+    int width = 0;
+    int height = 0;
+    std::size_t pixels = 0;
+    std::string variant;
+    int p_units = 1;
+    int iters = 0;
+    int warmup = 0;
+    SampleStats total;
+    SampleStats kernel;
+    SampleStats h2d;
+    SampleStats d2h;
+    double speedup_total = 1.0;
+    double speedup_kernel = 1.0;
+    double throughput_total_mpx_s = 0.0;
+    double throughput_kernel_mpx_s = 0.0;
+    double efficiency_total = 1.0;
+    double efficiency_kernel = 1.0;
+    bool exact_match = true;
+};
+
 void print_usage(const char* prog) {
     std::cout << "Uso: " << prog << " [opciones]\n\n"
-              << "Opciones (Fase 3 - Kernels GPU + Bateria de Validacion Unificada):\n"
-              << "  --validate                  Ejecuta la bateria de correctitud (Seq vs SIMD, GPU Naive y GPU Tiled)\n"
-              << "  --list-devices              Lista todas las GPUs OpenCL detectadas y sale\n"
-              << "  --device <idx>              Selecciona el indice de GPU OpenCL (default: auto Intel Iris Xe)\n"
-              << "  --variant <naive|tiled|both> Variante de kernel GPU a ejecutar (default: both)\n"
-              << "  --runs <N>                  Repeticiones consecutivas sin recompilar (default: 5)\n"
-              << "  --save <prefijo>            Guarda PNGs de entrada/salida para 512x512\n"
-              << "  --help                      Muestra esta ayuda\n";
+              << "Modos principales:\n"
+              << "  --validate                   Bateria de correctitud (Seq vs SIMD, GPU Naive y GPU Tiled)\n"
+              << "  --benchmark                  Benchmark completo (512x512, 1920x1080, 3840x2160) + exportacion CSV\n"
+              << "  --list-devices               Lista todas las GPUs OpenCL detectadas y sale\n\n"
+              << "Opciones de configuracion:\n"
+              << "  --device <idx>               Indice de GPU OpenCL (default: auto Intel Iris Xe)\n"
+              << "  --iters <N>                  Iteraciones medidas en --benchmark (default: 30)\n"
+              << "  --warmup <K>                 Iteraciones de warmup en --benchmark (default: 3)\n"
+              << "  --csv <prefijo>              Ruta base para <prefijo>_summary.csv y <prefijo>_raw.csv\n"
+              << "                               (default: bin/benchmark_results)\n"
+              << "  --simd-lanes <P>             Valor de P para eficiencia SIMD (default: auto, 8 en AVX2)\n"
+              << "  --variant <naive|tiled|both> Variante GPU en modo rapido (default: both)\n"
+              << "  --runs <N>                   Repeticiones en modo rapido (default: 5)\n"
+              << "  --save <prefijo>             Guarda PNGs de entrada/salida para 512x512 en modo rapido\n"
+              << "  --help                       Muestra esta ayuda\n";
 }
 
 bool parse_args(int argc, char** argv, CliOptions& opts) {
@@ -64,10 +120,28 @@ bool parse_args(int argc, char** argv, CliOptions& opts) {
             opts.list_devices = true;
         } else if (arg == "--validate") {
             opts.run_validate = true;
+        } else if (arg == "--benchmark") {
+            opts.run_benchmark = true;
         } else if (arg == "--device") {
             const char* v = need_val(arg);
             if (!v) return false;
             opts.device_index = std::stoi(v);
+        } else if (arg == "--iters") {
+            const char* v = need_val(arg);
+            if (!v) return false;
+            opts.iters = std::stoi(v);
+        } else if (arg == "--warmup") {
+            const char* v = need_val(arg);
+            if (!v) return false;
+            opts.warmup = std::stoi(v);
+        } else if (arg == "--csv") {
+            const char* v = need_val(arg);
+            if (!v) return false;
+            opts.csv_base = v;
+        } else if (arg == "--simd-lanes") {
+            const char* v = need_val(arg);
+            if (!v) return false;
+            opts.simd_lanes = std::stoi(v);
         } else if (arg == "--variant") {
             const char* v = need_val(arg);
             if (!v) return false;
@@ -97,8 +171,8 @@ bool parse_args(int argc, char** argv, CliOptions& opts) {
         }
     }
 
-    if (opts.runs <= 0) {
-        std::cerr << "Error: --runs debe ser > 0\n";
+    if (opts.runs <= 0 || opts.iters <= 0 || opts.warmup < 0 || opts.simd_lanes < 0) {
+        std::cerr << "Error: --runs y --iters deben ser > 0; --warmup y --simd-lanes deben ser >= 0\n";
         return false;
     }
     return true;
@@ -126,6 +200,62 @@ std::vector<sobel::GpuKernelVariant> resolve_variants(VariantSelection sel) {
             return {sobel::GpuKernelVariant::Naive, sobel::GpuKernelVariant::Tiled18x18};
     }
     return {sobel::GpuKernelVariant::Naive, sobel::GpuKernelVariant::Tiled18x18};
+}
+
+int detect_simd_parallelism(int override_lanes) {
+    if (override_lanes > 0) {
+        return override_lanes;
+    }
+    const std::string backend = sobel::sobel_simd_backend();
+    if (backend.find("AVX2") != std::string::npos) {
+        // sobel_simd.cpp procesa 8 pixeles RGBA32 por iteracion en registros AVX2 de 256 bits.
+        return 8;
+    }
+    if (backend.find("NEON") != std::string::npos) {
+        return 4;
+    }
+    return 1;
+}
+
+std::string strip_csv_extension(const std::string& path) {
+    if (path.size() >= 4 && path.substr(path.size() - 4) == ".csv") {
+        return path.substr(0, path.size() - 4);
+    }
+    return path;
+}
+
+SampleStats compute_stats(const std::vector<double>& values) {
+    SampleStats s;
+    if (values.empty()) {
+        return s;
+    }
+
+    std::vector<double> sorted = values;
+    std::sort(sorted.begin(), sorted.end());
+    const std::size_t n = sorted.size();
+    if (n % 2U == 1U) {
+        s.median = sorted[n / 2U];
+    } else {
+        s.median = 0.5 * (sorted[n / 2U - 1U] + sorted[n / 2U]);
+    }
+
+    const double mean = std::accumulate(values.begin(), values.end(), 0.0) / static_cast<double>(n);
+    if (n > 1U) {
+        double sq_sum = 0.0;
+        for (const double v : values) {
+            const double d = v - mean;
+            sq_sum += d * d;
+        }
+        s.stddev = std::sqrt(sq_sum / static_cast<double>(n - 1U));
+    }
+    return s;
+}
+
+double compute_throughput_mpx_s(std::size_t pixels, double time_ms) {
+    if (time_ms <= 0.0) {
+        return 0.0;
+    }
+    return static_cast<double>(pixels) / (time_ms * 1000.0);
 }
 
 bool verify_zero_interior(const sobel::ImageRGBA& img) {
@@ -212,12 +342,12 @@ bool run_validation_suite(sobel::SobelGpuContext& gpu_ctx) {
     std::cout << std::left
               << std::setw(24) << "Caso"
               << std::setw(10) << "Dims"
-              << std::setw(14) << "Variante"
+              << std::setw(22) << "Variante"
               << std::right
               << std::setw(14) << "max_abs_diff"
               << std::setw(14) << "MAE"
               << std::setw(10) << "Estado" << "\n";
-    std::cout << std::string(86, '-') << "\n";
+    std::cout << std::string(94, '-') << "\n";
 
     int total_checks = 0;
     int passed_checks = 0;
@@ -227,7 +357,6 @@ bool run_validation_suite(sobel::SobelGpuContext& gpu_ctx) {
         const auto expected = sobel::sobel_sequential(tc.input);
         const std::string dims = std::to_string(tc.input.width) + "x" + std::to_string(tc.input.height);
 
-        // Validar las propiedades estructurales sobre la referencia secuencial tambien.
         const bool ref_struct_ok =
             (!tc.check_zero_interior || verify_zero_interior(expected)) &&
             (tc.isolated_channel < 0 || verify_isolated_channel(expected, tc.isolated_channel));
@@ -264,7 +393,7 @@ bool run_validation_suite(sobel::SobelGpuContext& gpu_ctx) {
             std::cout << std::left
                       << std::setw(24) << tc.name
                       << std::setw(10) << dims
-                      << std::setw(14) << label
+                      << std::setw(22) << label
                       << std::right
                       << std::setw(14) << static_cast<int>(diff.max_abs_diff)
                       << std::setw(14) << std::fixed << std::setprecision(6) << diff.mae
@@ -272,11 +401,274 @@ bool run_validation_suite(sobel::SobelGpuContext& gpu_ctx) {
         }
     }
 
-    std::cout << std::string(86, '-') << "\n";
+    std::cout << std::string(94, '-') << "\n";
     std::cout << (all_passed ? "[PASS] " : "[FAIL] ")
               << "Validacion completada: " << passed_checks << "/" << total_checks
               << " verificaciones (" << cases.size() << " casos x 3 variantes) con max |O_seq - O_par| == 0.\n";
     return all_passed;
+}
+
+bool write_benchmark_csvs(const std::string& csv_base,
+                          const std::vector<SummaryRow>& summary_rows,
+                          const std::vector<RawSample>& raw_samples) {
+    const std::string stem = strip_csv_extension(csv_base);
+    const std::string summary_path = stem + "_summary.csv";
+    const std::string raw_path = stem + "_raw.csv";
+
+    std::ofstream f_sum(summary_path);
+    if (!f_sum) {
+        std::cerr << "[ERROR] No se pudo crear el archivo CSV de resumen: " << summary_path << "\n";
+        return false;
+    }
+
+    f_sum << "resolution,width,height,pixels,variant,p_units,iters,warmup,"
+          << "median_total_ms,std_total_ms,median_kernel_ms,std_kernel_ms,"
+          << "median_h2d_ms,std_h2d_ms,median_d2h_ms,std_d2h_ms,"
+          << "speedup_total,speedup_kernel,throughput_total_mpx_s,throughput_kernel_mpx_s,"
+          << "efficiency_total,efficiency_kernel,exact_match\n";
+    f_sum << std::fixed << std::setprecision(6);
+
+    for (const auto& r : summary_rows) {
+        f_sum << r.resolution << ','
+              << r.width << ','
+              << r.height << ','
+              << r.pixels << ','
+              << r.variant << ','
+              << r.p_units << ','
+              << r.iters << ','
+              << r.warmup << ','
+              << r.total.median << ','
+              << r.total.stddev << ','
+              << r.kernel.median << ','
+              << r.kernel.stddev << ','
+              << r.h2d.median << ','
+              << r.h2d.stddev << ','
+              << r.d2h.median << ','
+              << r.d2h.stddev << ','
+              << r.speedup_total << ','
+              << r.speedup_kernel << ','
+              << r.throughput_total_mpx_s << ','
+              << r.throughput_kernel_mpx_s << ','
+              << r.efficiency_total << ','
+              << r.efficiency_kernel << ','
+              << (r.exact_match ? 1 : 0) << '\n';
+    }
+
+    std::ofstream f_raw(raw_path);
+    if (!f_raw) {
+        std::cerr << "[ERROR] No se pudo crear el archivo CSV crudo: " << raw_path << "\n";
+        return false;
+    }
+
+    f_raw << "resolution,width,height,variant,iter,total_ms,kernel_ms,h2d_ms,d2h_ms\n";
+    f_raw << std::fixed << std::setprecision(6);
+
+    for (const auto& s : raw_samples) {
+        f_raw << s.resolution << ','
+              << s.width << ','
+              << s.height << ','
+              << s.variant << ','
+              << s.iter << ','
+              << s.total_ms << ','
+              << s.kernel_ms << ','
+              << s.h2d_ms << ','
+              << s.d2h_ms << '\n';
+    }
+
+    std::cout << "\nCSV exportados correctamente:\n"
+              << "  -> Resumen : " << summary_path << "\n"
+              << "  -> Crudos  : " << raw_path << "\n";
+    return true;
+}
+
+/**
+ * @brief Harness de benchmarking multi-resolucion (Fase 4).
+ *
+ * Evalua Seq, SIMD, GPU Naive y GPU Tiled en 512x512, 1920x1080 y 3840x2160,
+ * separando T_h2d, T_kernel, T_d2h (eventos OpenCL) y T_total (steady_clock),
+ * calculando mediana, desviacion estandar, speedup, throughput y eficiencia paralela.
+ */
+bool run_benchmark_suite(sobel::SobelGpuContext& gpu_ctx, const CliOptions& opts) {
+    const int p_seq = 1;
+    const int p_simd = detect_simd_parallelism(opts.simd_lanes);
+    const int p_gpu = gpu_ctx.device_info().compute_units > 0
+                          ? static_cast<int>(gpu_ctx.device_info().compute_units)
+                          : 1;
+
+    std::cout << "=== Harness de Benchmarking DLP - Sobel RGBA32 (Fase 4) ===\n";
+    print_device_details(gpu_ctx.device_info());
+    std::cout << "  Backend SIMD       : " << sobel::sobel_simd_backend() << "\n"
+              << "  Build OpenCL       : "
+              << (gpu_ctx.build_log().empty() ? "OK (sin warnings)" : gpu_ctx.build_log()) << "\n"
+              << "  Protocolo          : warmup=" << opts.warmup << ", iters=" << opts.iters << "\n"
+              << "  Paralelismo (P)    : Seq P=" << p_seq
+              << " | SIMD P=" << p_simd << " (carriles por vector)"
+              << " | GPU P=" << p_gpu << " (Execution Units)\n\n";
+
+    const std::vector<std::pair<int, int>> resolutions = {
+        {512, 512},
+        {1920, 1080},
+        {3840, 2160},
+    };
+
+    std::vector<SummaryRow> summary_rows;
+    std::vector<RawSample> raw_samples;
+    bool all_exact = true;
+
+    std::cout << std::left
+              << std::setw(11) << "Resolucion"
+              << std::setw(11) << "Variante"
+              << std::right
+              << std::setw(5) << "P"
+              << std::setw(11) << "MedTot(ms)"
+              << std::setw(10) << "StdTot"
+              << std::setw(11) << "MedKrn(ms)"
+              << std::setw(9) << "H2D(ms)"
+              << std::setw(9) << "D2H(ms)"
+              << std::setw(9) << "S_tot"
+              << std::setw(9) << "S_krn"
+              << std::setw(11) << "Q_krn(MP/s)"
+              << std::setw(9) << "E_krn"
+              << std::setw(7) << "Match" << "\n";
+    std::cout << std::string(122, '-') << "\n";
+
+    for (const auto& res : resolutions) {
+        const int w = res.first;
+        const int h = res.second;
+        const std::string res_label = std::to_string(w) + "x" + std::to_string(h);
+        const std::size_t pixels = static_cast<std::size_t>(w) * static_cast<std::size_t>(h);
+        const sobel::ImageRGBA input = sobel::make_deterministic_pattern(w, h, 42);
+
+        sobel::ImageRGBA seq_out(w, h);
+        sobel::ImageRGBA simd_out(w, h);
+        sobel::ImageRGBA naive_out(w, h);
+        sobel::ImageRGBA tiled_out(w, h);
+
+        auto measure_cpu = [&](const std::string& variant_name, int p_units,
+                               auto&& fn, sobel::ImageRGBA& out,
+                               const sobel::ImageRGBA* ref_out) -> SummaryRow {
+            for (int k = 0; k < opts.warmup; ++k) {
+                fn();
+            }
+
+            std::vector<double> totals;
+            totals.reserve(static_cast<std::size_t>(opts.iters));
+            for (int it = 0; it < opts.iters; ++it) {
+                const auto t0 = std::chrono::steady_clock::now();
+                fn();
+                const auto t1 = std::chrono::steady_clock::now();
+                const double ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
+                totals.push_back(ms);
+                raw_samples.push_back({res_label, w, h, variant_name, it + 1, ms, ms, 0.0, 0.0});
+            }
+
+            SummaryRow row;
+            row.resolution = res_label;
+            row.width = w;
+            row.height = h;
+            row.pixels = pixels;
+            row.variant = variant_name;
+            row.p_units = p_units;
+            row.iters = opts.iters;
+            row.warmup = opts.warmup;
+            row.total = compute_stats(totals);
+            row.kernel = row.total;
+            row.exact_match = (ref_out == nullptr) ? true : sobel::compare_images(*ref_out, out).exact_match();
+            return row;
+        };
+
+        auto measure_gpu = [&](const std::string& variant_name, sobel::GpuKernelVariant variant,
+                               sobel::ImageRGBA& out, const sobel::ImageRGBA& ref_out) -> SummaryRow {
+            gpu_ctx.ensure_buffers(w, h);
+
+            for (int k = 0; k < opts.warmup; ++k) {
+                gpu_ctx.run(input, out, variant, nullptr);
+            }
+
+            std::vector<double> totals, kernels, h2ds, d2hs;
+            totals.reserve(static_cast<std::size_t>(opts.iters));
+            kernels.reserve(static_cast<std::size_t>(opts.iters));
+            h2ds.reserve(static_cast<std::size_t>(opts.iters));
+            d2hs.reserve(static_cast<std::size_t>(opts.iters));
+
+            for (int it = 0; it < opts.iters; ++it) {
+                sobel::GpuTimingResult tm;
+                gpu_ctx.run(input, out, variant, &tm);
+                totals.push_back(tm.total_ms);
+                kernels.push_back(tm.kernel_ms);
+                h2ds.push_back(tm.h2d_ms);
+                d2hs.push_back(tm.d2h_ms);
+                raw_samples.push_back({res_label, w, h, variant_name, it + 1,
+                                       tm.total_ms, tm.kernel_ms, tm.h2d_ms, tm.d2h_ms});
+            }
+
+            SummaryRow row;
+            row.resolution = res_label;
+            row.width = w;
+            row.height = h;
+            row.pixels = pixels;
+            row.variant = variant_name;
+            row.p_units = p_gpu;
+            row.iters = opts.iters;
+            row.warmup = opts.warmup;
+            row.total = compute_stats(totals);
+            row.kernel = compute_stats(kernels);
+            row.h2d = compute_stats(h2ds);
+            row.d2h = compute_stats(d2hs);
+            row.exact_match = sobel::compare_images(ref_out, out).exact_match();
+            return row;
+        };
+
+        SummaryRow seq_row = measure_cpu("seq", p_seq,
+                                         [&]() { sobel::sobel_sequential_into(input, seq_out); },
+                                         seq_out, nullptr);
+        SummaryRow simd_row = measure_cpu("simd", p_simd,
+                                          [&]() { sobel::sobel_simd_into(input, simd_out); },
+                                          simd_out, &seq_out);
+        SummaryRow naive_row = measure_gpu("gpu_naive", sobel::GpuKernelVariant::Naive, naive_out, seq_out);
+        SummaryRow tiled_row = measure_gpu("gpu_tiled", sobel::GpuKernelVariant::Tiled18x18, tiled_out, seq_out);
+
+        const double seq_med_ms = seq_row.total.median;
+        std::vector<SummaryRow> res_rows = {seq_row, simd_row, naive_row, tiled_row};
+
+        for (auto& r : res_rows) {
+            r.speedup_total = (r.total.median > 0.0) ? (seq_med_ms / r.total.median) : 0.0;
+            r.speedup_kernel = (r.kernel.median > 0.0) ? (seq_med_ms / r.kernel.median) : 0.0;
+            r.throughput_total_mpx_s = compute_throughput_mpx_s(pixels, r.total.median);
+            r.throughput_kernel_mpx_s = compute_throughput_mpx_s(pixels, r.kernel.median);
+            r.efficiency_total = r.speedup_total / static_cast<double>(r.p_units);
+            r.efficiency_kernel = r.speedup_kernel / static_cast<double>(r.p_units);
+
+            if (!r.exact_match) {
+                all_exact = false;
+            }
+
+            std::cout << std::left
+                      << std::setw(11) << r.resolution
+                      << std::setw(11) << r.variant
+                      << std::right << std::fixed
+                      << std::setw(5) << r.p_units
+                      << std::setw(11) << std::setprecision(3) << r.total.median
+                      << std::setw(10) << std::setprecision(3) << r.total.stddev
+                      << std::setw(11) << std::setprecision(3) << r.kernel.median
+                      << std::setw(9) << std::setprecision(3) << r.h2d.median
+                      << std::setw(9) << std::setprecision(3) << r.d2h.median
+                      << std::setw(8) << std::setprecision(2) << r.speedup_total << "x"
+                      << std::setw(8) << std::setprecision(2) << r.speedup_kernel << "x"
+                      << std::setw(11) << std::setprecision(1) << r.throughput_kernel_mpx_s
+                      << std::setw(9) << std::setprecision(3) << r.efficiency_kernel
+                      << std::setw(7) << (r.exact_match ? "EXACT" : "FAIL") << "\n";
+
+            summary_rows.push_back(r);
+        }
+        std::cout << std::string(122, '-') << "\n";
+    }
+
+    const bool csv_ok = write_benchmark_csvs(opts.csv_base, summary_rows, raw_samples);
+    if (!all_exact) {
+        std::cerr << "[FAIL] Al menos una variante fallo la comprobacion bit a bit durante --benchmark.\n";
+    }
+    return all_exact && csv_ok;
 }
 
 }  // namespace
@@ -312,6 +704,10 @@ int main(int argc, char** argv) {
 
         if (opts.run_validate) {
             return run_validation_suite(gpu_ctx) ? 0 : 1;
+        }
+
+        if (opts.run_benchmark) {
+            return run_benchmark_suite(gpu_ctx, opts) ? 0 : 1;
         }
 
         std::cout << "=== Sobel RGBA32 GPU (OpenCL - Naive uchar4 vs Tiled 18x18) ===\n";
