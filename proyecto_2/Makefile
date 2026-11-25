@@ -148,4 +148,5 @@ help:
 	@echo   make gpu-save  - Ejecuta GPU y guarda PNGs en bin/demo_gpu_*
 	@echo   make validate  - Ejecuta la bateria --validate (Seq vs SIMD, GPU Naive y GPU Tiled)
 	@echo   make benchmark - Ejecuta --benchmark (512x512, 1080p, 4K) y exporta CSVs en bin/
+	@echo   Nota VTune     - Usar bin/sobel_gpu --profile (seq/simd/gpu_naive/gpu_tiled) W H iters
 	@echo   make clean     - Limpia binarios e imagenes generadas

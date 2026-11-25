@@ -22,6 +22,14 @@ enum class VariantSelection {
     Both,
 };
 
+enum class ProfileTarget {
+    None,
+    Seq,
+    Simd,
+    GpuNaive,
+    GpuTiled,
+};
+
 struct CliOptions {
     int device_index = -1;
     int runs = 5;
@@ -33,6 +41,11 @@ struct CliOptions {
     bool run_validate = false;
     bool run_benchmark = false;
     bool show_help = false;
+    ProfileTarget profile_target = ProfileTarget::None;
+    int profile_width = 0;
+    int profile_height = 0;
+    int profile_iters = 0;
+    bool profile_with_transfers = false;
     std::string save_prefix;
     std::string csv_base = "bin/benchmark_results";
 };
@@ -88,11 +101,14 @@ void print_usage(const char* prog) {
               << "Modos principales:\n"
               << "  --validate                   Bateria de correctitud (Seq vs SIMD, GPU Naive y GPU Tiled)\n"
               << "  --benchmark                  Benchmark completo (512x512, 1920x1080, 3840x2160) + exportacion CSV\n"
+              << "  --profile <modo> <W> <H> <N> Bucle limpio para Intel VTune Profiler (sin validacion ni PNGs)\n"
+              << "                               modos: seq | simd | gpu_naive | gpu_tiled\n"
               << "  --list-devices               Lista todas las GPUs OpenCL detectadas y sale\n\n"
               << "Opciones de configuracion:\n"
               << "  --device <idx>               Indice de GPU OpenCL (default: auto Intel Iris Xe)\n"
               << "  --iters <N>                  Iteraciones medidas en --benchmark (default: 30)\n"
-              << "  --warmup <K>                 Iteraciones de warmup en --benchmark (default: 3)\n"
+              << "  --warmup <K>                 Iteraciones de warmup en --benchmark/--profile (default: 3)\n"
+              << "  --profile-with-transfers     En --profile GPU incluye H2D+D2H en cada iteracion (default: solo kernel)\n"
               << "  --csv <prefijo>              Ruta base para <prefijo>_summary.csv y <prefijo>_raw.csv\n"
               << "                               (default: bin/benchmark_results)\n"
               << "  --simd-lanes <P>             Valor de P para eficiencia SIMD (default: auto, 8 en AVX2)\n"
@@ -122,6 +138,30 @@ bool parse_args(int argc, char** argv, CliOptions& opts) {
             opts.run_validate = true;
         } else if (arg == "--benchmark") {
             opts.run_benchmark = true;
+        } else if (arg == "--profile") {
+            if (i + 4 >= argc) {
+                std::cerr << "Error: --profile requiere 4 argumentos: <seq|simd|gpu_naive|gpu_tiled> <W> <H> <iters>\n";
+                return false;
+            }
+            const std::string mode = argv[++i];
+            if (mode == "seq") {
+                opts.profile_target = ProfileTarget::Seq;
+            } else if (mode == "simd") {
+                opts.profile_target = ProfileTarget::Simd;
+            } else if (mode == "gpu_naive") {
+                opts.profile_target = ProfileTarget::GpuNaive;
+            } else if (mode == "gpu_tiled") {
+                opts.profile_target = ProfileTarget::GpuTiled;
+            } else {
+                std::cerr << "Error: modo de --profile invalido: " << mode
+                          << " (use seq, simd, gpu_naive o gpu_tiled)\n";
+                return false;
+            }
+            opts.profile_width = std::stoi(argv[++i]);
+            opts.profile_height = std::stoi(argv[++i]);
+            opts.profile_iters = std::stoi(argv[++i]);
+        } else if (arg == "--profile-with-transfers") {
+            opts.profile_with_transfers = true;
         } else if (arg == "--device") {
             const char* v = need_val(arg);
             if (!v) return false;
@@ -173,6 +213,11 @@ bool parse_args(int argc, char** argv, CliOptions& opts) {
 
     if (opts.runs <= 0 || opts.iters <= 0 || opts.warmup < 0 || opts.simd_lanes < 0) {
         std::cerr << "Error: --runs y --iters deben ser > 0; --warmup y --simd-lanes deben ser >= 0\n";
+        return false;
+    }
+    if (opts.profile_target != ProfileTarget::None &&
+        (opts.profile_width <= 0 || opts.profile_height <= 0 || opts.profile_iters <= 0)) {
+        std::cerr << "Error: en --profile, <W>, <H> y <iters> deben ser > 0\n";
         return false;
     }
     return true;
@@ -527,10 +572,10 @@ bool run_benchmark_suite(sobel::SobelGpuContext& gpu_ctx, const CliOptions& opts
               << std::setw(9) << "D2H(ms)"
               << std::setw(9) << "S_tot"
               << std::setw(9) << "S_krn"
-              << std::setw(11) << "Q_krn(MP/s)"
+              << std::setw(13) << "Q_krn(MP/s)"
               << std::setw(9) << "E_krn"
               << std::setw(7) << "Match" << "\n";
-    std::cout << std::string(122, '-') << "\n";
+    std::cout << std::string(124, '-') << "\n";
 
     for (const auto& res : resolutions) {
         const int w = res.first;
@@ -655,13 +700,13 @@ bool run_benchmark_suite(sobel::SobelGpuContext& gpu_ctx, const CliOptions& opts
                       << std::setw(9) << std::setprecision(3) << r.d2h.median
                       << std::setw(8) << std::setprecision(2) << r.speedup_total << "x"
                       << std::setw(8) << std::setprecision(2) << r.speedup_kernel << "x"
-                      << std::setw(11) << std::setprecision(1) << r.throughput_kernel_mpx_s
+                      << std::setw(13) << std::setprecision(1) << r.throughput_kernel_mpx_s
                       << std::setw(9) << std::setprecision(3) << r.efficiency_kernel
                       << std::setw(7) << (r.exact_match ? "EXACT" : "FAIL") << "\n";
 
             summary_rows.push_back(r);
         }
-        std::cout << std::string(122, '-') << "\n";
+        std::cout << std::string(124, '-') << "\n";
     }
 
     const bool csv_ok = write_benchmark_csvs(opts.csv_base, summary_rows, raw_samples);
@@ -669,6 +714,122 @@ bool run_benchmark_suite(sobel::SobelGpuContext& gpu_ctx, const CliOptions& opts
         std::cerr << "[FAIL] Al menos una variante fallo la comprobacion bit a bit durante --benchmark.\n";
     }
     return all_exact && csv_ok;
+}
+
+/**
+ * @brief Modo limpio de perfilado para Intel VTune Profiler (Fase 5).
+ *
+ * Genera la imagen una sola vez en memoria, ejecuta warmup y luego un bucle limpio de
+ * <iters> repeticiones sin validacion ni escritura de PNGs. Para modos CPU (seq/simd)
+ * NO inicializa OpenCL para evitar ruido del driver/JIT en el perfilado de CPU.
+ */
+int run_profile_mode(const CliOptions& opts) {
+    const int w = opts.profile_width;
+    const int h = opts.profile_height;
+    const int iters = opts.profile_iters;
+    const int warmup = opts.warmup;
+
+    const sobel::ImageRGBA input = sobel::make_deterministic_pattern(w, h, 42);
+    sobel::ImageRGBA output(w, h);
+
+    if (opts.profile_target == ProfileTarget::Seq || opts.profile_target == ProfileTarget::Simd) {
+        const bool use_simd = (opts.profile_target == ProfileTarget::Simd);
+        const std::string label = use_simd ? (std::string("simd (") + sobel::sobel_simd_backend() + ")") : "seq";
+
+        std::cout << "=== Modo Perfilado CPU (VTune) ===\n"
+                  << "Variante   : " << label << "\n"
+                  << "Resolucion : " << w << "x" << h << "\n"
+                  << "Warmup     : " << warmup << " | Iters: " << iters << "\n";
+
+        auto step = [&]() {
+            if (use_simd) {
+                sobel::sobel_simd_into(input, output);
+            } else {
+                sobel::sobel_sequential_into(input, output);
+            }
+        };
+
+        for (int k = 0; k < warmup; ++k) {
+            step();
+        }
+
+        const auto t0 = std::chrono::steady_clock::now();
+        for (int it = 0; it < iters; ++it) {
+            step();
+        }
+        const auto t1 = std::chrono::steady_clock::now();
+        const double total_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
+
+        // Lectura minima del resultado para impedir que el compilador elimine el bucle.
+        const uint8_t sink = static_cast<uint8_t>(
+            output.data[0] ^ output.data[output.data.size() / 2U] ^ output.data.back());
+        std::cout << "Completado : " << std::fixed << std::setprecision(3) << total_ms << " ms ("
+                  << (total_ms / static_cast<double>(iters)) << " ms/iter) | sink="
+                  << static_cast<int>(sink) << "\n";
+        return 0;
+    }
+
+    // Modos GPU: gpu_naive o gpu_tiled.
+    const sobel::GpuKernelVariant variant =
+        (opts.profile_target == ProfileTarget::GpuNaive)
+            ? sobel::GpuKernelVariant::Naive
+            : sobel::GpuKernelVariant::Tiled18x18;
+
+    sobel::SobelGpuContext gpu_ctx(opts.device_index);
+    gpu_ctx.ensure_buffers(w, h);
+
+    std::cout << "=== Modo Perfilado GPU (VTune) ===\n";
+    print_device_details(gpu_ctx.device_info());
+    std::cout << "Variante   : " << sobel::gpu_kernel_variant_name(variant)
+              << (opts.profile_with_transfers ? " (H2D+Kernel+D2H por iter)" : " (kernel puro por iter)") << "\n"
+              << "Resolucion : " << w << "x" << h << "\n"
+              << "Warmup     : " << warmup << " | Iters: " << iters << "\n";
+
+    if (opts.profile_with_transfers) {
+        for (int k = 0; k < warmup; ++k) {
+            gpu_ctx.run(input, output, variant, nullptr);
+        }
+
+        const auto t0 = std::chrono::steady_clock::now();
+        double sum_kernel_ms = 0.0;
+        for (int it = 0; it < iters; ++it) {
+            sobel::GpuTimingResult tm;
+            gpu_ctx.run(input, output, variant, &tm);
+            sum_kernel_ms += tm.kernel_ms;
+        }
+        const auto t1 = std::chrono::steady_clock::now();
+        const double total_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
+
+        const uint8_t sink = static_cast<uint8_t>(
+            output.data[0] ^ output.data[output.data.size() / 2U] ^ output.data.back());
+        std::cout << "Completado : total=" << std::fixed << std::setprecision(3) << total_ms << " ms ("
+                  << (total_ms / static_cast<double>(iters)) << " ms/iter) | avg_kernel="
+                  << (sum_kernel_ms / static_cast<double>(iters)) << " ms | sink="
+                  << static_cast<int>(sink) << "\n";
+        return 0;
+    }
+
+    // Por defecto: sube la imagen una vez y despacha <iters> kernels limpios para VTune GPU Hotspots.
+    gpu_ctx.upload(input);
+    for (int k = 0; k < warmup; ++k) {
+        gpu_ctx.execute_kernel(w, h, variant);
+    }
+
+    const auto t0 = std::chrono::steady_clock::now();
+    double sum_kernel_ms = 0.0;
+    for (int it = 0; it < iters; ++it) {
+        sum_kernel_ms += gpu_ctx.execute_kernel(w, h, variant);
+    }
+    const auto t1 = std::chrono::steady_clock::now();
+    gpu_ctx.download(output);
+
+    const double wall_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
+    const uint8_t sink = static_cast<uint8_t>(
+        output.data[0] ^ output.data[output.data.size() / 2U] ^ output.data.back());
+    std::cout << "Completado : wall=" << std::fixed << std::setprecision(3) << wall_ms << " ms | avg_kernel="
+              << (sum_kernel_ms / static_cast<double>(iters)) << " ms/iter | sink="
+              << static_cast<int>(sink) << "\n";
+    return 0;
 }
 
 }  // namespace
@@ -697,6 +858,10 @@ int main(int argc, char** argv) {
                 std::cout << "\n";
             }
             return 0;
+        }
+
+        if (opts.profile_target != ProfileTarget::None) {
+            return run_profile_mode(opts);
         }
 
         // Un solo contexto OpenCL persistente: compila sobel_rgba_naive y sobel_rgba_tiled una sola vez.
