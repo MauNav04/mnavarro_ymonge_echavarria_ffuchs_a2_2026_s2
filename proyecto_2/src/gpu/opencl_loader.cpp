@@ -79,7 +79,10 @@ bool OpenCLApi::load(std::string& error_out) {
         bind_fn(lib_handle, "clCreateKernel", clCreateKernel, error_out) &&
         bind_fn(lib_handle, "clSetKernelArg", clSetKernelArg, error_out) &&
         bind_fn(lib_handle, "clEnqueueNDRangeKernel", clEnqueueNDRangeKernel, error_out) &&
-        bind_fn(lib_handle, "clReleaseKernel", clReleaseKernel, error_out);
+        bind_fn(lib_handle, "clReleaseKernel", clReleaseKernel, error_out) &&
+        bind_fn(lib_handle, "clWaitForEvents", clWaitForEvents, error_out) &&
+        bind_fn(lib_handle, "clReleaseEvent", clReleaseEvent, error_out) &&
+        bind_fn(lib_handle, "clGetEventProfilingInfo", clGetEventProfilingInfo, error_out);
 
     if (!ok) {
         unload();

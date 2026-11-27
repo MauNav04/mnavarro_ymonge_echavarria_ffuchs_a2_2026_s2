@@ -61,7 +61,7 @@ add_executable(sobel_gpu
     src/gpu/main_gpu.cpp
 )
 
-target_link_libraries(sobel_gpu PRIVATE sobel_gpu_lib)
+target_link_libraries(sobel_gpu PRIVATE sobel_gpu_lib sobel_simd_core)
 add_executable(sobel_simd
     src/simd/main_simd.cpp
 )

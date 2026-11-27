@@ -47,7 +47,7 @@ TEST_BIN      := $(OUT_DIR)/test_sobel_sequential$(EXE)
 TEST_GPU_BIN  := $(OUT_DIR)/test_sobel_gpu$(EXE)
 TEST_SIMD_BIN := $(OUT_DIR)/test_sobel_simd$(EXE)
 
-.PHONY: all build seq seq-save gpu gpu-save simd simd-save test test-gpu test-simd clean help
+.PHONY: all build seq seq-save gpu gpu-save validate benchmark simd simd-save test test-gpu test-simd clean help
 
 all: build
 
@@ -83,8 +83,8 @@ $(OUT_DIR)/opencl_loader.o: src/gpu/opencl_loader.cpp src/gpu/opencl_loader.hpp 
 $(OUT_DIR)/sobel_gpu.o: src/gpu/sobel_gpu.cpp include/sobel_gpu.hpp include/image_rgba.hpp src/gpu/opencl_loader.hpp | $(OUT_DIR)
 	$(CXX) $(CXXFLAGS) -Isrc/gpu -c $< -o $@
 
-$(GPU_BIN): src/gpu/main_gpu.cpp $(GPU_OBJS) $(CORE_OBJS) | $(OUT_DIR)
-	$(CXX) $(CXXFLAGS) -Isrc/gpu $< $(GPU_OBJS) $(CORE_OBJS) -o $@ $(DL_FLAGS)
+$(GPU_BIN): src/gpu/main_gpu.cpp $(GPU_OBJS) $(SIMD_OBJS) $(CORE_OBJS) | $(OUT_DIR)
+	$(CXX) $(CXXFLAGS) -Isrc/gpu $< $(GPU_OBJS) $(SIMD_OBJS) $(CORE_OBJS) -o $@ $(DL_FLAGS)
 
 $(TEST_GPU_BIN): tests/test_sobel_gpu.cpp $(GPU_OBJS) $(CORE_OBJS) | $(OUT_DIR)
 	$(CXX) $(CXXFLAGS) -Isrc/gpu $< $(GPU_OBJS) $(CORE_OBJS) -o $@ $(DL_FLAGS)
@@ -111,6 +111,13 @@ gpu: $(GPU_BIN)
 
 gpu-save: $(GPU_BIN)
 	$(call RUN_BIN,$(GPU_BIN)) --save $(OUT_DIR)/demo_gpu
+
+validate: $(GPU_BIN)
+	$(call RUN_BIN,$(GPU_BIN)) --validate
+
+benchmark: $(GPU_BIN)
+	$(call RUN_BIN,$(GPU_BIN)) --benchmark --csv $(OUT_DIR)/benchmark_results
+
 simd: $(SIMD_BIN)
 	$(call RUN_BIN,$(SIMD_BIN))
 
@@ -137,6 +144,9 @@ help:
 	@echo   make seq-save  - Ejecuta secuencial 512x512 y guarda PNGs en bin/demo_*
 	@echo   make simd      - Ejecuta el benchmark SIMD y compara speedup vs secuencial
 	@echo   make simd-save - Ejecuta SIMD 512x512 y guarda PNGs en bin/demo_*
-	@echo   make gpu       - Ejecuta el dummy OpenCL en GPU y valida contra secuencial
+	@echo   make gpu       - Ejecuta GPU (Naive vs Tiled 18x18) y valida contra secuencial
 	@echo   make gpu-save  - Ejecuta GPU y guarda PNGs en bin/demo_gpu_*
+	@echo   make validate  - Ejecuta la bateria --validate (Seq vs SIMD, GPU Naive y GPU Tiled)
+	@echo   make benchmark - Ejecuta --benchmark (512x512, 1080p, 4K) y exporta CSVs en bin/
+	@echo   Nota VTune     - Usar bin/sobel_gpu --profile (seq/simd/gpu_naive/gpu_tiled) W H iters
 	@echo   make clean     - Limpia binarios e imagenes generadas
