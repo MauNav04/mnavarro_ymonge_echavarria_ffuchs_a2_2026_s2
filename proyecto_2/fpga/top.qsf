@@ -80,6 +80,7 @@ set_location_assignment PIN_V18 -to LEDR[3]
 set_location_assignment PIN_V17 -to LEDR[2]
 set_location_assignment PIN_W16 -to LEDR[1]
 set_location_assignment PIN_V16 -to LEDR[0]
+set_global_assignment -name SDC_FILE top.sdc
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/sobel_isa_pkg.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/bram_simple_dp.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/sobel_core_rgb.sv
@@ -89,6 +90,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/cycle_counter.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/sobel_accelerator_top.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/jtag_bridge.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/vjtag_wrapper.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/pll_100mhz.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/top.sv
 set_global_assignment -name EDA_TEST_BENCH_FILE tb/tb_sobel_4lane.sv -section_id tb_sobel_4lane
 set_global_assignment -name EDA_TEST_BENCH_FILE tb/tb_jtag_system.sv -section_id tb_jtag_system
