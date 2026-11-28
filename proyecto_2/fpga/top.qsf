@@ -43,14 +43,6 @@ set_global_assignment -name TOP_LEVEL_ENTITY top
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION 20.1.1
 set_global_assignment -name PROJECT_CREATION_TIME_DATE "10:27:34  NOVEMBER 21, 2026"
 set_global_assignment -name LAST_QUARTUS_VERSION "20.1.1 Lite Edition"
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/sobel_isa_pkg.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/bram_simple_dp.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/sobel_core_rgb.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/sobel_control_fsm.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/line_buffer_4lane.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/cycle_counter.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/sobel_accelerator_top.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/top.sv
 set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
 set_global_assignment -name MIN_CORE_JUNCTION_TEMP 0
 set_global_assignment -name MAX_CORE_JUNCTION_TEMP 85
@@ -68,7 +60,6 @@ set_global_assignment -name EDA_NATIVELINK_SIMULATION_TEST_BENCH tb_sobel_4lane 
 set_global_assignment -name EDA_TEST_BENCH_NAME tb_sobel_4lane -section_id eda_simulation
 set_global_assignment -name EDA_DESIGN_INSTANCE_NAME NA -section_id tb_sobel_4lane
 set_global_assignment -name EDA_TEST_BENCH_MODULE_NAME tb_sobel_4lane -section_id tb_sobel_4lane
-set_global_assignment -name EDA_TEST_BENCH_FILE tb/tb_sobel_4lane.sv -section_id tb_sobel_4lane
 set_location_assignment PIN_AF14 -to CLOCK_50
 set_location_assignment PIN_AA14 -to KEY[0]
 set_location_assignment PIN_AA15 -to KEY[1]
@@ -85,4 +76,14 @@ set_location_assignment PIN_V18 -to LEDR[3]
 set_location_assignment PIN_V17 -to LEDR[2]
 set_location_assignment PIN_W16 -to LEDR[1]
 set_location_assignment PIN_V16 -to LEDR[0]
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/line_buffer_window.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/sobel_isa_pkg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/bram_simple_dp.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/sobel_core_rgb.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/sobel_control_fsm.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/line_buffer_4lane.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/cycle_counter.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/sobel_accelerator_top.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/top.sv
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
+set_global_assignment -name EDA_TEST_BENCH_FILE tb/tb_sobel_4lane.sv -section_id tb_sobel_4lane
