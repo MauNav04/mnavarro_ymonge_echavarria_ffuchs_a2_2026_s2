@@ -2,17 +2,24 @@
 // Proyecto Grupal 2 - Framework Experimental DLP (Sobel RGBA32)
 // Archivo: top.sv
 // Descripcion:
-//   Envoltorio temporal de Fase 1 para la placa Terasic DE1-SoC.
-//   Instancia el acelerador completo 4-lane con BRAM_IN y BRAM_OUT (128 KB c/u)
-//   y permite sintetizarlo en Quartus Prime 20.1 para verificar recursos M10K
-//   y timing antes de conectar Virtual JTAG (Fase 2) y PLL 100 MHz (Fase 3).
+//   Modulo de nivel superior para la placa Terasic DE1-SoC (Cyclone V
+//   5CSEMA5F31C6). Conecta:
+//     1. `vjtag_wrapper`         -> Intel Virtual JTAG IP (IR de 4 bits)
+//     2. `jtag_bridge`           -> Shift-register 128b + CDC 3-FF (tck -> clk)
+//     3. `sobel_accelerator_top` -> FSM + cycle_counter + BRAM_IN/OUT (128 KB
+//                                   c/u) + line_buffer_4lane + 4x sobel_core_rgb
 //
-// Controles fisicos en DE1-SoC (prueba local previa a JTAG):
-//   - CLOCK_50 : Reloj principal de 50 MHz
-//   - KEY[0]   : Reset activo en bajo
-//   - KEY[1]   : Configura 4x4 (ISA_CONFIG) y carga 4 filas en BRAM_IN
-//   - KEY[2]   : Ejecuta ISA_START y muestra estado + ciclos en LEDR
-//   - SW[0]    : Patron de entrada (0 = borde vertical, 1 = imagen constante)
+//   (En Fase 3 se conectara el PLL de 100 MHz para reemplazar CLOCK_50).
+//
+// Controles fisicos e indicadores en DE1-SoC:
+//   - CLOCK_50  : Reloj base de 50 MHz
+//   - KEY[0]    : Reset fisico activo en bajo
+//   - LEDR[2:0] : Estado de la FSM (0=IDLE, 1=CFG, 2=RUN, 3=DONE, 4=ERR)
+//   - LEDR[3]   : Bandera BUSY
+//   - LEDR[4]   : Bandera DONE
+//   - LEDR[5]   : Bandera ERROR
+//   - LEDR[6]   : Actividad JTAG (conmuta en cada comando recibido)
+//   - LEDR[9:7] : 3 bits bajos de `cycle_count[2:0]`
 // ============================================================================
 
 module top
@@ -24,106 +31,117 @@ module top
     output logic [9:0] LEDR
 );
 
+    logic clk_sys;
     logic rst_n;
-    assign rst_n = KEY[0];
 
-    // Sincronizadores y detectores de flanco de bajada para KEY[1] y KEY[2]
-    logic [1:0] key1_sync, key2_sync;
-    logic       key1_fall, key2_fall;
+    assign clk_sys = CLOCK_50;
+    assign rst_n   = KEY[0];
 
-    always_ff @(posedge CLOCK_50 or negedge rst_n) begin
-        if (!rst_n) begin
-            key1_sync <= 2'b11;
-            key2_sync <= 2'b11;
-        end else begin
-            key1_sync <= {key1_sync[0], KEY[1]};
-            key2_sync <= {key2_sync[0], KEY[2]};
-        end
-    end
+    // Pines sin uso en modo JTAG (evita warnings de puertos desconectados)
+    logic unused_io;
+    assign unused_io = (&KEY[3:1]) & (&SW);
 
-    assign key1_fall = (key1_sync == 2'b10);
-    assign key2_fall = (key2_sync == 2'b10);
+    // ------------------------------------------------------------------------
+    // Senales Virtual JTAG (dominio `tck`)
+    // ------------------------------------------------------------------------
+    logic       jtag_tck;
+    logic       jtag_tdi;
+    logic       jtag_tdo;
+    logic [3:0] jtag_ir_in;
+    logic       jtag_v_cdr;
+    logic       jtag_v_sdr;
+    logic       jtag_v_e1dr;
+    logic       jtag_v_pdr;
+    logic       jtag_v_e2dr;
+    logic       jtag_v_udr;
+    logic       jtag_v_cir;
+    logic       jtag_v_uir;
 
-    // Mini secuenciador de carga local de 4 palabras (frame 4x4) tras KEY[1]
-    logic [2:0] load_cnt_q;
-    logic       loading_q;
+    vjtag_wrapper u_vjtag (
+        .tdo_i    (jtag_tdo),
+        .ir_out_i (4'b0000),
+        .tck_o    (jtag_tck),
+        .tdi_o    (jtag_tdi),
+        .ir_in_o  (jtag_ir_in),
+        .v_cdr_o  (jtag_v_cdr),
+        .v_sdr_o  (jtag_v_sdr),
+        .v_e1dr_o (jtag_v_e1dr),
+        .v_pdr_o  (jtag_v_pdr),
+        .v_e2dr_o (jtag_v_e2dr),
+        .v_udr_o  (jtag_v_udr),
+        .v_cir_o  (jtag_v_cir),
+        .v_uir_o  (jtag_v_uir)
+    );
 
-    always_ff @(posedge CLOCK_50 or negedge rst_n) begin
-        if (!rst_n) begin
-            loading_q  <= 1'b0;
-            load_cnt_q <= 3'd0;
-        end else if (key1_fall) begin
-            loading_q  <= 1'b1;
-            load_cnt_q <= 3'd0;
-        end else if (loading_q) begin
-            if (load_cnt_q == 3'd3) begin
-                loading_q <= 1'b0;
-            end else begin
-                load_cnt_q <= load_cnt_q + 3'd1;
-            end
-        end
-    end
+    // ------------------------------------------------------------------------
+    // Puente JTAG + CDC 3-FF (`tck` -> `clk_sys`)
+    // ------------------------------------------------------------------------
+    logic                     cmd_valid;
+    isa_opcode_t              cmd_opcode;
+    logic [DIM_WIDTH-1:0]     cfg_width;
+    logic [DIM_WIDTH-1:0]     cfg_height;
+    logic                     jtag_wr_en;
+    logic [WORD_WIDTH-1:0]    jtag_wr_data;
+    logic [WORD_WIDTH-1:0]    jtag_rd_data;
+    logic                     jtag_activity;
 
-    // Generacion de comandos ISA hacia el acelerador 4-lane
-    logic                  cmd_valid;
-    isa_opcode_t           cmd_opcode;
-    logic [WORD_WIDTH-1:0] wr_word;
-    logic [WORD_WIDTH-1:0] rd_word;
-
-    always_comb begin
-        cmd_valid  = 1'b0;
-        cmd_opcode = ISA_NOP;
-        if (key1_fall) begin
-            cmd_valid  = 1'b1;
-            cmd_opcode = ISA_CONFIG;
-        end else if (loading_q) begin
-            cmd_valid  = 1'b1;
-            cmd_opcode = ISA_WRITE_DATA;
-        end else if (key2_fall) begin
-            cmd_valid  = 1'b1;
-            cmd_opcode = ISA_START;
-        end
-    end
-
-    // Patron 4 pixeles/fila (128 bits):
-    //   SW[0] == 0 -> borde vertical (px0=0, px1=0, px2=255, px3=255)
-    //   SW[0] == 1 -> imagen constante (100, 150, 200, 255)
-    logic [31:0] px_const, px_black, px_white;
-    assign px_const = pack_rgba(8'd100, 8'd150, 8'd200, 8'd255);
-    assign px_black = pack_rgba(8'd0,   8'd0,   8'd0,   8'd255);
-    assign px_white = pack_rgba(8'd255, 8'd255, 8'd255, 8'd255);
-    assign wr_word  = SW[0] ? {px_const, px_const, px_const, px_const}
-                            : {px_white, px_white, px_black, px_black};
-
-    // Instancia del acelerador completo 4-lane con BRAM M10K real (128 KB x 2)
     accel_state_t             state;
     logic [31:0]              status_reg;
     logic [COUNTER_WIDTH-1:0] cycle_count;
     logic [31:0]              processed_words;
 
+    jtag_bridge u_jtag_bridge (
+        .clk_sys         (clk_sys),
+        .rst_n           (rst_n),
+        .tck             (jtag_tck),
+        .tdi             (jtag_tdi),
+        .ir_in           (jtag_ir_in),
+        .v_cdr           (jtag_v_cdr),
+        .v_sdr           (jtag_v_sdr),
+        .v_udr           (jtag_v_udr),
+        .v_uir           (jtag_v_uir),
+        .tdo             (jtag_tdo),
+        .status_reg_i    (status_reg),
+        .cycle_count_i   (cycle_count),
+        .rd_data_i       (jtag_rd_data),
+        .cmd_valid_o     (cmd_valid),
+        .cmd_opcode_o    (cmd_opcode),
+        .cfg_width_o     (cfg_width),
+        .cfg_height_o    (cfg_height),
+        .jtag_wr_en_o    (jtag_wr_en),
+        .wr_data_o       (jtag_wr_data),
+        .jtag_activity_o (jtag_activity)
+    );
+
+    // ------------------------------------------------------------------------
+    // Acelerador Sobel DLP 4-Lane + BRAM_IN / BRAM_OUT (M10K)
+    // ------------------------------------------------------------------------
     sobel_accelerator_top #(
         .P_MAX_WIDTH  (MAX_WIDTH),
         .P_BRAM_DEPTH (BRAM_DEPTH)
     ) u_accel (
-        .clk               (CLOCK_50),
+        .clk               (clk_sys),
         .rst_n             (rst_n),
         .cmd_valid_i       (cmd_valid),
         .cmd_opcode_i      (cmd_opcode),
-        .cfg_width_i       (16'd4),
-        .cfg_height_i      (16'd4),
-        .jtag_wr_data_i    (wr_word),
-        .jtag_rd_data_o    (rd_word),
+        .cfg_width_i       (cfg_width),
+        .cfg_height_i      (cfg_height),
+        .jtag_wr_data_i    (jtag_wr_data),
+        .jtag_rd_data_o    (jtag_rd_data),
         .state_o           (state),
         .status_reg_o      (status_reg),
         .cycle_count_o     (cycle_count),
         .processed_words_o (processed_words)
     );
 
-    // Mapeo visual a LEDs de la DE1-SoC
+    // ------------------------------------------------------------------------
+    // LEDs de diagnostico en tiempo real en la DE1-SoC
+    // ------------------------------------------------------------------------
     assign LEDR[2:0] = state;
     assign LEDR[3]   = status_reg[STATUS_BIT_BUSY];
     assign LEDR[4]   = status_reg[STATUS_BIT_DONE];
-    assign LEDR[5]   = (rgba_r(rd_word[63:32]) != 8'd0); // px1 de fila 0
-    assign LEDR[9:6] = cycle_count[3:0];
+    assign LEDR[5]   = status_reg[STATUS_BIT_ERROR];
+    assign LEDR[6]   = jtag_activity;
+    assign LEDR[9:7] = cycle_count[2:0];
 
 endmodule : top
